@@ -8,7 +8,7 @@ import { prefs, usePref } from '../lib/prefs'
 import { afterStarAsk, dueStarAsk } from '../lib/star-ask'
 import { useApp } from '../store/context'
 
-const REPO = 'https://github.com/leepokai/Codync'
+const REPO = 'https://github.com/Ali120B/codyncRe'
 
 const copy = {
   first: {

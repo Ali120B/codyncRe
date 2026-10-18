@@ -41,7 +41,7 @@ export interface SSHState {
   attachments: SSHAttachment[]
 }
 
-export const SSH_INSTALL_COMMAND = 'brew install leepokai/codync/codync-host && codync-host install'
+export const SSH_INSTALL_COMMAND = 'curl -fsSL https://raw.githubusercontent.com/Ali120B/codyncRe/main/packaging/install.sh | sh -s -- --host-only && codync-host install'
 
 export const newSSHProfile = (remotePort = 19222): SSHProfile => ({
   id: crypto.randomUUID(),

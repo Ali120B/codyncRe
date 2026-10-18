@@ -19,8 +19,7 @@ Distro and C library don't matter. From the first release built by the updated w
 Run as the user who owns the agents (not root, unless the agents are root's):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh -s -- --host-only
-# or: brew install leepokai/codync/codync-host
+curl -fsSL https://raw.githubusercontent.com/Ali120B/codyncRe/main/packaging/install.sh | sh -s -- --host-only
 codync-host install                    # systemd --user service, restarts on crash
 sudo loginctl enable-linger "$USER"    # keep it running after you log out of SSH
 codync-host status

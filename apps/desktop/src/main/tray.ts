@@ -87,7 +87,7 @@ export class Tray {
           break
         }
         items.push({ label: 'Reinstall Codync or install the host with Homebrew.', enabled: false })
-        items.push({ label: 'Copy host install command', click: () => clipboard.writeText('brew install leepokai/codync/codync-host') })
+        items.push({ label: 'Copy host install command', click: () => clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/Ali120B/codyncRe/main/packaging/install.sh | sh -s -- --host-only') })
         break
       case 'notInstalled':
         items.push({ label: 'Install host', click: () => void host.install() })

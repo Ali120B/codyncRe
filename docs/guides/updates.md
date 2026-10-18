@@ -59,7 +59,7 @@ may finish installing when the old app exits. Reopen Codync if it does not relau
 then check the version in **Settings → Updates**.
 
 If it still fails, uninstall and reinstall the application from the
-[latest release](https://github.com/leepokai/Codync/releases/latest).
+[latest release](https://github.com/Ali120B/codyncRe/releases/latest).
 Replace the application while keeping its data and settings. **Do not use Reset
 all data, delete `~/.codync` (or a custom `CODYNC_HOME`), remove Codync's application
 support/settings folders, or use a cleanup utility.** Those are data resets, not
