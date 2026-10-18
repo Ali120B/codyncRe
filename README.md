@@ -7,22 +7,24 @@
 **The open-source Grok Bot alternative.**<br>
 Your coding agents, as teammates you can message.
 
+> **Fork note** — this is [Ali120B](https://github.com/Ali120B)'s fork of [Codync](https://github.com/leepokai/Codync).
+> Builds, releases and app updates come from [Ali120B/codyncRe](https://github.com/Ali120B/codyncRe/releases);
+> the iPhone app and the wired-in cloud relay are upstream's for now.
+
 [Website](https://www.codync.dev) · [Compare](https://www.codync.dev/compare) · [Launch film](https://youtu.be/QAhyZWpV70U)
 
-[![Star Codync on GitHub](https://img.shields.io/github/stars/leepokai/Codync?style=social&label=Star)](https://github.com/leepokai/Codync/stargazers)<br>
+[![Star Codync on GitHub](https://img.shields.io/github/stars/Ali120B/codyncRe?style=social&label=Star)](https://github.com/Ali120B/codyncRe/stargazers)<br>
 <sub>Free, open source, no paid tier. A ⭐ is how others find it.</sub>
 
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/leepokai/Codync/releases/latest/download/codync-macos.dmg)
-[![Download for Windows](https://img.shields.io/badge/Download-Windows_x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/leepokai/Codync/releases/latest/download/codync-windows-x64.exe)
-[![Download for Linux x86_64](https://img.shields.io/badge/Download-Linux_x86__64-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/leepokai/Codync/releases/latest/download/codync-linux-x86_64.AppImage)
-[![Download for Linux ARM64](https://img.shields.io/badge/Download-Linux_ARM64-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/leepokai/Codync/releases/latest/download/codync-linux-arm64.AppImage)
+[![Download for Windows](https://img.shields.io/badge/Download-Windows_x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Ali120B/codyncRe/releases/latest/download/codync-windows-x64.exe)
+[![Download for Linux x86_64](https://img.shields.io/badge/Download-Linux_x86__64-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/Ali120B/codyncRe/releases/latest/download/codync-linux-x86_64.AppImage)
+[![Download for Linux ARM64](https://img.shields.io/badge/Download-Linux_ARM64-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/Ali120B/codyncRe/releases/latest/download/codync-linux-arm64.AppImage)
 
-macOS: Apple Silicon + Intel (DMG) · Windows: x64 installer · Linux: AppImage · [All downloads](https://github.com/leepokai/Codync/releases/latest)
+Windows: x64 installer · Linux: AppImage (x86_64 + arm64) · macOS: not published by this fork yet — [all downloads](https://github.com/Ali120B/codyncRe/releases/latest)
 
 [![App Store](https://img.shields.io/badge/App_Store-iOS-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/codync/id6760984418)
-[![Homebrew](https://img.shields.io/badge/Homebrew-codync-FBB040?logo=homebrew&logoColor=white)](https://github.com/leepokai/homebrew-codync)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/KBAX3Qznxh)
-[![Release](https://img.shields.io/github/v/release/leepokai/Codync?color=black)](https://github.com/leepokai/Codync/releases/latest)
+[![Release](https://img.shields.io/github/v/release/Ali120B/codyncRe?color=black)](https://github.com/Ali120B/codyncRe/releases/latest)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 <br>
 ![iOS](https://img.shields.io/badge/iOS-18+-black?logo=apple)
@@ -97,60 +99,46 @@ UI patterns (roster, character avatars, approval cards, trace sheet, "needs you 
 
 ## Install
 
-**One line** (macOS or Linux):
+**One line** (Linux — the host, plus the desktop app when a display is present):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Ali120B/codyncRe/main/packaging/install.sh | sh
 ```
 
-On a Mac it installs the app (the host ships inside it); on Linux the host, plus the desktop app when a display is present. Add `sh -s -- --host-only` for servers and headless Macs. Re-run it to upgrade.
+Add `sh -s -- --host-only` for servers and headless machines. Re-run it to upgrade; it downloads this fork's [Releases](https://github.com/Ali120B/codyncRe/releases/latest).
 
-**Mac** — [download codync-macos.dmg](https://github.com/leepokai/Codync/releases/latest/download/codync-macos.dmg) and drag it to Applications, or:
+**Windows** — [download codync-windows-x64.exe](https://github.com/Ali120B/codyncRe/releases/latest/download/codync-windows-x64.exe) and run it. It installs for your user and starts the host at sign-in. The installer isn't code-signed yet, so SmartScreen asks you to confirm it once (**More info → Run anyway**). Not on Windows yet: remote screen, on-device speech and the Claude Code status line hook. Details: [desktop app](docs/architecture/desktop-app.md#platform-notes).
 
-```bash
-brew install --cask leepokai/codync/codync
-```
+**macOS** — this fork doesn't publish Mac builds yet: they wait on Apple signing. Add the Apple signing secrets and set the `MAC_SIGNING` repository variable to publish them, or build from source below (same code as upstream's Mac app).
 
-All three install the same signed, notarized app.
+**iPhone** — [get Codync on the App Store](https://apps.apple.com/app/codync/id6760984418) (iOS 18+, free), then scan the QR code from **Pair iPhone…** in the desktop app or `codync-host pair`.
 
-Open Codync: it sets up the host on first launch. **Open Codync** opens the full window; **Pair iPhone…** shows the QR code.
-
-**Windows** — [download codync-windows-x64.exe](https://github.com/leepokai/Codync/releases/latest/download/codync-windows-x64.exe) and run it. It installs for your user and starts the host at sign-in. The installer isn't code-signed yet, so SmartScreen asks you to confirm it once (**More info → Run anyway**). Not on Windows yet: remote screen, on-device speech and the Claude Code status line hook. Details: [desktop app](docs/architecture/desktop-app.md#platform-notes).
-
-**iPhone** — [get Codync on the App Store](https://apps.apple.com/app/codync/id6760984418) (iOS 18+, free), then scan the QR code from **Pair iPhone…** on the Mac, the Windows or Linux app, or `codync-host pair`.
-
-> **Why the iPhone app can be a version behind:** every iPhone release goes through Apple's App Review first, which usually takes a day or more, so the App Store version can trail the Mac, Windows, Linux and host releases. Your computer accounts for that: an update that needs a newer iPhone app waits until that version is in the App Store, then installs, and the iPhone app shows a reminder when a newer version is available.
+> **Why the iPhone app can be a version behind:** every iPhone release goes through Apple's App Review first, which usually takes a day or more, so the App Store version can trail the host release. Your computer accounts for that: an update that needs a newer iPhone app waits until that version is in the App Store, then installs.
 
 **Linux** — the host, plus the desktop app:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh
-# or: brew install leepokai/codync/codync-host
+curl -fsSL https://raw.githubusercontent.com/Ali120B/codyncRe/main/packaging/install.sh | sh
 codync-host install   # systemd --user service
 codync-host pair      # QR code in the terminal, or Settings in the app
 ```
 
-The script also installs the desktop app (`codync`, an AppImage, with its `.desktop` file) when you're in a graphical session. By hand: `codync-linux-<arch>.AppImage`, `.deb` or `.tar.gz` from [Releases](https://github.com/leepokai/Codync/releases/latest).
+The script also installs the desktop app (`codync`, an AppImage, with its `.desktop` file) when you're in a graphical session. By hand: `codync-linux-<arch>.AppImage`, `.deb` or `.tar.gz` from [Releases](https://github.com/Ali120B/codyncRe/releases/latest) (x86_64 and arm64).
 
-Building the desktop app yourself: `cd apps/desktop && npm ci && npm run dev`.
+**Any platform, from source** — the host is plain Rust, the desktop app is Electron:
+
+```bash
+cd host && cargo build --release && ./target/release/codync-host install
+cd apps/desktop && npm ci && npm run dev
+```
 
 **Linux server / cloud VM** — the host runs headless on any distro (static binary, x86_64 + arm64). Setup, remote access and limitations: [docs/guides/linux-servers.md](docs/guides/linux-servers.md).
 
-**Remote access** works out of the box through the free Cloudflare relay, end-to-end encrypted; the phone switches to a direct connection on the same network or over Tailscale. Details: [remote relay](docs/reference/remote-relay.md).
+**Remote access** works out of the box through the Cloudflare relay, end-to-end encrypted; the phone switches to a direct connection on the same network or over Tailscale. Details: [remote relay](docs/reference/remote-relay.md).
 
 **Agents** — install and sign in to whichever you use; Codync finds them. Claude Code, Codex and Pi run through their ACP adapters (fetched by `npx`, so Node.js is needed for those).
 
 `codync-host install` also routes Claude Code's status line through `codync-host statusline` so live limits reach the host; an existing status line keeps working (it's wrapped, and restored on `uninstall`).
-
-### If an update fails
-
-Quit Codync completely and reopen it first; a downloaded update may still be waiting
-for the old app to exit. If updating still fails, uninstall the app and reinstall
-the latest version from [Releases](https://github.com/leepokai/Codync/releases/latest).
-On macOS, stop/remove the old host service before replacing `Codync.app`.
-**Keep `~/.codync` and Codync's settings folders** to retain your bots, conversations
-and computer identity; do not use **Reset all data**, a cleanup utility, or Homebrew
-`--zap` for this repair. Follow the [reinstallation steps](docs/guides/updates.md#recovering-from-a-failed-update).
 
 ## `codync-host`
 
@@ -202,7 +190,7 @@ Data lives in `~/.codync`. The local bearer token authorizes loopback helpers an
 | `docs/` | [Documentation index](docs/README.md) and [file structure](docs/architecture/file-structure.md) |
 | `relay/` | Cloudflare Worker APNs relay with encrypted per-device tickets |
 | `web/` | Website (Next.js static export, deployed on Vercel) |
-| `packaging/` | Homebrew cask and formula templates (published to `leepokai/homebrew-codync` on release) and `install.sh` (the curl installer) |
+| `packaging/` | Homebrew cask and formula templates (this fork publishes no tap yet) and `install.sh` (the curl installer) |
 
 Build, install, restart and full checks: [development guide](docs/guides/development.md).
 
@@ -228,17 +216,9 @@ transcripts, and keeping two desktop apps in step took more than one person can 
 The iPhone app stays native SwiftUI; its shared package moved into `apps/ios/Kit/`.
 Details: [desktop app](docs/architecture/desktop-app.md).
 
-**Native Mac source (SwiftUI + AppKit).** The last native revision is `1055636`, the parent
-of migration commit `41135ac`. It includes `apps/macos/` and the Mac code paths in `kit/`.
-The chat used `MacChatList`, an AppKit `NSScrollView` hosting SwiftUI message rows;
-see the [archived implementation notes](docs/archive/macos-chat-swiftui.md).
+**Native Mac source (SwiftUI + AppKit).** That history lives in [upstream's repository](https://github.com/leepokai/Codync) — this fork starts at the 2.18 import. The [archived implementation notes](docs/archive/macos-chat-swiftui.md) still describe it.
 
-```bash
-git show 1055636:apps/macos/Views/ChatWindow.swift
-git worktree add ../codync-swiftui 1055636  # a checkout of the whole native-era repo
-```
-
-For release-by-release changes, see [GitHub Releases](https://github.com/leepokai/Codync/releases).
+For release-by-release changes, see [GitHub Releases](https://github.com/Ali120B/codyncRe/releases).
 
 ## Versioning
 
@@ -247,7 +227,7 @@ Clients and the host each name the oldest version of the other they still work w
 ## Contact
 
 - Email: [kevin@codync.dev](mailto:kevin@codync.dev)
-- Questions and bug reports: [GitHub Issues](https://github.com/leepokai/Codync/issues) or [Discord](https://discord.gg/KBAX3Qznxh)
+- Questions and bug reports: [GitHub Issues](https://github.com/Ali120B/codyncRe/issues) or [Discord](https://discord.gg/KBAX3Qznxh)
 - Security issues: report privately as described in [SECURITY.md](SECURITY.md) (GitHub private reporting or email)
 - Community rules: [Code of Conduct](CODE_OF_CONDUCT.md)
 
@@ -261,10 +241,10 @@ Apache 2.0 for the code (see [NOTICE](NOTICE)); versions up to 2.11.0 were MIT. 
 
 ## Star History
 
-<a href="https://www.star-history.com/#leepokai/Codync&Date">
+<a href="https://www.star-history.com/#Ali120B/codyncRe&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=leepokai/Codync&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=leepokai/Codync&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=leepokai/Codync&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Ali120B/codyncRe&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Ali120B/codyncRe&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Ali120B/codyncRe&type=Date" />
  </picture>
 </a>
