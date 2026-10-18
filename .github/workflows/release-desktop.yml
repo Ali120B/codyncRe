@@ -129,7 +129,7 @@ jobs:
           curl -sSL https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz | tar xJ -C "$RUNNER_TEMP"
           mkdir -p build/updates && cp apps/desktop/dist/codync-macos.zip build/updates/
           printf '%s' "$SPARKLE_PRIVATE_KEY" | "$RUNNER_TEMP/bin/generate_appcast" --ed-key-file - --maximum-deltas 0 \
-            --download-url-prefix "https://github.com/leepokai/Codync/releases/download/v${VERSION}/" \
+            --download-url-prefix "https://github.com/Ali120B/codyncRe/releases/download/v${VERSION}/" \
             --link https://www.codync.dev/ -o build/appcast.xml build/updates
           python3 packaging/updates/annotate-appcast.py build/appcast.xml "$MIN_APP"
           python3 -m venv "$RUNNER_TEMP/update-verification"
@@ -163,10 +163,12 @@ jobs:
 
       - name: Update Homebrew tap
         if: startsWith(github.ref, 'refs/tags/')
+        # The fork's tap may not exist (or have a TAP_TOKEN): never block a release on it.
+        continue-on-error: true
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           SHA=$(shasum -a 256 apps/desktop/dist/codync-macos.dmg | awk '{print $1}')
-          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/leepokai/homebrew-codync.git tap
+          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/Ali120B/homebrew-codync.git tap
           mkdir -p tap/Casks
           sed -e "s/^  version .*/  version \"$VERSION\"/" -e "s/REPLACE_WITH_SHA256/$SHA/" packaging/homebrew/codync.rb > tap/Casks/codync.rb
           cp packaging/homebrew/README.md tap/

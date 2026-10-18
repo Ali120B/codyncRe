@@ -1,5 +1,5 @@
 #!/bin/sh
-# Codync installer — curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh
+# Codync installer — curl -fsSL https://raw.githubusercontent.com/Ali120B/codyncRe/main/packaging/install.sh | sh
 #
 #   macOS: the Codync app (the host ships inside it)
 #   Linux: codync-host, plus the desktop app when a display is present
@@ -25,7 +25,7 @@ done
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
-RELEASES=https://github.com/leepokai/Codync/releases
+RELEASES=https://github.com/Ali120B/codyncRe/releases
 VERSION=${CODYNC_VERSION:-latest}
 if [ "$VERSION" = latest ]; then BASE=$RELEASES/latest/download; else BASE=$RELEASES/download/v${VERSION#v}; fi
 

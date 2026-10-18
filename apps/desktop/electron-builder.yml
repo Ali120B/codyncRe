@@ -25,8 +25,8 @@ protocols:
     schemes: [codync, com.pokai.Codync]
 publish:
   provider: github
-  owner: leepokai
-  repo: Codync
+  owner: Ali120B
+  repo: codyncRe
   releaseType: release
 
 mac:

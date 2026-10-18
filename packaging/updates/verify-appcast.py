@@ -22,7 +22,7 @@ def main():
     assert version == info["CFBundleVersion"], "appcast build version differs from app"
     assert enclosure.get("length") == str(archive.stat().st_size), "appcast archive size is wrong"
     assert len(base64.b64decode(enclosure.attrib[f"{{{namespace}}}edSignature"], validate=True)) == 64
-    expected = f"https://github.com/leepokai/Codync/releases/download/v{info['CFBundleShortVersionString']}/{archive.name}"
+    expected = f"https://github.com/Ali120B/codyncRe/releases/download/v{info['CFBundleShortVersionString']}/{archive.name}"
     assert enclosure.get("url") == expected, "appcast must point to this immutable release archive"
     public_key = Path(__file__).with_name("macos-public-key.txt").read_text().strip()
     Ed25519PublicKey.from_public_bytes(base64.b64decode(public_key, validate=True)).verify(

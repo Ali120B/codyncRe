@@ -113,12 +113,14 @@ jobs:
             codync-host-*.update.json.sig
 
   homebrew:
-    # Keeps `brew install leepokai/codync/codync-host` (Linux, headless Macs) in step with releases.
+    # Keeps the tap's codync-host formula in step with releases. The fork's tap may not
+    # exist (or have a TAP_TOKEN): never block a release on it.
     needs: release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Update the tap's formula
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -131,7 +133,7 @@ jobs:
               -e "0,/REPLACE_WITH_SHA256/s//$(sha linux-arm64)/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha linux-x86_64)/" \
               packaging/homebrew/codync-host.rb > codync-host.rb
-          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/leepokai/homebrew-codync.git tap
+          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/Ali120B/homebrew-codync.git tap
           mkdir -p tap/Formula && cp codync-host.rb tap/Formula/ && cp packaging/homebrew/README.md tap/
           cd tap
           git config user.name "github-actions[bot]"
