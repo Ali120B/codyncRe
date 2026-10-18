@@ -26,6 +26,8 @@ export function BrowserTab({ bot, store }: { bot: Bot; store: BotStore }) {
   /** The user asked to see this browser (Start, a URL, Take control). */
   const [watch, setWatch] = useState(false)
   const [busy, setBusy] = useState<'start' | 'restart' | 'stop' | null>(null)
+  /** Near-fullscreen: the browser fills the window (not the OS full screen). */
+  const [expanded, setExpanded] = useState(false)
   const [address, setAddress] = useState('')
   const addressFocused = useRef(false)
   const view = useRef<HTMLDivElement>(null)
@@ -94,6 +96,16 @@ export function BrowserTab({ bot, store }: { bot: Bot; store: BotStore }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bot.id, store, live])
+
+  // Escape closes the big view — unless the user is driving the page, where it's a key for the page.
+  useEffect(() => {
+    if (!expanded) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !user) setExpanded(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [expanded, user])
 
   const point = (e: { clientX: number; clientY: number }, el: HTMLElement) => {
     const rect = el.getBoundingClientRect()
@@ -186,16 +198,8 @@ export function BrowserTab({ bot, store }: { bot: Bot; store: BotStore }) {
     )
   }
 
-  return (
-    <div className="browser-tab">
-      <div className="browser-owner">
-        <span style={{ ...font('caption'), color: 'var(--tertiary)' }}>Browser</span>
-        <span style={{ flex: 1 }} />
-        <button className="browser-stop" disabled={busy === 'stop'} title={`Close the browser and take the tools away from ${bot.name}. Its profile is kept.`} onClick={stopForBot}>
-          <Icon name="power" size={11} weight="semibold" />
-          Stop for {bot.name}
-        </button>
-      </div>
+  const chrome = (
+    <>
       <div className="browser-toolbar">
         <button className="browser-nav" title="Back" aria-label="Back" onClick={() => void perform((b) => b.back())}>
           <Icon name="chevron.left" size={13} weight="semibold" />
@@ -234,6 +238,9 @@ export function BrowserTab({ bot, store }: { bot: Bot; store: BotStore }) {
             Take control
           </button>
         )}
+        <button className="browser-nav" title={expanded ? 'Exit full view' : 'Full view'} aria-label={expanded ? 'Exit full view' : 'Full view'} onClick={() => setExpanded((x) => !x)}>
+          <Icon name={expanded ? 'arrow.down.right.and.arrow.up.left' : 'arrow.up.left.and.arrow.down.right'} size={13} weight="semibold" />
+        </button>
       </div>
       <div className="browser-tabstrip">
         {(state?.tabs ?? []).map((tab) => (
@@ -290,6 +297,27 @@ export function BrowserTab({ bot, store }: { bot: Bot; store: BotStore }) {
         ) : null}
       </div>
       {error ? <div className="browser-error" style={font('footnote')}>{error}</div> : null}
+    </>
+  )
+
+  return (
+    <div className="browser-tab">
+      <div className="browser-owner">
+        <span style={{ ...font('caption'), color: 'var(--tertiary)' }}>Browser</span>
+        <span style={{ flex: 1 }} />
+        <button className="browser-stop" disabled={busy === 'stop'} title={`Close the browser and take the tools away from ${bot.name}. Its profile is kept.`} onClick={stopForBot}>
+          <Icon name="power" size={11} weight="semibold" />
+          Stop for {bot.name}
+        </button>
+      </div>
+      {expanded ? null : chrome}
+      {expanded ? (
+        <div className="browser-overlay" onClick={(e) => e.target === e.currentTarget && setExpanded(false)}>
+          <div className="browser-overlay-panel" role="dialog" aria-modal="true" aria-label={`${bot.name}'s browser, full view`}>
+            {chrome}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

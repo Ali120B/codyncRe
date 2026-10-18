@@ -33,6 +33,12 @@
   gap: 4px;
   padding: 0 12px 10px;
   flex: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.computer-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .computer-tab {
@@ -41,6 +47,7 @@
   gap: 6px;
   height: 28px;
   padding: 0 10px;
+  flex: none;
   border-radius: 8px;
   font-size: 12.5px;
   font-weight: 500;
@@ -468,4 +475,31 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.45;
+}
+
+/* Full view: the browser fills the window (theater, not the OS full screen). */
+.browser-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3vh 3vw;
+  background: color-mix(in srgb, black 55%, transparent);
+}
+
+.browser-overlay-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(1240px, 94vw);
+  height: min(860px, 94vh);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--background);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+}
+
+.browser-overlay-panel .browser-toolbar {
+  padding-top: 10px;
 }

@@ -20,6 +20,30 @@ export function reactionPick(store: BotStore, entry: Entry): ReactionPick {
   return { emoji: QUICK_REACTIONS, chosen: entry.data.reactions ?? [], toggle: (e) => store.react(entry, e) }
 }
 
+/** Replies faster than this aren't "work" worth a line about. */
+const WORKED_MIN_MS = 2500
+
+/** How long the turn took, for final replies that followed real work, else null. */
+function workedForMs(store: BotStore, entry: Entry): number | null {
+  if (!entry.data.final) return null
+  const sameTurn = store
+    .allEntries(entry.botId)
+    .filter((e) => (e.threadId ?? null) === (entry.threadId ?? null) && e.turn === entry.turn)
+  if (sameTurn.length < 2) return null
+  const ms = entry.updatedAt - Math.min(...sameTurn.map((e) => e.createdAt))
+  return ms >= WORKED_MIN_MS ? ms : null
+}
+
+/** 42s, 3m 12s, 1h 5m. */
+function workedText(ms: number): string {
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return s % 60 ? `${m}m ${s % 60}s` : `${m}m`
+  const h = Math.floor(m / 60)
+  return m % 60 ? `${h}h ${m % 60}m` : `${h}h`
+}
+
 /** One chat-visible entry in a chat or a thread, with what can be done to it. */
 export const ChatRow = memo(function ChatRow({ entry, groupStart, chat, openTrace, openThread }: {
   entry: Entry
@@ -194,9 +218,16 @@ export function AgentBubble({ entry, openTrace, reply }: { entry: Entry; openTra
   const store = useStore()
   const [hovering, setHovering] = useState(false)
   const copy = () => entry.data.text && window.codync.app.copy(entry.data.text)
+  const worked = workedForMs(store, entry)
   return (
     <div className="message agent" title={fullDate.format(entry.createdAt)} onMouseEnter={() => setHovering(true)} onMouseLeave={() => setHovering(false)}>
       <div className="message-body">
+        {worked ? (
+          <button className="worked-line" onClick={openTrace} title="See what it did">
+            Worked for {workedText(worked)}
+            <Icon name="chevron.forward" size={8} weight="bold" />
+          </button>
+        ) : null}
         <Bubble
           className={entry.data.files?.length ? "file-message" : "bubble agent"}
           reactions={reactionPick(store, entry)}

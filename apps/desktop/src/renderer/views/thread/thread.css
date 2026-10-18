@@ -417,3 +417,18 @@
     opacity: 0;
   }
 }
+
+/* "Worked for Xs" above a reply that took real time (opens the full conversation). */
+.worked-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 4px 5px;
+  font-size: calc(11.5px * var(--scale));
+  color: var(--tertiary);
+  transition: color var(--hover);
+}
+
+.worked-line:hover {
+  color: var(--secondary);
+}

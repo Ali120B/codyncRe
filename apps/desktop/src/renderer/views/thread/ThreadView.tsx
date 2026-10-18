@@ -11,6 +11,8 @@ import { useApp, useStore } from '../../store/context'
 import { UpdateNeededCard } from '../UpdateNeededCard'
 import { buildChat, rowIn, useArrivals, type ChatItem } from './chat-items'
 import { BotConversationView, BotMessageRow } from './BotConversation'
+import { ChatFindBar } from './ChatFindBar'
+import { ChatHeaderMenu } from './ChatHeaderMenu'
 import { ChatRow, TimeSeparator, WorkingIndicator } from './ChatRows'
 import { Composer } from './Composer'
 import { ChatSidePanel } from './ChatSidePanel'
@@ -41,6 +43,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const app = useApp()
   const bot = store.bots.get(botId) ?? null
   const [showTrace, setShowTrace] = useState(false)
+  const [findOpen, setFindOpen] = useState(false)
   const [openThread, setOpenThread] = useState<string | null>(null)
   const [botChat, setBotChat] = useState<string | null>(null)
   const [editingGroup, setEditingGroup] = useState(false)
@@ -121,6 +124,14 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const openTrace = useCallback(() => setShowTrace(true), [])
   const openThreadOn = useCallback((root: { id: string }) => setOpenThread(root.id), [])
   const closeThread = useCallback(() => setOpenThread(null), [])
+  /** The ⋯ menu's Settings (same landing as the Computer panel's gear). */
+  const openSettingsPanel = useCallback(() => {
+    setShowComputer(false)
+    setOpenThread(null)
+    setEditingDetails(true)
+    setShowSettings(true)
+    setCompactDetails(true)
+  }, [])
 
   const presentRoutine = (id: string | null) => {
     setRoutineId(id)
@@ -162,6 +173,17 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             {bot && !isGroup(bot) && !calling ? (
               <MacChatButton title="Computer" icon="display" direction={[0, 0]} className={showComputer ? 'active' : undefined} onClick={toggleComputer} />
             ) : null}
+            {bot && !calling ? (
+              <ChatHeaderMenu
+                bot={bot}
+                showComputer={showComputer}
+                withComputer={!isGroup(bot)}
+                onFind={() => setFindOpen(true)}
+                onFull={openTrace}
+                onComputer={toggleComputer}
+                onSettings={openSettingsPanel}
+              />
+            ) : null}
           </div>
           {/* The call bar takes the pill's place; its frosted glass would show the name blurred. */}
           <button className={`title-pill ${calling ? 'hidden-by-call' : ''}`} inert={calling} onClick={toggleDetails} aria-label="View conversation details" title="View conversation details">
@@ -172,6 +194,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             {store.shownConnection.kind !== 'online' || store.mismatch ? <ConnectionSubtitle /> : null}
           </button>
         </div>
+        {findOpen && !calling ? <ChatFindBar botId={botId} store={store} close={() => setFindOpen(false)} /> : null}
         <Transcript botId={botId} openTrace={openTrace} openThread={openThreadOn} openRoutine={presentRoutine} openBotChat={setBotChat} focusEntryId={focus && !focus.threadId ? focus.entryId : null} />
         <div className="composer-dock" ref={dock}>
           <div className="composer-fade" />
@@ -227,12 +250,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             store={store}
             width={panelWidth}
             onWidth={setPanelWidth}
-            settings={() => {
-              setShowComputer(false)
-              setEditingDetails(true)
-              setShowSettings(true)
-              setCompactDetails(true)
-            }}
+            settings={openSettingsPanel}
             close={() => setShowComputer(false)}
           />
         ) : null}
