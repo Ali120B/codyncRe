@@ -43,6 +43,18 @@ export class BotStore extends BotSync {
   /** Pinned thread models by bot (thread root → model), from the host's `threadModels`. */
   threadModels = new Map<string, Record<string, string>>()
 
+  /** Bots whose next message starts a new chat (it runs on a fresh session). */
+  pendingNewChat = new Map<string, number>()
+
+  startNewChat(botId: string) {
+    this.pendingNewChat.set(botId, Date.now())
+    this.changed()
+  }
+
+  cancelNewChat(botId: string) {
+    if (this.pendingNewChat.delete(botId)) this.changed()
+  }
+
   /** Reads a bot's pinned thread models into the mirror. */
   async loadThreadModels(botId: string): Promise<Record<string, string>> {
     const res = await (await this.ready()).call<{ models?: Record<string, string> }>('threadModels', { botId })
@@ -86,7 +98,7 @@ export class BotStore extends BotSync {
               ids.push(id)
             }
           }
-          return client.send(botId, trimmed, nonce, thread, ids)
+          return client.send(botId, trimmed, nonce, thread, ids, this.pendingNewChat.delete(botId))
         }, true)
         this.outgoingFiles.delete(nonce)
         this.upsert(e)

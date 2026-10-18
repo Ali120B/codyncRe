@@ -155,8 +155,8 @@ export class HostClient {
     return (await this.call<{ entries: Entry[] }>('botConversation', { botId, peerId })).entries
   }
 
-  async send(botId: string, text: string, clientNonce: string, threadId: string | null, attachments: string[] | null) {
-    return (await this.call<{ entry: Entry }>('send', { botId, text, clientNonce, threadId, attachments })).entry
+  async send(botId: string, text: string, clientNonce: string, threadId: string | null, attachments: string[] | null, newChat = false) {
+    return (await this.call<{ entry: Entry }>('send', { botId, text, clientNonce, threadId, attachments, newChat })).entry
   }
 
   /** Bytes per `upload` call: base64 of it stays well under the channel's 1 MiB message. */

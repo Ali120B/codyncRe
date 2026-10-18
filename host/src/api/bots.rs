@@ -172,6 +172,9 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
                 None => None,
             };
             let lane = Lane { chat: bot.to_owned(), thread };
+            // A new chat: the message is stored as a root in the main chat, but its turn
+            // runs in that root's own lane, so it starts on a fresh session.
+            let new_chat = b["newChat"].as_bool() == Some(true) && lane.thread.is_none();
             let mut attachments = Vec::new();
             if !uploads.is_empty() {
                 let root = crate::chat::uploads::root(&row.config);
@@ -197,10 +200,11 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
             if let Err(error) = hub.mark_read(bot, scope) {
                 tracing::warn!(%error, bot, "couldn't mark bot read after send");
             }
+            let turn_lane = if new_chat { Lane { chat: bot.to_owned(), thread: Some(e.id.clone()) } } else { lane };
             if row.config.is_group() {
-                crate::chat::group::start(hub, &row.config, lane);
+                crate::chat::group::start(hub, &row.config, turn_lane);
             } else {
-                hub.send_cmd(bot, Cmd::Send { lane, entry_id: e.id.clone(), text: prompt })?;
+                hub.send_cmd(bot, Cmd::Send { lane: turn_lane, entry_id: e.id.clone(), text: prompt })?;
             }
             json!({"entry": e})
         }

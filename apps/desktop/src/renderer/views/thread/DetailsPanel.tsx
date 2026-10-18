@@ -16,7 +16,15 @@ import '../bots/bots.css'
 const isMac = window.codync.platform === 'darwin'
 
 /** The inspector beside a conversation: the computer, the agent, and the bot's settings. */
-export function DetailsPanel({ botId, routineId, editing, setEditing, share, openPlugins, close }: {
+/** One chat of a bot or group: a thread root that runs on its own context. */
+export interface ChatSummary {
+  id: string
+  title: string
+  at: number
+  replies: number
+}
+
+export function DetailsPanel({ botId, routineId, editing, setEditing, share, openPlugins, close, chats, activeChat, onOpenChat, onNewChat }: {
   botId: string
   routineId: string | null
   editing: boolean
@@ -24,6 +32,10 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, share, ope
   share: () => void
   openPlugins?: () => void
   close: () => void
+  chats: ChatSummary[]
+  activeChat: string | null
+  onOpenChat: (id: string) => void
+  onNewChat: () => void
 }) {
   const store = useStore()
   const bot = store.bots.get(botId) ?? null
@@ -76,7 +88,12 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, share, ope
               <GroupEditorView group={bot} />
             </div>
           ) : (
-            <GroupMembersList group={bot} />
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ padding: '0 20px' }}>
+                <ChatsCard chats={chats} activeChat={activeChat} onOpenChat={onOpenChat} onNewChat={onNewChat} />
+              </div>
+              <GroupMembersList group={bot} />
+            </div>
           )
         ) : editing ? (
           <div className="panel-slide from-trailing" style={{ height: '100%', overflowY: 'auto' }}>
@@ -90,6 +107,7 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, share, ope
               openPlugins={openPlugins}
               onSettings={openSettings}
               details={<>
+                <ChatsCard chats={chats} activeChat={activeChat} onOpenChat={onOpenChat} onNewChat={onNewChat} />
                 <ComputerSummary botId={botId} />
                 <AgentSummary bot={bot} />
               </>}
@@ -97,6 +115,38 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, share, ope
           </div>
         ) : null}
       </div>
+    </div>
+  )
+}
+
+/** Every chat of this bot or group; open one to continue it on its own context. */
+function ChatsCard({ chats, activeChat, onOpenChat, onNewChat }: {
+  chats: ChatSummary[]
+  activeChat: string | null
+  onOpenChat: (id: string) => void
+  onNewChat: () => void
+}) {
+  return (
+    <div className="chats-card">
+      <div className="chats-head">
+        <span className="chats-label" style={font(13, 'semibold')}>Chats</span>
+        <span style={{ flex: 1 }} />
+        <button className="chats-new press" onClick={onNewChat}>
+          <Icon name="plus" size={11} weight="semibold" />
+          New chat
+        </button>
+      </div>
+      {chats.length === 0 ? (
+        <span className="chats-empty" style={font('footnote')}>New chat starts a fresh context and shows up here.</span>
+      ) : (
+        chats.map((chat) => (
+          <button key={chat.id} className={`chat-row press ${chat.id === activeChat ? 'active' : ''}`} onClick={() => onOpenChat(chat.id)}>
+            <Icon name="bubble.left" size={11} color="var(--secondary)" />
+            <span className="chat-row-title" style={font(13)}>{chat.title}</span>
+            <span className="chat-row-meta" style={font('caption')}>{chat.replies} {chat.replies === 1 ? 'reply' : 'replies'}</span>
+          </button>
+        ))
+      )}
     </div>
   )
 }

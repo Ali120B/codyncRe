@@ -191,3 +191,123 @@
 .details-row.all:hover {
   background: var(--hover-fill);
 }
+
+/* Chats: every chat of a bot or group, open one to continue it on its own context. */
+.chats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.chats-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 6px;
+}
+
+.chats-label {
+  color: var(--text);
+}
+
+.chats-new {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: calc(12px * var(--scale));
+  font-weight: 500;
+  color: var(--secondary);
+  background: var(--surface);
+  transition: background var(--hover), color var(--hover);
+}
+
+.chats-new:hover {
+  background: var(--hover-fill);
+  color: var(--text);
+}
+
+.chats-empty {
+  color: var(--tertiary);
+  padding: 2px 4px 6px;
+}
+
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  text-align: left;
+  transition: background var(--hover);
+}
+
+.chat-row:hover {
+  background: var(--hover-fill);
+}
+
+.chat-row.active {
+  background: var(--bubble-agent);
+}
+
+.chat-row-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-row-meta {
+  color: var(--tertiary);
+  white-space: nowrap;
+}
+
+/* The bar above the transcript: which chat you're in, or a pending new one. */
+.chat-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 14px 0;
+  padding: 5px 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  position: relative;
+  z-index: 5;
+  flex: none;
+}
+
+.chat-mode-bar.pending {
+  border: 1px dashed var(--border);
+  background: transparent;
+}
+
+.chat-mode-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: calc(12px * var(--scale));
+  color: var(--secondary);
+  transition: background var(--hover), color var(--hover);
+}
+
+.chat-mode-back:hover {
+  background: var(--hover-fill);
+  color: var(--text);
+}
+
+.chat-mode-title {
+  font-size: calc(12px * var(--scale));
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
