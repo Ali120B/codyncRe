@@ -17,7 +17,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.TAP_TOKEN }}
+          # TAP_TOKEN when configured (upstream), the workflow token in a fork without it.
+          token: ${{ secrets.TAP_TOKEN || github.token }}
 
       - name: Read version from pbxproj
         id: version
