@@ -155,8 +155,8 @@ export class BotStore extends BotSync {
     this.perform((c) => c.call('stop', { botId }), true)
   }
 
-  newSession(botId: string) {
-    this.perform((c) => c.call('newSession', { botId }))
+  newSession(botId: string, threadId: string | null = null) {
+    this.perform((c) => c.call('newSession', { botId, threadId }))
   }
 
   logCall(botId: string, seconds: number) {

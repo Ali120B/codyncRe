@@ -176,7 +176,8 @@ fn model_catalog(session: &Value, options: &Value) -> Value {
         }
     }
     let mut models = Vec::new();
-    let current = if let Some(config) = model_config(session) {
+    let chosen = model_config(session);
+    let current = if let Some(config) = chosen {
         collect(&config["options"], &mut models);
         text(&config["currentValue"])
     } else {
@@ -190,8 +191,13 @@ fn model_catalog(session: &Value, options: &Value) -> Value {
         }
         text(&session["models"]["currentModelId"])
     };
+    // Selects that also claim category "model" (Cline's provider switch) become options of
+    // every model, so the picker can change them; Cursor's per-model options come first.
+    let mut shared = shared_model_options(session, chosen);
     for model in &mut models {
-        model["options"] = json!(model_options(options, model["id"].as_str().unwrap_or_default()));
+        let mut opts = model_options(options, model["id"].as_str().unwrap_or_default());
+        opts.append(&mut shared);
+        model["options"] = json!(opts);
     }
     json!({"models": models, "currentModelId": current,
         "fastMode": crate::agent::config::fast_mode_config(session).is_some()})
@@ -217,6 +223,35 @@ fn model_options(options: &Value, model: &str) -> Vec<Value> {
                 })
                 .collect();
             Some(json!({"id": id, "name": text(&o["name"]).unwrap_or(id), "values": values,
+                "default": text(&o["currentValue"])}))
+        })
+        .collect()
+}
+
+/// Selects (other than the model list itself) carrying category "model" — Cline's
+/// provider/account switch — shaped like `model_options` so clients render them the same way.
+fn shared_model_options(session: &Value, chosen: Option<&Value>) -> Vec<Value> {
+    let Some(chosen_id) = chosen.and_then(|c| text(&c["id"])) else { return Vec::new() };
+    session["configOptions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|o| o["category"] == "model" && (o["type"] == "select" || o.get("type").is_none()))
+        .filter(|o| text(&o["id"]).is_some_and(|id| id != chosen_id))
+        .filter_map(|o| {
+            let id = text(&o["id"])?;
+            let values: Vec<Value> = o["options"]
+                .as_array()?
+                .iter()
+                .filter_map(|v| {
+                    let value = text(&v["value"])?;
+                    Some(json!({"id": value, "name": text(&v["name"]).unwrap_or(value)}))
+                })
+                .collect();
+            if values.is_empty() {
+                return None;
+            }
+            Some(json!({"id": id, "name": text(&o["name"]).unwrap_or_else(|| id.clone()), "values": values,
                 "default": text(&o["currentValue"])}))
         })
         .collect()
@@ -519,6 +554,23 @@ mod tests {
         ]});
         assert_eq!(model_config(&cline).unwrap()["id"], "model");
         assert!(model_config(&json!({"configOptions": [{"id": "model", "type": "boolean"}]})).is_none());
+    }
+
+    #[test]
+    fn another_model_category_select_rides_along_as_an_option() {
+        // Cline lists its provider selector beside the real model list.
+        let session = json!({"configOptions": [
+            {"id": "provider", "name": "Provider", "category": "model", "type": "select", "currentValue": "cline",
+             "options": [{"value": "cline", "name": "Cline Usage-Billing"}, {"value": "cline-pass", "name": "ClinePass"}]},
+            {"id": "model", "name": "Model", "category": "model", "type": "select", "currentValue": "m1",
+             "options": [{"value": "m1", "name": "Model One"}]}
+        ]});
+        let catalog = model_catalog(&session, &Value::Null);
+        assert_eq!(catalog["models"][0]["id"], "m1");
+        let options = catalog["models"][0]["options"].as_array().unwrap();
+        assert_eq!(options[0]["id"], "provider");
+        assert_eq!(options[0]["values"][0]["id"], "cline");
+        assert_eq!(options[0]["default"], "cline");
     }
 
     fn cmd() -> Cmd {

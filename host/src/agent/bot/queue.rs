@@ -4,7 +4,7 @@ use super::{Actor, CANCEL_GRACE, Cmd, Done, NoticeStyle, Queued, RESUME_PROMPT, 
 use crate::chat::memory;
 use crate::hub::BotStatus;
 use crate::market::requests;
-use crate::store::{Lane, lane_key, now_ms};
+use crate::store::{EntryKind, Lane, lane_key, now_ms};
 use anyhow::{Result, anyhow};
 use serde_json::json;
 use std::time::Instant;
@@ -65,14 +65,28 @@ impl Actor {
             Cmd::SendFile { path, name, cancelled, reply } => self.begin_file(path, name, cancelled, reply),
             Cmd::Stop => self.stop().await,
             Cmd::Permission { entry_id, option_id } => self.answer_permission(&entry_id, option_id).await,
-            Cmd::NewSession => {
+            Cmd::NewSession { thread } => {
                 if self.turn.is_some() {
                     self.stop().await;
                 }
-                self.forget_session();
-                // Retain and summarize completed exchanges even when the user starts afresh.
-                let _ = self.keeper.send(memory::KeeperEvent::Flush);
-                self.notice("New session — the agent starts with a fresh context.", NoticeStyle::Divider);
+                if let Some(root) = &thread {
+                    // Just this chat: it starts fresh on its next message, history kept.
+                    let key = lane_key("session", &self.cfg.id, &Lane::in_thread(&self.cfg.id, root));
+                    self.lane_sessions.remove(&key);
+                    if let Err(error) = self.hub.store.kv_set(&key, "") {
+                        tracing::warn!(bot = %self.cfg.id, error = format!("{error:#}"), "couldn't forget a chat's session");
+                    }
+                    let lane = Lane::in_thread(&self.cfg.id, root);
+                    let turn = self.hub.store.max_turn(&self.cfg.id);
+                    let notice =
+                        json!({"text": "New session — this chat starts with a fresh context.", "style": "divider"});
+                    self.hub.add_entry(&lane, EntryKind::Notice, turn, &notice);
+                } else {
+                    self.forget_session();
+                    // Retain and summarize completed exchanges even when the user starts afresh.
+                    let _ = self.keeper.send(memory::KeeperEvent::Flush);
+                    self.notice("New session — the agent starts with a fresh context.", NoticeStyle::Divider);
+                }
             }
             Cmd::Reconfigure(cfg) => {
                 let cfg = *cfg;

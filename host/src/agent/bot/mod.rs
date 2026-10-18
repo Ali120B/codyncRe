@@ -85,7 +85,10 @@ pub enum Cmd {
         entry_id: String,
         option_id: Option<String>,
     },
-    NewSession,
+    /// Fresh context: the whole bot, or just one of its chats (`thread`).
+    NewSession {
+        thread: Option<String>,
+    },
     Reconfigure(Box<BotConfig>),
     /// A thread's model changed (the pin lives in the store); open sessions switch now.
     ThreadModel {

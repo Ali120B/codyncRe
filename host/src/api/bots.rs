@@ -227,9 +227,10 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
         }
         "newSession" => {
             let bot = str_arg(&b, "botId")?;
+            let thread = b["threadId"].as_str().filter(|t| !t.is_empty()).map(str::to_owned);
             match hub.store.bot(bot)? {
                 Some(row) if row.config.is_group() => hub.groups.new_session(hub, bot),
-                _ => hub.send_cmd(bot, Cmd::NewSession)?,
+                _ => hub.send_cmd(bot, Cmd::NewSession { thread })?,
             }
             json!({})
         }

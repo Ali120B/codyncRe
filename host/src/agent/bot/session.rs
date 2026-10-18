@@ -387,6 +387,19 @@ pub(crate) async fn select_model(acp: &Acp, res: &Value, sid: &str, cfg: &BotCon
     let set = |id: &str, value: &str| {
         acp.request("session/set_config_option", json!({"sessionId": sid, "configId": id, "value": value}))
     };
+    // A provider/account switch (Cline lists one) must land before the model it gates.
+    let mut first: Vec<(&str, &str)> = Vec::new();
+    options.retain(|(id, value)| {
+        if *id == "provider" {
+            first.push((id, value));
+            false
+        } else {
+            true
+        }
+    });
+    for (id, value) in first {
+        set(id, value).await.map_err(|e| model_error(&format!("{model} (with {id}={value})"), &e))?;
+    }
     let mut current = set(config_id, model).await.map_err(|e| model_error(model, &e))?;
     for (id, value) in options {
         let answer = set(id, value).await.map_err(|e| model_error(&format!("{model} with {id}={value}"), &e))?;
