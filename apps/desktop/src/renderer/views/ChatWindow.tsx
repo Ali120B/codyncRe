@@ -285,7 +285,7 @@ function ChatSplitView() {
     { title: 'Mark as Read', icon: 'bell.badge', action: () => store.markAllRead(bot.id) },
     { title: 'Edit Profile…', icon: 'square.and.pencil', divider: true, action: () => app.openSettings({ computerId: store.computer.id, botId: bot.id }) },
     { title: 'Copy conversation ID', icon: 'square.on.square', divider: true, action: () => window.codync.app.copy(bot.id) },
-    { title: 'New session', icon: 'arrow.counterclockwise', action: () => setNewSessionBot({ bot, store }) },
+    ...(isGroup(bot) ? [] : [{ title: 'New session', icon: 'arrow.counterclockwise', action: () => setNewSessionBot({ bot, store }) } as MenuItem]),
     { title: 'Hide from sidebar', icon: 'eye.slash', divider: true, action: () => store.setHidden(bot, true) },
     { title: 'Delete', icon: 'trash', destructive: true, action: () => setConfirmDelete({ bot, store }) },
   ]

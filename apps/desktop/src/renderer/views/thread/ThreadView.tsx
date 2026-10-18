@@ -3,7 +3,7 @@ import { draftOf, isGroup, isWorkingIn, type Bot, type BotDraft, type Entry } fr
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
 import { Spinner } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { Dialog, Sheet } from '../../components/Overlay'
+import { Sheet } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { useFocusMessage } from '../../lib/focus-message'
 import { prefs, usePref } from '../../lib/prefs'
@@ -46,9 +46,13 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const [showTrace, setShowTrace] = useState(false)
   const [findOpen, setFindOpen] = useState(false)
   const [threadModelsSignal, setThreadModelsSignal] = useState(0)
-  const [confirmNewSession, setConfirmNewSession] = useState<{ thread: string | null } | null>(null)
-  const [activeChat, setActiveChat] = useState<string | null>(null)
   const [showChats, setShowChats] = useState(false)
+  // Which chat is open: 'main' is the first one (everything before chats existed).
+  const [activeChat, setActiveChatRaw] = useState<string>(() => localStorage.getItem(`chat.${botId}`) ?? 'main')
+  const setActiveChat = (id: string) => {
+    setActiveChatRaw(id)
+    localStorage.setItem(`chat.${botId}`, id)
+  }
   const [openThread, setOpenThread] = useState<string | null>(null)
   const [botChat, setBotChat] = useState<string | null>(null)
   const [templateDraft, setTemplateDraft] = useState<BotDraft | null>(null)
@@ -71,7 +75,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const focus = app.focus?.ref.botId === botId && app.focus.ref.computerId === store.computer.id ? app.focus : null
   useEffect(() => {
     if (!focus) return
-    setActiveChat(null)
+    setActiveChat('main')
     setOpenThread(focus.threadId)
     if (focus.threadId) void store.loadThread(botId, focus.threadId)
     else void store.ensureEntry(botId, focus.entryId)
@@ -79,23 +83,32 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   }, [focus?.nonce])
   useFocusMessage(focus, (nonce) => app.consumeMessageFocus(nonce))
 
-  // This bot's or group's chats: roots started by New chat (not threads), newest first.
+  // Every chat: the first one is the conversation so far; the rest are marked roots.
   const entries = store.allEntries(botId)
   const chats: ChatSummary[] = (() => {
-    const roots = entries.filter((e) => (e.threadId ?? null) === null && e.data.chat === true).map((e) => e.id)
-    return roots
-      .map((root) => {
-        const first = entries.find((e) => e.id === root)
-        const replies = entries.filter((e) => e.threadId === root)
-        const raw = (first?.data.text ?? replies.find((e) => e.kind === 'user')?.data.text ?? '').replace(/\s+/g, ' ').trim()
-        return {
-          id: root,
-          title: raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat',
-          at: Math.max(first?.createdAt ?? 0, ...replies.map((e) => e.createdAt), 0),
-          replies: replies.filter((e) => e.kind === 'agent').length,
-        }
+    const main = entries.filter((e) => (e.threadId ?? null) === null && e.data.chat !== true)
+    const mainAsk = main.find((e) => e.kind === 'user')
+    const list: ChatSummary[] = []
+    if (mainAsk) {
+      const raw = (mainAsk.data.text ?? '').replace(/\s+/g, ' ').trim()
+      list.push({
+        id: 'main',
+        title: raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat',
+        at: Math.max(...main.map((e) => e.createdAt), 0),
+        replies: main.filter((e) => e.kind === 'agent').length,
       })
-      .sort((a, b) => b.at - a.at)
+    }
+    for (const root of entries.filter((e) => (e.threadId ?? null) === null && e.data.chat === true)) {
+      const replies = entries.filter((e) => e.threadId === root.id)
+      const raw = (root.data.text ?? '').replace(/\s+/g, ' ').trim()
+      list.push({
+        id: root.id,
+        title: raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat',
+        at: Math.max(root.createdAt, ...replies.map((e) => e.createdAt), 0),
+        replies: replies.filter((e) => e.kind === 'agent').length,
+      })
+    }
+    return list.sort((a, b) => b.at - a.at)
   })()
 
   // A pending "New chat" is anchored by the first message sent after it was asked for.
@@ -116,7 +129,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
     store.markAllRead(botId)
   }
   const startNewChat = () => {
-    setActiveChat(null)
     store.startNewChat(botId)
   }
 
@@ -253,7 +265,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
                 onFull={openTrace}
                 onComputer={toggleComputer}
                 onThreadModels={() => setThreadModelsSignal((n) => n + 1)}
-                onNewSession={() => setConfirmNewSession({ thread: null })}
                 onSettings={openSettingsPanel}
               />
             ) : null}
@@ -269,33 +280,14 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           {bot && !isGroup(bot) && !calling ? <ThreadModelsLine bot={bot} store={store} openSignal={threadModelsSignal} /> : null}
         </div>
         {findOpen && !calling ? <ChatFindBar botId={botId} store={store} close={() => setFindOpen(false)} /> : null}
-        {activeChat ? (
-          <div className="chat-mode-bar">
-            <button className="chat-mode-back press" onClick={() => setActiveChat(null)}>
-              <Icon name="chevron.left" size={10} weight="semibold" />
-              All chats
-            </button>
-            <span className="chat-mode-title">{chats.find((c) => c.id === activeChat)?.title ?? 'Chat'}</span>
-            <span style={{ flex: 1 }} />
-            <button className="chat-mode-back press" onClick={() => setConfirmNewSession({ thread: activeChat })}>
-              New session
-            </button>
-          </div>
-        ) : store.pendingNewChat.has(botId) ? (
-          <div className="chat-mode-bar pending">
-            <Icon name="plus.circle" size={11} color="var(--secondary)" />
-            <span className="chat-mode-title">New chat — this message starts a fresh context</span>
-            <button className="chat-mode-back press" onClick={() => store.cancelNewChat(botId)}>Cancel</button>
-          </div>
-        ) : null}
-        {store.pendingNewChat.has(botId) && !activeChat ? (
+        {store.pendingNewChat.has(botId) ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
             <span style={{ ...font('footnote'), color: 'var(--tertiary)', textAlign: 'center', maxWidth: 320 }}>
-              This chat is empty. Send a message to start it — it runs on a fresh context.
+              New chat — send a message to start it; it runs on a fresh context.
             </span>
           </div>
         ) : (
-        <Transcript botId={botId} chatRoot={activeChat} openTrace={openTrace} openThread={openThreadOn} openRoutine={presentRoutine} openBotChat={setBotChat} focusEntryId={focus && !focus.threadId ? focus.entryId : null} />
+        <Transcript botId={botId} chatRoot={activeChat === 'main' ? null : activeChat} openTrace={openTrace} openThread={openThreadOn} openRoutine={presentRoutine} openBotChat={setBotChat} focusEntryId={focus && !focus.threadId ? focus.entryId : null} />
         )}
         <div className="composer-dock" ref={dock}>
           <div className="composer-fade" />
@@ -306,7 +298,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           ) : (
             <Composer
               botId={botId}
-              thread={activeChat}
+              thread={activeChat === 'main' ? null : activeChat}
               onCall={!calling && bot ? () => setCalling(true) : null}
               onInterrupt={callSpeaking ? () => interruptCall.current?.() : null}
             />
@@ -386,32 +378,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
       <Sheet open={botChat !== null} onClose={() => setBotChat(null)} width={620} height={560}>
         {botChat ? <BotConversationView botId={botId} peerId={botChat} /> : null}
       </Sheet>
-      <Dialog
-        open={confirmNewSession !== null}
-        title={
-          confirmNewSession?.thread
-            ? 'Start a new session in this chat?'
-            : bot && isGroup(bot)
-              ? 'Start a new session in this room?'
-              : `Start a new session with ${bot?.name ?? 'this bot'}?`
-        }
-        message={
-          confirmNewSession?.thread
-            ? 'This chat starts with a fresh context on your next message. Its history stays.'
-            : bot && isGroup(bot)
-              ? 'Every member starts fresh in this group. Their own chats keep their context; this room keeps its history.'
-              : 'The agent starts with a fresh context. Its chats keep their own.'
-        }
-        actions={[{
-          title: 'New session',
-          destructive: true,
-          action: () => {
-            if (bot) void store.newSession(bot.id, confirmNewSession?.thread ?? null)
-            setConfirmNewSession(null)
-          },
-        }]}
-        onClose={() => setConfirmNewSession(null)}
-      />
       <Sheet open={showTrace} onClose={() => setShowTrace(false)} width={620} height={560}>
         <TraceView botId={botId} />
       </Sheet>
