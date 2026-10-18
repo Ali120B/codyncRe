@@ -192,7 +192,7 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
                     &lane,
                     EntryKind::User,
                     turn,
-                    &json!({"text": text, "clientNonce": nonce, "status": status, "attachments": attachments}),
+                    &json!({"text": text, "clientNonce": nonce, "status": status, "attachments": attachments, "chat": new_chat}),
                 )
                 .ok_or_else(|| anyhow!("couldn't save the message"))?;
             // Before the turn starts, so its reply lands unread.

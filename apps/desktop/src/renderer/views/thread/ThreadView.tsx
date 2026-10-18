@@ -79,10 +79,10 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   }, [focus?.nonce])
   useFocusMessage(focus, (nonce) => app.consumeMessageFocus(nonce))
 
-  // This bot's or group's chats: every thread root with its replies, newest first.
+  // This bot's or group's chats: roots started by New chat (not threads), newest first.
   const entries = store.allEntries(botId)
   const chats: ChatSummary[] = (() => {
-    const roots = [...new Set(entries.map((e) => e.threadId).filter((t): t is string => !!t))]
+    const roots = entries.filter((e) => (e.threadId ?? null) === null && e.data.chat === true).map((e) => e.id)
     return roots
       .map((root) => {
         const first = entries.find((e) => e.id === root)
@@ -288,7 +288,15 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             <button className="chat-mode-back press" onClick={() => store.cancelNewChat(botId)}>Cancel</button>
           </div>
         ) : null}
+        {store.pendingNewChat.has(botId) && !activeChat ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <span style={{ ...font('footnote'), color: 'var(--tertiary)', textAlign: 'center', maxWidth: 320 }}>
+              This chat is empty. Send a message to start it — it runs on a fresh context.
+            </span>
+          </div>
+        ) : (
         <Transcript botId={botId} chatRoot={activeChat} openTrace={openTrace} openThread={openThreadOn} openRoutine={presentRoutine} openBotChat={setBotChat} focusEntryId={focus && !focus.threadId ? focus.entryId : null} />
+        )}
         <div className="composer-dock" ref={dock}>
           <div className="composer-fade" />
           {store.mismatch ? (
@@ -460,7 +468,7 @@ const PAGE = 40
 function Transcript({ botId, chatRoot = null, openTrace, openThread, openRoutine, openBotChat, focusEntryId }: { botId: string; chatRoot?: string | null; openTrace: () => void; openThread: (e: { id: string }) => void; openRoutine: (id: string | null) => void; openBotChat: (peerId: string) => void; focusEntryId: string | null }) {
   const store = useStore()
   const bot = store.bots.get(botId) ?? null
-  const thread = chatRoot ? chatEntries(store, botId, chatRoot) : store.chat(botId)
+  const thread = chatRoot ? chatEntries(store, botId, chatRoot) : store.chat(botId).filter((e) => e.data.chat !== true)
   const live = !!bot && isWorkingIn(bot, botId, null) && !store.isOffline
   const all = buildChat(thread, true)
   // The newest 40 items first; older pages come in near the top.

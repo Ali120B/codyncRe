@@ -170,6 +170,8 @@ export interface BotMessage {
 }
 
 export interface EntryData {
+  /** A root of a chat (as opposed to a thread): chats have their own history. */
+  chat?: boolean
   /** Structured conversation data added to the existing team-tool notice. */
   botMessage?: BotMessage
   heading?: string
