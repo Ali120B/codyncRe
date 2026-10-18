@@ -191,16 +191,14 @@ fn model_catalog(session: &Value, options: &Value) -> Value {
         }
         text(&session["models"]["currentModelId"])
     };
-    // Selects that also claim category "model" (Cline's provider switch) become options of
-    // every model, so the picker can change them; Cursor's per-model options come first.
-    let mut shared = shared_model_options(session, chosen);
+    // Selects that also claim category "model" (Cline's provider switch) sit above the list.
+    let shared = shared_model_options(session, chosen);
     for model in &mut models {
-        let mut opts = model_options(options, model["id"].as_str().unwrap_or_default());
-        opts.append(&mut shared);
-        model["options"] = json!(opts);
+        model["options"] = json!(model_options(options, model["id"].as_str().unwrap_or_default()));
     }
     json!({"models": models, "currentModelId": current,
-        "fastMode": crate::agent::config::fast_mode_config(session).is_some()})
+        "fastMode": crate::agent::config::fast_mode_config(session).is_some(),
+        "options": shared})
 }
 
 /// One model's options as `[{id, name, values: [{id, name}], default}]`, from Cursor's
@@ -567,7 +565,8 @@ mod tests {
         ]});
         let catalog = model_catalog(&session, &Value::Null);
         assert_eq!(catalog["models"][0]["id"], "m1");
-        let options = catalog["models"][0]["options"].as_array().unwrap();
+        assert_eq!(catalog["models"][0]["options"], json!([]));
+        let options = catalog["options"].as_array().unwrap();
         assert_eq!(options[0]["id"], "provider");
         assert_eq!(options[0]["values"][0]["id"], "cline");
         assert_eq!(options[0]["default"], "cline");

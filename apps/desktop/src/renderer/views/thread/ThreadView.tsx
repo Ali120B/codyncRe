@@ -17,7 +17,8 @@ import { ChatRow, TimeSeparator, WorkingIndicator } from './ChatRows'
 import { Composer } from './Composer'
 import { ChatSidePanel } from './ChatSidePanel'
 import { ComputerPanel } from '../computer/ComputerPanel'
-import { DetailsPanel, type ChatSummary } from './DetailsPanel'
+import { ChatsPanel, type ChatSummary } from './ChatsPanel'
+import { DetailsPanel } from './DetailsPanel'
 import { RepliesView } from './RepliesView'
 import { TraceView } from './TraceView'
 import { useReading } from './reading'
@@ -47,6 +48,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const [threadModelsSignal, setThreadModelsSignal] = useState(0)
   const [confirmNewSession, setConfirmNewSession] = useState<{ thread: string | null } | null>(null)
   const [activeChat, setActiveChat] = useState<string | null>(null)
+  const [showChats, setShowChats] = useState(false)
   const [openThread, setOpenThread] = useState<string | null>(null)
   const [botChat, setBotChat] = useState<string | null>(null)
   const [templateDraft, setTemplateDraft] = useState<BotDraft | null>(null)
@@ -154,6 +156,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const toggleDetails = useCallback(() => {
     // One panel at a time: the name pill closes the Computer panel, the monitor closes Details.
     setShowComputer(false)
+    setShowChats(false)
     if (!wide) {
       setOpenThread(null)
       setCompactDetails((c) => !c)
@@ -166,6 +169,15 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
 
   const toggleComputer = useCallback(() => {
     setShowComputer((s) => !s)
+    setShowChats(false)
+    setShowSettings(false)
+    setCompactDetails(false)
+    if (!wide) setOpenThread(null)
+  }, [wide])
+
+  const toggleChats = useCallback(() => {
+    setShowChats((s) => !s)
+    setShowComputer(false)
     setShowSettings(false)
     setCompactDetails(false)
     if (!wide) setOpenThread(null)
@@ -185,6 +197,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   /** The ⋯ menu's Settings (same landing as the Computer panel's gear). */
   const openSettingsPanel = useCallback(() => {
     setShowComputer(false)
+    setShowChats(false)
     setOpenThread(null)
     setEditingDetails(true)
     setShowSettings(true)
@@ -208,10 +221,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
       editing={editingDetails}
       setEditing={setEditingDetails}
       openPlugins={openPlugins}
-      chats={chats}
-      activeChat={activeChat}
-      onOpenChat={openChat}
-      onNewChat={startNewChat}
       share={() => {
         setCompactDetails(false)
         if (bot) setTemplateDraft(draftOf(bot))
@@ -240,6 +249,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
                 showComputer={showComputer}
                 withComputer={!isGroup(bot)}
                 onFind={() => setFindOpen(true)}
+                onChats={toggleChats}
                 onFull={openTrace}
                 onComputer={toggleComputer}
                 onThreadModels={() => setThreadModelsSignal((n) => n + 1)}
@@ -301,11 +311,20 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
         ) : null}
       </div>
       <ChatSidePanel
-        open={wide && (!!openThread || showComputer || showSettings)}
+        open={wide && (!!openThread || showComputer || showSettings || showChats)}
         width={openThread ? Math.min(420, width * 0.45) : showComputer ? panelWidth : 400}
       >
         {openThread ? (
           <RepliesView key={openThread} botId={botId} rootId={openThread} close={closeThread} />
+        ) : showChats && bot ? (
+          <ChatsPanel
+            bot={bot}
+            chats={chats}
+            activeChat={activeChat}
+            onOpen={(id) => openChat(id)}
+            onNew={() => startNewChat()}
+            close={() => setShowChats(false)}
+          />
         ) : showComputer && bot && !isGroup(bot) ? (
           <ComputerPanel
             bot={bot}
@@ -322,6 +341,24 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
 
       <Sheet open={compactDetails && !wide} onClose={() => setCompactDetails(false)} width={400} height={600}>
         {details}
+      </Sheet>
+      <Sheet open={showChats && !wide && !!bot} onClose={() => setShowChats(false)} width={400} height={600}>
+        {bot ? (
+          <ChatsPanel
+            bot={bot}
+            chats={chats}
+            activeChat={activeChat}
+            onOpen={(id) => {
+              openChat(id)
+              setShowChats(false)
+            }}
+            onNew={() => {
+              startNewChat()
+              setShowChats(false)
+            }}
+            close={() => setShowChats(false)}
+          />
+        ) : null}
       </Sheet>
       <Sheet open={showComputer && !wide && !!bot && !isGroup(bot)} onClose={() => setShowComputer(false)} width={panelWidth} height={Math.min(720, window.innerHeight - 60)}>
         {bot && !isGroup(bot) ? (

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { isWorkingIn } from '@shared/models'
 import { IconButton } from '../../components/Controls'
+import { Dialog } from '../../components/Overlay'
 import { Sheet } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
@@ -25,6 +26,7 @@ export function RepliesView({ botId, rootId, close }: { botId: string; rootId: s
   const items = buildChat(replies)
   const arrivals = useArrivals([...items.map((i) => i.id), ...(live ? ['working'] : [])], true)
   const [showTrace, setShowTrace] = useState(false)
+  const [confirmNewSession, setConfirmNewSession] = useState(false)
   const scroller = useRef<HTMLDivElement>(null)
   useReading(store, botId, rootId)
 
@@ -45,6 +47,7 @@ export function RepliesView({ botId, rootId, close }: { botId: string; rootId: s
           <span style={{ ...font('compactBody', 'semibold'), color: 'var(--text)' }}>Thread</span>
           <span style={{ ...font('caption'), color: 'var(--tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{chat?.name ?? ''}</span>
         </div>
+        <IconButton title="New session in this thread" icon="arrow.counterclockwise" onClick={() => setConfirmNewSession(true)} />
         <IconButton title="Close thread" icon="xmark" onClick={close} />
       </div>
       <div style={{ height: 0.5, background: 'var(--border)', flex: 'none' }} />
@@ -87,6 +90,20 @@ export function RepliesView({ botId, rootId, close }: { botId: string; rootId: s
           <Composer botId={botId} thread={rootId} />
         )}
       </div>
+      <Dialog
+        open={confirmNewSession}
+        title="Start a new session in this thread?"
+        message="This thread starts with a fresh context on your next reply. Its history stays."
+        actions={[{
+          title: 'New session',
+          destructive: true,
+          action: () => {
+            void store.newSession(botId, rootId)
+            setConfirmNewSession(false)
+          },
+        }]}
+        onClose={() => setConfirmNewSession(false)}
+      />
       <Sheet open={showTrace} onClose={() => setShowTrace(false)} width={620} height={560}>
         <TraceView botId={botId} thread={rootId} />
       </Sheet>

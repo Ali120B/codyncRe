@@ -7,7 +7,7 @@ import { ProviderMark } from '../../components/ProviderMark'
 import { usePresence } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
-import { useAgentModels, type AgentModels } from '../bots/agent-models'
+import { useAgentModels, type AgentModels, type ModelOption } from '../bots/agent-models'
 import { errorText } from '../bots/drafts'
 import './model-chip.css'
 
@@ -40,6 +40,28 @@ interface ModelRow {
   id: string | null
   name: string
   description?: string | null
+}
+
+/** Rows for an option list (a provider switch above the models, effort below). */
+function OptionRows({ options, current, onChange }: {
+  options: ModelOption[]
+  current: Record<string, string>
+  onChange: (id: string, value: string) => void
+}) {
+  return (
+    <div className="model-options">
+      {options.map((o) => {
+        const fallback = o.values.find((v) => v.id === o.default)?.name
+        const choices = [{ id: '', label: fallback ? `Default · ${fallback}` : 'Default' }, ...o.values.map((v) => ({ id: v.id, label: v.name }))]
+        return (
+          <div key={o.id} className="model-option-row">
+            <span style={{ ...font('caption'), color: 'var(--secondary)' }}>{o.name}</span>
+            <ChoicePicker selection={current[o.id] ?? ''} options={choices} onChange={(v) => onChange(o.id, v)} />
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 function ModelPopover({ open, onClose, anchor, bot }: {
@@ -182,6 +204,9 @@ function ModelPopover({ open, onClose, anchor, bot }: {
           <div className="model-search">
             <SearchField value={query} onChange={setQuery} prompt="Search models" ariaLabel="Search models" inputRef={search} onKeyDown={onKey} />
           </div>
+          {(models.catalog?.options ?? []).length ? (
+            <OptionRows options={models.catalog?.options ?? []} current={bot.modelOptions} onChange={applyOption} />
+          ) : null}
           <div className="model-list">
             {rows.map((row, i) => (
               <button
@@ -219,20 +244,7 @@ function ModelPopover({ open, onClose, anchor, bot }: {
           {!models.loading && !models.failure && models.catalog && !models.catalog.models.length ? (
             <div className="model-note">This agent doesn't advertise a model list. Change it in bot settings.</div>
           ) : null}
-          {modelOptions.length ? (
-            <div className="model-options">
-              {modelOptions.map((o) => {
-                const fallback = o.values.find((v) => v.id === o.default)?.name
-                const choices = [{ id: '', label: fallback ? `Default · ${fallback}` : 'Default' }, ...o.values.map((v) => ({ id: v.id, label: v.name }))]
-                return (
-                  <div key={o.id} className="model-option-row">
-                    <span style={{ ...font('caption'), color: 'var(--secondary)' }}>{o.name}</span>
-                    <ChoicePicker selection={bot.modelOptions[o.id] ?? ''} options={choices} onChange={(v) => applyOption(o.id, v)} />
-                  </div>
-                )
-              })}
-            </div>
-          ) : null}
+          {modelOptions.length ? <OptionRows options={modelOptions} current={bot.modelOptions} onChange={applyOption} /> : null}
           {error ? <div className="model-note model-error">{error}</div> : null}
         </div>
       </div>

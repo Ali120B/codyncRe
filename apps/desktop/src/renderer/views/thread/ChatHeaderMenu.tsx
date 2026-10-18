@@ -8,12 +8,13 @@ import { MacChatButton } from './MacChatButton'
  * The chat header's ⋯ menu: find in chat, the full conversation, copying the
  * transcript, the Computer panel and the bot's settings.
  */
-export function ChatHeaderMenu({ bot, showComputer, withComputer, onFind, onFull, onComputer, onThreadModels, onNewSession, onSettings }: {
+export function ChatHeaderMenu({ bot, showComputer, withComputer, onFind, onChats, onFull, onComputer, onThreadModels, onNewSession, onSettings }: {
   bot: Bot
   showComputer: boolean
   /** The Computer panel exists for bots only, not groups. */
   withComputer: boolean
   onFind: () => void
+  onChats: () => void
   onFull: () => void
   onComputer: () => void
   onThreadModels: () => void
@@ -38,6 +39,7 @@ export function ChatHeaderMenu({ bot, showComputer, withComputer, onFind, onFull
 
   const items = (): MenuItem[] => [
     { title: 'Find in chat', icon: 'magnifyingglass', action: onFind },
+    { title: 'Chats', icon: 'bubble.left', action: onChats },
     { title: 'Full conversation', icon: 'list.bullet.rectangle', action: onFull },
     { title: 'Copy conversation', icon: 'doc.on.doc', action: copyConversation },
     ...(withComputer ? [{ title: 'Computer', icon: 'display', selected: showComputer, divider: true, action: onComputer } as MenuItem] : []),

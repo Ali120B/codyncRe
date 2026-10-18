@@ -311,3 +311,24 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The Chats panel (side slot, like the Computer panel). */
+.chats-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background);
+}
+
+.chats-panel .chats-head {
+  height: 54px;
+  padding: 0 12px;
+  flex: none;
+}
+
+.chats-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px 12px;
+}

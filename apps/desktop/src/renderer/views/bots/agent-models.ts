@@ -16,6 +16,8 @@ export interface AgentModels {
   currentModelId?: string | null
   /** The agent offers Fast mode (absent on older hosts). */
   fastMode?: boolean
+  /** Selections above the list (Cline's provider/account switch). */
+  options?: ModelOption[]
 }
 
 /** What the agent behind `backend` offers, loaded from the selected computer. */
