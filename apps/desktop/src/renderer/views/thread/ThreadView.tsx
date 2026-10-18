@@ -3,7 +3,7 @@ import { draftOf, isGroup, isWorkingIn, type Bot, type BotDraft } from '@shared/
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
 import { Spinner } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { Sheet } from '../../components/Overlay'
+import { Dialog, Sheet } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { useFocusMessage } from '../../lib/focus-message'
 import { prefs, usePref } from '../../lib/prefs'
@@ -45,6 +45,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const [showTrace, setShowTrace] = useState(false)
   const [findOpen, setFindOpen] = useState(false)
   const [threadModelsSignal, setThreadModelsSignal] = useState(0)
+  const [confirmNewSession, setConfirmNewSession] = useState(false)
   const [openThread, setOpenThread] = useState<string | null>(null)
   const [botChat, setBotChat] = useState<string | null>(null)
   const [templateDraft, setTemplateDraft] = useState<BotDraft | null>(null)
@@ -195,6 +196,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
                 onFull={openTrace}
                 onComputer={toggleComputer}
                 onThreadModels={() => setThreadModelsSignal((n) => n + 1)}
+                onNewSession={() => setConfirmNewSession(true)}
                 onSettings={openSettingsPanel}
               />
             ) : null}
@@ -272,6 +274,22 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
       <Sheet open={botChat !== null} onClose={() => setBotChat(null)} width={620} height={560}>
         {botChat ? <BotConversationView botId={botId} peerId={botChat} /> : null}
       </Sheet>
+      <Dialog
+        open={confirmNewSession}
+        title={bot && isGroup(bot) ? 'Start a new session in this room?' : `Start a new session with ${bot?.name ?? 'this bot'}?`}
+        message={bot && isGroup(bot)
+          ? 'Every member starts fresh in this group. Their own chats keep their context; this room keeps its history.'
+          : 'The agent starts with a fresh context. This chat keeps its history; its threads keep theirs.'}
+        actions={[{
+          title: 'New session',
+          destructive: true,
+          action: () => {
+            if (bot) void store.newSession(bot.id)
+            setConfirmNewSession(false)
+          },
+        }]}
+        onClose={() => setConfirmNewSession(false)}
+      />
       <Sheet open={showTrace} onClose={() => setShowTrace(false)} width={620} height={560}>
         <TraceView botId={botId} />
       </Sheet>
