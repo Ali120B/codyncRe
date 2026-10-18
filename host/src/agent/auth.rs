@@ -307,7 +307,7 @@ async fn reported_login(inbox: &mut mpsc::UnboundedReceiver<Incoming>) -> Option
 /// The agent's inbox must stay open: the reader stops when nobody listens.
 type Started = (Arc<Acp>, mpsc::UnboundedReceiver<Incoming>, Value, Cmd);
 
-async fn start(store: &Store, backend: &str) -> Result<Started> {
+pub(crate) async fn start(store: &Store, backend: &str) -> Result<Started> {
     // The installed CLI alone when there is one: resolving the registry build can mean a long download.
     let candidates = match backends::local_candidate(backend) {
         Some(local) => vec![local],

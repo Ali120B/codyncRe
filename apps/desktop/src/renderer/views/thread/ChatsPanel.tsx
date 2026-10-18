@@ -2,8 +2,9 @@ import type { Bot } from '@shared/models'
 import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
 import { MacChatButton } from './MacChatButton'
+import { relativeTime } from './chat-items'
 
-/** One chat of a bot or group: a thread root that runs on its own context. */
+/** One chat of a bot or group: a conversation with its own messages and context. */
 export interface ChatSummary {
   id: string
   title: string
@@ -18,7 +19,7 @@ export interface ChatSummary {
 export function ChatsPanel({ bot, chats, activeChat, onOpen, onNew, close }: {
   bot: Bot
   chats: ChatSummary[]
-  activeChat: string | null
+  activeChat: string
   onOpen: (id: string) => void
   onNew: () => void
   close: () => void
@@ -36,15 +37,30 @@ export function ChatsPanel({ bot, chats, activeChat, onOpen, onNew, close }: {
       </div>
       <div className="chats-body">
         {chats.length === 0 ? (
-          <span className="chats-empty" style={font('footnote')}>
-            New chat starts a fresh context and shows up here. Nothing is kept until you send a message.
-          </span>
+          <div className="chats-empty-box">
+            <Icon name="bubble.left" size={18} color="var(--tertiary)" />
+            <span style={{ ...font('footnote'), color: 'var(--secondary)', textAlign: 'center' }}>
+              No chats yet. {bot.name} names one right after your first message — nothing is kept until then.
+            </span>
+          </div>
         ) : (
           chats.map((chat) => (
-            <button key={chat.id} className={`chat-row press ${chat.id === activeChat ? 'active' : ''}`} onClick={() => onOpen(chat.id)}>
-              <Icon name="bubble.left" size={11} color="var(--secondary)" />
-              <span className="chat-row-title" style={font(13)}>{chat.title}</span>
-              <span className="chat-row-meta" style={font('caption')}>{chat.replies} {chat.replies === 1 ? 'reply' : 'replies'}</span>
+            <button
+              key={chat.id}
+              className={`chat-item press ${chat.id === activeChat ? 'active' : ''}`}
+              onClick={() => onOpen(chat.id)}
+              title={chat.title}
+            >
+              <span className="chat-item-icon">
+                <Icon name="bubble.left" size={12} color={chat.id === activeChat ? 'var(--accent)' : 'var(--secondary)'} />
+              </span>
+              <span className="chat-item-text">
+                <span className="chat-item-title" style={font(13, 'medium')}>{chat.title}</span>
+                <span className="chat-item-meta" style={font('caption')}>
+                  {chat.replies} {chat.replies === 1 ? 'reply' : 'replies'} · {relativeTime.time(chat.at)}
+                </span>
+              </span>
+              <Icon name="chevron.right" size={10} weight="semibold" color="var(--tertiary)" className="chat-item-go" />
             </button>
           ))
         )}

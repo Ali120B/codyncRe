@@ -93,7 +93,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
       const raw = (mainAsk.data.text ?? '').replace(/\s+/g, ' ').trim()
       list.push({
         id: 'main',
-        title: raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat',
+        title: store.chatTitles.get(botId)?.['main'] ?? (raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat'),
         at: Math.max(...main.map((e) => e.createdAt), 0),
         replies: main.filter((e) => e.kind === 'agent').length,
       })
@@ -103,7 +103,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
       const raw = (root.data.text ?? '').replace(/\s+/g, ' ').trim()
       list.push({
         id: root.id,
-        title: raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat',
+        title: store.chatTitles.get(botId)?.[root.id] ?? (raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat'),
         at: Math.max(root.createdAt, ...replies.map((e) => e.createdAt), 0),
         replies: replies.filter((e) => e.kind === 'agent').length,
       })
@@ -123,6 +123,15 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
     store.cancelNewChat(botId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingChatAt, newestUserRoot?.id])
+
+  // The agent names a chat right after its first message; pull names in on open and
+  // once more a moment later, since naming runs in the background.
+  useEffect(() => {
+    void store.loadChatTitles(botId)
+    const timer = setTimeout(() => void store.loadChatTitles(botId), 9_000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, botId, chats.length, showChats])
 
   const openChat = (id: string) => {
     setActiveChat(id)

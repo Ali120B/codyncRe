@@ -46,6 +46,10 @@ fn next_rev(c: &Connection) -> Result<i64> {
     )?)
 }
 
+fn chat_titles_key(bot: &str) -> String {
+    format!("chat-titles.{bot}")
+}
+
 fn thread_models_key(bot: &str) -> String {
     format!("thread-models.{bot}")
 }
@@ -90,6 +94,26 @@ impl Store {
         }
         self.kv_set(&thread_models_key(bot), &serde_json::to_string(&models)?)?;
         Ok(models)
+    }
+
+    /// A chat's generated name (`None` until the agent has named it).
+    pub fn chat_title(&self, bot: &str, chat: &str) -> Option<String> {
+        self.chat_titles(bot).remove(chat)
+    }
+
+    /// Every generated chat name for one bot (chat key → title).
+    pub fn chat_titles(&self, bot: &str) -> HashMap<String, String> {
+        self.kv_get(&chat_titles_key(bot))
+            .and_then(|raw| serde_json::from_str(&raw).ok())
+            .unwrap_or_default()
+    }
+
+    /// Stores a chat's generated name.
+    pub fn set_chat_title(&self, bot: &str, chat: &str, title: &str) -> Result<()> {
+        let mut titles = self.chat_titles(bot);
+        titles.insert(chat.to_owned(), title.to_owned());
+        self.kv_set(&chat_titles_key(bot), &serde_json::to_string(&titles)?)?;
+        Ok(())
     }
 
     /// Keys starting with `prefix`.

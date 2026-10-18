@@ -46,6 +46,17 @@ export class BotStore extends BotSync {
   /** Bots whose next message starts a new chat (it runs on a fresh session). */
   pendingNewChat = new Map<string, number>()
 
+  /** Generated chat names by bot (chat key → title), from the host's `chatTitles`. */
+  chatTitles = new Map<string, Record<string, string>>()
+
+  async loadChatTitles(botId: string): Promise<void> {
+    try {
+      const res = await (await this.ready()).call<{ titles?: Record<string, string> }>('chatTitles', { botId })
+      this.chatTitles.set(botId, res.titles ?? {})
+      this.changed()
+    } catch {}
+  }
+
   startNewChat(botId: string) {
     this.pendingNewChat.set(botId, Date.now())
     this.changed()

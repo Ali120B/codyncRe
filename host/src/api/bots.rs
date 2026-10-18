@@ -206,6 +206,10 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
             } else {
                 hub.send_cmd(bot, Cmd::Send { lane: turn_lane, entry_id: e.id.clone(), text: prompt })?;
             }
+            // A chat names itself after its first message, on a throwaway agent call.
+            if new_chat {
+                crate::chat::title::spawn(hub.clone(), bot.to_owned(), e.id.clone(), text.to_owned());
+            }
             json!({"entry": e})
         }
         // A finished voice call, as a line in the chat ("Voice chat · 0:16").
@@ -233,6 +237,11 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
                 _ => hub.send_cmd(bot, Cmd::NewSession { thread })?,
             }
             json!({})
+        }
+        // Generated chat names (the agent names a chat after its first message).
+        "chatTitles" => {
+            let titles = hub.store.chat_titles(str_arg(&b, "botId")?);
+            json!({"titles": titles})
         }
         // Thread models: a thread can pin its own; without one it follows the bot's.
         "threadModels" => {
