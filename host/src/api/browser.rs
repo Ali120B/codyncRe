@@ -69,27 +69,27 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
         // Starts the browser (first call) or moves the active tab.
         "browserOpen" => {
             let session = session(hub, &b).await?;
-            session.open(str_arg(&b, "url")?, b["newTab"] == true).await?;
+            session.user_open(str_arg(&b, "url")?, b["newTab"] == true).await?;
             json!({})
         }
         "browserNewTab" => {
             let session = session(hub, &b).await?;
-            session.new_tab(b["url"].as_str()).await?;
+            session.user_new_tab(b["url"].as_str()).await?;
             json!({})
         }
         "browserCloseTab" => {
             let session = session(hub, &b).await?;
-            session.close_tab(str_arg(&b, "tabId")?).await?;
+            session.user_close_tab(str_arg(&b, "tabId")?).await?;
             json!({})
         }
         "browserSelectTab" => {
             let session = session(hub, &b).await?;
-            session.select_tab(str_arg(&b, "tabId")?).await?;
+            session.user_select_tab(str_arg(&b, "tabId")?).await?;
             json!({})
         }
         "browserReload" => {
             let session = session(hub, &b).await?;
-            session.reload().await?;
+            session.user_reload().await?;
             json!({})
         }
         "browserBack" | "browserForward" => {

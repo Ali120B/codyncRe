@@ -21,7 +21,6 @@ import { DetailsPanel } from './DetailsPanel'
 import { RepliesView } from './RepliesView'
 import { TraceView } from './TraceView'
 import { useReading } from './reading'
-import { GroupEditorView } from '../bots/GroupEditorView'
 import { BotTemplateView } from '../bots/BotTemplateView'
 import { CallView } from '../call/CallView'
 import { MacChatButton } from './MacChatButton'
@@ -45,9 +44,9 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const bot = store.bots.get(botId) ?? null
   const [showTrace, setShowTrace] = useState(false)
   const [findOpen, setFindOpen] = useState(false)
+  const [threadModelsSignal, setThreadModelsSignal] = useState(0)
   const [openThread, setOpenThread] = useState<string | null>(null)
   const [botChat, setBotChat] = useState<string | null>(null)
-  const [editingGroup, setEditingGroup] = useState(false)
   const [templateDraft, setTemplateDraft] = useState<BotDraft | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [editingDetails, setEditingDetails] = useState(false)
@@ -164,7 +163,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
       routineId={routineId}
       editing={editingDetails}
       setEditing={setEditingDetails}
-      editGroup={() => setEditingGroup(true)}
       openPlugins={openPlugins}
       share={() => {
         setCompactDetails(false)
@@ -196,6 +194,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
                 onFind={() => setFindOpen(true)}
                 onFull={openTrace}
                 onComputer={toggleComputer}
+                onThreadModels={() => setThreadModelsSignal((n) => n + 1)}
                 onSettings={openSettingsPanel}
               />
             ) : null}
@@ -208,7 +207,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             </span>
             {store.shownConnection.kind !== 'online' || store.mismatch ? <ConnectionSubtitle /> : null}
           </button>
-          {bot && !isGroup(bot) && !calling ? <ThreadModelsLine bot={bot} store={store} /> : null}
+          {bot && !isGroup(bot) && !calling ? <ThreadModelsLine bot={bot} store={store} openSignal={threadModelsSignal} /> : null}
         </div>
         {findOpen && !calling ? <ChatFindBar botId={botId} store={store} close={() => setFindOpen(false)} /> : null}
         <Transcript botId={botId} openTrace={openTrace} openThread={openThreadOn} openRoutine={presentRoutine} openBotChat={setBotChat} focusEntryId={focus && !focus.threadId ? focus.entryId : null} />
@@ -278,9 +277,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
       </Sheet>
       <Sheet open={templateDraft !== null} onClose={() => setTemplateDraft(null)}>
         {templateDraft ? <BotTemplateView draft={templateDraft} /> : null}
-      </Sheet>
-      <Sheet open={editingGroup} onClose={() => setEditingGroup(false)} width={480} height={Math.min(660, window.innerHeight - 60)}>
-        <GroupEditorView group={bot} />
       </Sheet>
     </div>
   )

@@ -10,8 +10,8 @@ pub const INSTRUCTIONS: &str = "You have your own headless browser with a privat
 Work in it like a person: browser_open a page, browser_read or browser_scrape to see it, then browser_click / \
 browser_type / browser_press to act, and browser_screenshot whenever looking at the rendered page helps. \
 Click by the text or selector you saw in browser_read/scrape when you can — coordinates are the fallback. \
-The user can watch your browser and take it over from their computer; if a tool answers that the user has control, \
-wait and try again — do not fight them for it.";
+The user can watch your browser and take it over from their computer; while they do, your tools pause and \
+resume when they hand it back.";
 
 /// The tools a bot with **Use a browser** on is offered; none when this computer has no browser.
 pub fn tools() -> Value {

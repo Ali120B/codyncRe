@@ -52,6 +52,7 @@ function ModelPopover({ open, onClose, anchor, bot }: {
   const { mounted, shown } = usePresence(open, 120)
   const [paneBackend, setPaneBackend] = useState(bot.backend)
   const [query, setQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const [highlight, setHighlight] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const search = useRef<HTMLInputElement>(null)
@@ -107,9 +108,15 @@ function ModelPopover({ open, onClose, anchor, bot }: {
     ...available.map((m) => ({ id: m.id, name: m.name, description: m.description })),
   ]
   const q = query.trim().toLowerCase()
-  const rows = q ? allRows.filter((r) => [r.name, r.description ?? '', r.id ?? ''].some((s) => s.toLowerCase().includes(q))) : allRows
+  const matching = q ? allRows.filter((r) => [r.name, r.description ?? '', r.id ?? ''].some((s) => s.toLowerCase().includes(q))) : allRows
+  // Top five until the user asks for more (Maus's pattern); searching always shows every match.
+  const more = !q && !showAll && matching.length > 5
+  const rows = more ? matching.slice(0, 5) : matching
 
-  useEffect(() => setHighlight(0), [query, open, paneBackend])
+  useEffect(() => {
+    setHighlight(0)
+    setShowAll(false)
+  }, [query, open, paneBackend])
   const modelOptions = value ? (available.find((m) => m.id === value)?.options ?? []) : []
 
   const apply = (model: string | null) => {
@@ -193,6 +200,11 @@ function ModelPopover({ open, onClose, anchor, bot }: {
               </button>
             ))}
             {!rows.length && !models.loading ? <div className="model-note">No matching models</div> : null}
+            {more ? (
+              <button className="model-note model-more" style={{ cursor: 'pointer' }} onClick={() => setShowAll(true)}>
+                Show all {matching.length} models
+              </button>
+            ) : null}
           </div>
           {models.loading ? (
             <div className="model-note" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

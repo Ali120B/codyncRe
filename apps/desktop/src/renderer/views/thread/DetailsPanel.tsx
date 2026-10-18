@@ -7,6 +7,7 @@ import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
 import { BotSettingsPanel } from '../bots/BotEditorView'
+import { GroupEditorView } from '../bots/GroupEditorView'
 import { ComputerBadge } from '../ComputerBadge'
 import { BotPanel } from './BotPanel'
 import { MacChatButton } from './MacChatButton'
@@ -15,12 +16,11 @@ import '../bots/bots.css'
 const isMac = window.codync.platform === 'darwin'
 
 /** The inspector beside a conversation: the computer, the agent, and the bot's settings. */
-export function DetailsPanel({ botId, routineId, editing, setEditing, editGroup, share, openPlugins, close }: {
+export function DetailsPanel({ botId, routineId, editing, setEditing, share, openPlugins, close }: {
   botId: string
   routineId: string | null
   editing: boolean
   setEditing: (on: boolean) => void
-  editGroup: () => void
   share: () => void
   openPlugins?: () => void
   close: () => void
@@ -71,7 +71,13 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, editGroup,
       </div>
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
         {bot && isGroup(bot) ? (
-          <GroupMembersList group={bot} editGroup={editGroup} />
+          editing ? (
+            <div className="panel-slide from-trailing" style={{ height: '100%', overflowY: 'auto' }}>
+              <GroupEditorView group={bot} />
+            </div>
+          ) : (
+            <GroupMembersList group={bot} />
+          )
         ) : editing ? (
           <div className="panel-slide from-trailing" style={{ height: '100%', overflowY: 'auto' }}>
             <BotSettingsPanel key={`${botId}:${settingsAt?.nonce ?? 0}`} botId={botId} opened={settingsAt?.section} />
@@ -105,11 +111,30 @@ function RoundButton({ label, symbol, action }: { label: string; symbol: string;
 }
 
 /** A group's bots (Grok Bot's member list); clicking one opens its own chat. */
-function GroupMembersList({ group, editGroup }: { group: Bot; editGroup: () => void }) {
+function GroupMembersList({ group }: { group: Bot }) {
   const store = useStore()
+  const [adding, setAdding] = useState(false)
+  const [query, setQuery] = useState('')
+  const members = store.members(group)
+  const q = query.trim().toLowerCase()
+  const candidates = store.roster.filter((b) => !isGroup(b) && !group.members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
+  const add = (id: string) => {
+    void store.updateGroup({
+      kind: 'group',
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      members: [...group.members, id],
+      leader: group.leader,
+      instructions: group.instructions,
+      workspace: group.workspace,
+      pinned: group.pinned,
+    })
+    setQuery('')
+  }
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '0 20px' }}>
-      {store.members(group).map((bot) => (
+      {members.map((bot) => (
         <div key={bot.id} className="member-row removable">
           <button className="member-open press" title={`Open ${bot.name}'s own chat`} onClick={() => store.setSelection(bot.id)}>
             <BotAvatar bot={bot} size={32} />
@@ -122,12 +147,37 @@ function GroupMembersList({ group, editGroup }: { group: Bot; editGroup: () => v
           {group.members.length > 1 ? <IconButton title={`Remove ${bot.name} from the group`} icon="xmark" onClick={() => store.removeMember(group, bot.id)} /> : null}
         </div>
       ))}
-      <button className="member-row press" onClick={editGroup}>
-        <span style={{ width: 32, display: 'grid', placeItems: 'center' }}>
-          <Icon name="plus" size={16} color="var(--secondary)" />
-        </span>
-        <span className="member-name" style={{ color: 'var(--secondary)' }}>Add Member</span>
-      </button>
+      {adding ? (
+        <>
+          <input
+            className="field-box fade-in"
+            style={{ margin: '6px 0' }}
+            autoFocus
+            value={query}
+            placeholder="Search bots"
+            aria-label="Search bots to add"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing && candidates[0]) add(candidates[0].id)
+              if (e.key === 'Escape') setAdding(false)
+            }}
+          />
+          {candidates.map((bot) => (
+            <button key={bot.id} className="member-row press fade-in" aria-label={`Add ${bot.name}`} onClick={() => add(bot.id)}>
+              <BotAvatar bot={bot} size={32} animated={false} />
+              <span className="member-name" style={{ color: 'var(--secondary)' }}>{bot.name}</span>
+              <Icon name="plus.circle" size={18} color="var(--secondary)" />
+            </button>
+          ))}
+        </>
+      ) : candidates.length ? (
+        <button className="member-row press" onClick={() => setAdding(true)}>
+          <span style={{ width: 32, display: 'grid', placeItems: 'center' }}>
+            <Icon name="plus" size={16} color="var(--secondary)" />
+          </span>
+          <span className="member-name" style={{ color: 'var(--secondary)' }}>Add bots</span>
+        </button>
+      ) : null}
     </div>
   )
 }

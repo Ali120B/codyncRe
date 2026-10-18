@@ -112,16 +112,17 @@ impl BotBrowser {
         shared.user_last = Instant::now();
     }
 
-    /// The bot may act unless the user has the wheel.
-    fn ensure_bot_may_act(&self) -> Result<()> {
-        self.tick();
-        if self.shared.locked().user_control {
-            bail!(
-                "The user is using the browser from their desktop right now. Wait a little (it comes back on its own), \
-                 or ask them to hand it back."
-            );
+    /// The bot waits out a takeover: the release is manual (the panel's Release) or the
+    /// 50 s auto-release, so a tool call resumes on its own instead of failing the turn.
+    async fn wait_for_bot_turn(&self) -> Result<()> {
+        for _ in 0..1200 {
+            self.tick();
+            if !self.shared.locked().user_control {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
-        Ok(())
+        bail!("The user still has the browser; ask them to hand it back.")
     }
 
     // MARK: tabs
@@ -156,8 +157,7 @@ impl BotBrowser {
         Ok(tab.id)
     }
 
-    pub async fn new_tab(&self, url: Option<&str>) -> Result<TabInfo> {
-        self.ensure_bot_may_act()?;
+    async fn raw_new_tab(&self, url: Option<&str>) -> Result<TabInfo> {
         let url = match url {
             Some(url) => normalize_url(url)?,
             None => "about:blank".to_owned(),
@@ -169,8 +169,7 @@ impl BotBrowser {
         Ok(tab)
     }
 
-    pub async fn close_tab(&self, id: &str) -> Result<()> {
-        self.ensure_bot_may_act()?;
+    async fn raw_close_tab(&self, id: &str) -> Result<()> {
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
         if engine.list().await?.len() <= 1 {
@@ -184,7 +183,7 @@ impl BotBrowser {
         Ok(())
     }
 
-    pub async fn select_tab(&self, id: &str) -> Result<()> {
+    async fn raw_select_tab(&self, id: &str) -> Result<()> {
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
         if !engine.list().await?.iter().any(|t| t.id == id) {
@@ -195,8 +194,7 @@ impl BotBrowser {
     }
 
     /// Navigates the active tab (`url` with no scheme gets one).
-    pub async fn navigate(&self, url: &str) -> Result<TabInfo> {
-        self.ensure_bot_may_act()?;
+    async fn raw_navigate(&self, url: &str) -> Result<TabInfo> {
         let url = normalize_url(url)?;
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
@@ -206,8 +204,7 @@ impl BotBrowser {
         Ok(TabInfo { id, title: String::new(), url })
     }
 
-    pub async fn reload(&self) -> Result<()> {
-        self.ensure_bot_may_act()?;
+    async fn raw_reload(&self) -> Result<()> {
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
         let id = self.active_tab(engine).await?;
@@ -222,6 +219,60 @@ impl BotBrowser {
         let id = self.active_tab(engine).await?;
         engine.evaluate(&id, if back { "history.back()" } else { "history.forward()" }).await?;
         Ok(())
+    }
+
+    // MARK: who does what
+
+    /// The panel's own actions; each one counts as taking over.
+    pub async fn user_open(&self, url: &str, new_tab: bool) -> Result<TabInfo> {
+        self.user_acted();
+        self.raw_open(url, new_tab).await
+    }
+
+    pub async fn user_new_tab(&self, url: Option<&str>) -> Result<TabInfo> {
+        self.user_acted();
+        self.raw_new_tab(url).await
+    }
+
+    pub async fn user_close_tab(&self, id: &str) -> Result<()> {
+        self.user_acted();
+        self.raw_close_tab(id).await
+    }
+
+    pub async fn user_select_tab(&self, id: &str) -> Result<()> {
+        self.user_acted();
+        self.raw_select_tab(id).await
+    }
+
+    pub async fn user_reload(&self) -> Result<()> {
+        self.user_acted();
+        self.raw_reload().await
+    }
+
+    /// The bot's actions wait out a takeover instead of failing its turn.
+    pub async fn open(&self, url: &str, new_tab: bool) -> Result<TabInfo> {
+        self.wait_for_bot_turn().await?;
+        self.raw_open(url, new_tab).await
+    }
+
+    pub async fn navigate(&self, url: &str) -> Result<TabInfo> {
+        self.wait_for_bot_turn().await?;
+        self.raw_navigate(url).await
+    }
+
+    pub async fn new_tab(&self, url: Option<&str>) -> Result<TabInfo> {
+        self.wait_for_bot_turn().await?;
+        self.raw_new_tab(url).await
+    }
+
+    pub async fn close_tab(&self, id: &str) -> Result<()> {
+        self.wait_for_bot_turn().await?;
+        self.raw_close_tab(id).await
+    }
+
+    pub async fn select_tab(&self, id: &str) -> Result<()> {
+        self.wait_for_bot_turn().await?;
+        self.raw_select_tab(id).await
     }
 
     // MARK: watching and driving
@@ -277,16 +328,15 @@ impl BotBrowser {
     // MARK: the bot's own tools
 
     /// Opens `url` in a new tab when asked, else the active one.
-    pub async fn open(&self, url: &str, new_tab: bool) -> Result<TabInfo> {
-        self.ensure_bot_may_act()?;
+    async fn raw_open(&self, url: &str, new_tab: bool) -> Result<TabInfo> {
         if new_tab {
-            return self.new_tab(Some(url)).await;
+            return self.raw_new_tab(Some(url)).await;
         }
-        self.navigate(url).await
+        self.raw_navigate(url).await
     }
 
     pub async fn agent_evaluate(&self, js: &str) -> Result<Value> {
-        self.ensure_bot_may_act()?;
+        self.wait_for_bot_turn().await?;
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
         let id = self.active_tab(engine).await?;
@@ -294,7 +344,7 @@ impl BotBrowser {
     }
 
     pub async fn agent_click(&self, x: f64, y: f64) -> Result<()> {
-        self.ensure_bot_may_act()?;
+        self.wait_for_bot_turn().await?;
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
         let id = self.active_tab(engine).await?;
@@ -302,7 +352,7 @@ impl BotBrowser {
     }
 
     pub async fn agent_type(&self, text: &str) -> Result<()> {
-        self.ensure_bot_may_act()?;
+        self.wait_for_bot_turn().await?;
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
         let id = self.active_tab(engine).await?;
@@ -310,7 +360,7 @@ impl BotBrowser {
     }
 
     pub async fn agent_press(&self, key: &str) -> Result<()> {
-        self.ensure_bot_may_act()?;
+        self.wait_for_bot_turn().await?;
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
         let id = self.active_tab(engine).await?;
@@ -318,7 +368,7 @@ impl BotBrowser {
     }
 
     pub async fn agent_scroll(&self, x: f64, y: f64, delta_y: f64) -> Result<()> {
-        self.ensure_bot_may_act()?;
+        self.wait_for_bot_turn().await?;
         let engine_guard = self.running_engine().await?;
         let engine = engine_guard.as_ref().expect("checked");
         let id = self.active_tab(engine).await?;

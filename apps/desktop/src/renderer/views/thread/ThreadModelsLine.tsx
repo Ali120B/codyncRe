@@ -30,9 +30,13 @@ function threadTitle(store: BotStore, botId: string, root: string): string {
  * Maus's thread-models line: a thread can run on its own model; the rest follow the bot's.
  * Shown under the chat's title when the chat has threads.
  */
-export function ThreadModelsLine({ bot, store }: { bot: Bot; store: BotStore }) {
+export function ThreadModelsLine({ bot, store, openSignal = 0 }: { bot: Bot; store: BotStore; openSignal?: number }) {
   const anchor = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
+  // The ⋯ menu's "Thread models" opens this panel.
+  useEffect(() => {
+    if (openSignal) setOpen(true)
+  }, [openSignal])
   const models = useAgentModels(bot.backend, open)
   const online = store.connection.kind === 'online'
   useEffect(() => {
