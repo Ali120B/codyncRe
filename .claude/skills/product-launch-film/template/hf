@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs the HyperFrames plugin CLI (newest installed version). Never `npx hyperframes`.
+d=$(ls -d "$HOME"/.claude/plugins/cache/hyperframes/hyperframes/*/ | sort -V | tail -1)
+exec node "${d}skills/hyperframes/scripts/plugin-cli.mjs" "$@"

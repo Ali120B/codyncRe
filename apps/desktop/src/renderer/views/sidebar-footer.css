@@ -1,0 +1,86 @@
+.sidebar:not(.compact) .roster {
+  padding-bottom: 92px;
+  scroll-padding-bottom: 92px;
+}
+
+.sidebar-footer {
+  position: absolute;
+  z-index: 2;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  isolation: isolate;
+}
+
+.sidebar-footer-fade {
+  position: absolute;
+  z-index: -1;
+  inset: -38px 0 0;
+  pointer-events: none;
+  background: linear-gradient(to top, var(--surface) 22%, color-mix(in srgb, var(--surface) 90%, transparent) 54%, transparent);
+}
+.sidebar-footer-fade::before,
+.sidebar-footer-fade::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(to top, black 40%, transparent);
+  mask-image: linear-gradient(to top, black 40%, transparent);
+}
+.sidebar-footer-fade::after {
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  -webkit-mask-image: linear-gradient(to top, black 18%, transparent 75%);
+  mask-image: linear-gradient(to top, black 18%, transparent 75%);
+}
+
+/* The profile box (Maus's): avatar and name, with the plugins button at its right edge. */
+.profile-box {
+  flex: 1;
+  min-width: 0;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.profile-button {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 10px 0 6px;
+  border-radius: 13px;
+  transition: background-color var(--hover);
+}
+.profile-button:hover,
+.profile-box.active .profile-button { background: rgba(var(--text-rgb), 0.06); }
+.profile-button .profile-avatar { width: 32px; height: 32px; }
+.profile-button .profile-initial { font-size: calc(15px * var(--scale)); }
+
+.profile-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(14px * var(--scale));
+  font-weight: 600;
+}
+
+.profile-button:active { transform: scale(.98); }
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-button:active { transform: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar-footer-fade { background: var(--surface); inset: 0; }
+  .sidebar-footer-fade::before, .sidebar-footer-fade::after { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}

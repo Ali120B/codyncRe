@@ -1,0 +1,482 @@
+{
+  "schemaVersion": 2,
+  "appName": "Codync",
+  "themeId": "codync-halftone",
+  "fontId": "system-sans",
+  "connectedCanvas": true,
+  "locales": [
+    "en",
+    "zh-Hant"
+  ],
+  "locale": "en",
+  "device": "iphone",
+  "orientation": "portrait",
+  "appIcon": "/app-icon.png",
+  "slidesByDevice": {
+    "iphone": [
+      {
+        "id": "s_i1",
+        "layout": "hero",
+        "label": {
+          "en": "CODYNC",
+          "zh-Hant": "CODYNC"
+        },
+        "headline": {
+          "en": "Your coding agents,\nas bots.",
+          "zh-Hant": "你的 coding agent，\n變成 bot。"
+        },
+        "screenshot": "/screenshots/apple/iphone/en/01.png"
+      },
+      {
+        "id": "s_i2",
+        "layout": "device-top",
+        "label": {
+          "en": "DELEGATE",
+          "zh-Hant": "交辦"
+        },
+        "headline": {
+          "en": "Say what.\nPut the phone away.",
+          "zh-Hant": "交代一句，\n手機收起來。"
+        },
+        "screenshot": "/screenshots/apple/iphone/en/02.png",
+        "inverted": true
+      },
+      {
+        "id": "s_i3",
+        "layout": "device-bottom",
+        "label": {
+          "en": "APPROVE",
+          "zh-Hant": "批准"
+        },
+        "headline": {
+          "en": "Approve\nfrom anywhere.",
+          "zh-Hant": "人在哪，\n都能批准。"
+        },
+        "screenshot": "/screenshots/apple/iphone/en/03.png"
+      },
+      {
+        "id": "s_i4",
+        "layout": "two-devices",
+        "label": {
+          "en": "GROUP CHAT",
+          "zh-Hant": "群組"
+        },
+        "headline": {
+          "en": "Let your bots\nreview each other.",
+          "zh-Hant": "讓 bot\n互相 review。"
+        },
+        "screenshot": "/screenshots/apple/iphone/en/04.png",
+        "screenshotSecondary": "/screenshots/apple/iphone/en/05.png"
+      },
+      {
+        "id": "s_i5",
+        "layout": "device-top",
+        "label": {
+          "en": "LIVE ACTIVITY",
+          "zh-Hant": "即時動態"
+        },
+        "headline": {
+          "en": "Follow along\nin the Dynamic Island.",
+          "zh-Hant": "動態島上\n隨時看進度。"
+        },
+        "screenshot": "/screenshots/apple/iphone/en/06.png",
+        "inverted": true
+      },
+      {
+        "id": "s_i6",
+        "layout": "hero",
+        "label": {
+          "en": "USAGE",
+          "zh-Hant": "用量"
+        },
+        "headline": {
+          "en": "Know your limits\nat a glance.",
+          "zh-Hant": "額度剩多少，\n一眼就知道。"
+        },
+        "screenshot": "/screenshots/apple/iphone/en/07.png"
+      },
+      {
+        "id": "s_i7",
+        "layout": "no-device",
+        "label": {
+          "en": "WORKS WITH",
+          "zh-Hant": "支援"
+        },
+        "headline": {
+          "en": "Claude Code\nCodex · Cursor\nGemini · Pi\n& dozens more",
+          "zh-Hant": "Claude Code\nCodex · Cursor\nGemini · Pi\n還有數十種"
+        },
+        "screenshot": ""
+      }
+    ],
+    "android": [
+      {
+        "id": "s_mup83m53_5",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Sell one\nidea per slide."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_6",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Your headline\nlives here."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_7",
+        "layout": "two-devices",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Show two\nscreens at once."
+        },
+        "screenshot": "",
+        "screenshotSecondary": ""
+      },
+      {
+        "id": "s_mup83m53_8",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 03"
+        },
+        "headline": {
+          "en": "Flip the contrast\nfor visual rhythm."
+        },
+        "screenshot": "",
+        "inverted": true
+      },
+      {
+        "id": "s_mup83m53_9",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so\nmuch more."
+        },
+        "screenshot": ""
+      }
+    ],
+    "ipad": [
+      {
+        "id": "s_p1",
+        "layout": "hero",
+        "label": {
+          "en": "CODYNC",
+          "zh-Hant": "CODYNC"
+        },
+        "headline": {
+          "en": "Your coding agents,\nas bots.",
+          "zh-Hant": "你的 coding agent，\n變成 bot。"
+        },
+        "screenshot": "/screenshots/apple/ipad/en/01.png"
+      },
+      {
+        "id": "s_p2",
+        "layout": "device-top",
+        "label": {
+          "en": "DELEGATE",
+          "zh-Hant": "交辦"
+        },
+        "headline": {
+          "en": "Say what.\nPut the tablet away.",
+          "zh-Hant": "交代一句，\n平板收起來。"
+        },
+        "screenshot": "/screenshots/apple/ipad/en/02.png",
+        "inverted": true
+      },
+      {
+        "id": "s_p3",
+        "layout": "two-devices",
+        "label": {
+          "en": "GROUP CHAT",
+          "zh-Hant": "群組"
+        },
+        "headline": {
+          "en": "Let your bots\nreview each other.",
+          "zh-Hant": "讓 bot\n互相 review。"
+        },
+        "screenshot": "/screenshots/apple/ipad/en/03.png",
+        "screenshotSecondary": "/screenshots/apple/ipad/en/04.png"
+      },
+      {
+        "id": "s_p4",
+        "layout": "hero",
+        "label": {
+          "en": "USAGE",
+          "zh-Hant": "用量"
+        },
+        "headline": {
+          "en": "Know your limits\nat a glance.",
+          "zh-Hant": "額度剩多少，\n一眼就知道。"
+        },
+        "screenshot": "/screenshots/apple/ipad/en/05.png"
+      },
+      {
+        "id": "s_p5",
+        "layout": "no-device",
+        "label": {
+          "en": "WORKS WITH",
+          "zh-Hant": "支援"
+        },
+        "headline": {
+          "en": "Claude Code\nCodex · Cursor\nGemini · Pi\n& dozens more",
+          "zh-Hant": "Claude Code\nCodex · Cursor\nGemini · Pi\n還有數十種"
+        },
+        "screenshot": ""
+      }
+    ],
+    "tvos": [
+      {
+        "id": "s_mup83m53_d",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Made for\nthe living room."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_e",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "One idea\nper screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_f",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Flip the contrast."
+        },
+        "screenshot": "",
+        "inverted": true
+      },
+      {
+        "id": "s_mup83m53_g",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so\nmuch more."
+        },
+        "screenshot": ""
+      }
+    ],
+    "watchos": [
+      {
+        "id": "s_mup83m53_h",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "On your\nwrist."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_i",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "One glance.\nDone."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_j",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Always\nwith you."
+        },
+        "screenshot": "",
+        "inverted": true
+      }
+    ],
+    "carplay": [
+      {
+        "id": "s_mup83m53_k",
+        "layout": "split-landscape",
+        "label": {
+          "en": "CARPLAY"
+        },
+        "headline": {
+          "en": "Eyes on\nthe road."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_l",
+        "layout": "device-bottom",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Everything, one tap away."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_m",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "Made for every drive."
+        },
+        "screenshot": "",
+        "inverted": true
+      }
+    ],
+    "mac": [
+      {
+        "id": "s_mup83m53_n",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Made for\nyour Mac."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_o",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Everything in\none window."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_p",
+        "layout": "device-top",
+        "label": {
+          "en": "FEATURE 02"
+        },
+        "headline": {
+          "en": "One shortcut away."
+        },
+        "screenshot": "",
+        "inverted": true
+      },
+      {
+        "id": "s_mup83m53_q",
+        "layout": "two-devices",
+        "label": {
+          "en": "FEATURE 03"
+        },
+        "headline": {
+          "en": "Work across windows."
+        },
+        "screenshot": "",
+        "screenshotSecondary": ""
+      },
+      {
+        "id": "s_mup83m53_r",
+        "layout": "no-device",
+        "label": {
+          "en": "MORE"
+        },
+        "headline": {
+          "en": "And so\nmuch more."
+        },
+        "screenshot": ""
+      }
+    ],
+    "android-7": [
+      {
+        "id": "s_mup83m53_s",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Pocket-sized\npower."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_t",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Wide canvas,\nbigger ideas."
+        },
+        "screenshot": ""
+      }
+    ],
+    "android-10": [
+      {
+        "id": "s_mup83m53_u",
+        "layout": "hero",
+        "label": {
+          "en": "MEET YOUR APP"
+        },
+        "headline": {
+          "en": "Made for\nthe big screen."
+        },
+        "screenshot": ""
+      },
+      {
+        "id": "s_mup83m53_v",
+        "layout": "split-landscape",
+        "label": {
+          "en": "FEATURE 01"
+        },
+        "headline": {
+          "en": "Wide canvas,\nbigger ideas."
+        },
+        "screenshot": ""
+      }
+    ],
+    "feature-graphic": [
+      {
+        "id": "s_mup83m53_w",
+        "layout": "feature-graphic",
+        "label": {},
+        "headline": {
+          "en": "Your tagline goes here."
+        },
+        "screenshot": ""
+      }
+    ]
+  },
+  "crossScreenMockupsByDevice": {
+    "iphone": [],
+    "ipad": []
+  }
+}

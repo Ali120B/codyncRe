@@ -1,0 +1,120 @@
+.roster-section {
+  flex: none;
+  min-width: 0;
+  max-width: 100%;
+  transition: opacity var(--layout);
+}
+
+.roster-section.dragging {
+  opacity: 0.55;
+}
+
+/* Where the dragged heading would land. */
+.roster-section-line {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  margin: 4px 10px;
+  background: var(--accent-fill);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-fill) 60%, transparent);
+  animation: roster-line-in var(--fade) both;
+}
+@keyframes roster-line-in {
+  from { opacity: 0; transform: scaleX(0.9); }
+}
+
+.roster-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 0 2px;
+}
+
+.roster-section-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  color: var(--secondary);
+}
+
+.roster-section-toggle:hover {
+  background: var(--bubble-agent);
+}
+
+.roster-section-chevron {
+  flex: none;
+  display: flex;
+  transition: transform var(--layout);
+}
+
+.roster-section-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.roster-section-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: calc(12px * var(--scale));
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roster-section-grip {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: var(--tertiary);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity var(--hover), background-color var(--hover), color var(--hover), transform var(--press);
+}
+
+.roster-section-heading:hover .roster-section-grip,
+.roster-section-grip:focus-visible {
+  opacity: 1;
+}
+
+.roster-section-grip:hover {
+  background: var(--bubble-agent);
+  color: var(--secondary);
+}
+
+.roster-section-grip:active {
+  cursor: grabbing;
+  transform: scale(0.94);
+}
+
+.roster-section-content {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows var(--layout), opacity var(--layout);
+}
+
+.roster-section-content.collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.roster-section-content > div {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roster-section,
+  .roster-section-chevron,
+  .roster-section-content {
+    transition: none;
+  }
+}

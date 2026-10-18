@@ -1,0 +1,185 @@
+/* The chat header's model chip and its picker (Grok Bot's header control). */
+.model-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  max-width: 300px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(var(--text-rgb), 0.08);
+  backdrop-filter: blur(20px);
+  color: var(--text);
+  font-size: calc(12px * var(--scale));
+  white-space: nowrap;
+  transition: background-color var(--hover);
+}
+.model-chip:hover,
+.model-chip.open {
+  background: rgba(var(--text-rgb), 0.13);
+}
+.model-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.model-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  opacity: 0;
+  transition: opacity var(--fade);
+  -webkit-app-region: no-drag;
+}
+.model-layer.shown {
+  opacity: 1;
+}
+.model-panel {
+  display: flex;
+  background: var(--bubble-agent);
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  transform: scale(0.98);
+  transition: transform var(--layout);
+}
+.model-layer.shown .model-panel {
+  transform: none;
+}
+
+/* Left: every agent on this computer. */
+.model-rail {
+  flex: none;
+  width: 136px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgba(var(--text-rgb), 0.04);
+}
+.model-rail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: calc(13px * var(--scale));
+  text-align: left;
+  transition: background-color var(--hover);
+}
+.model-rail-row:hover {
+  background: rgba(var(--text-rgb), 0.06);
+}
+.model-rail-row.selected {
+  background: rgba(var(--text-rgb), 0.1);
+}
+.model-rail-row.dim {
+  opacity: 0.5;
+}
+.model-rail-row > svg {
+  flex: none;
+}
+.model-rail-row.selected .provider-mark-fallback {
+  background: var(--text);
+  color: var(--surface);
+}
+.model-rail-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right: the agent's models, searchable. */
+.model-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.model-search {
+  padding: 8px 8px 0;
+  flex: none;
+}
+/* The field sits on the panel: lift it with a hair of contrast, not its default bubble fill. */
+.model-search .search-field {
+  background: rgba(var(--text-rgb), 0.06);
+}
+.model-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--text);
+  font-size: calc(13px * var(--scale));
+  transition: background-color var(--hover);
+}
+.model-row.highlight {
+  background: rgba(var(--text-rgb), 0.07);
+}
+.model-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.model-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-row-description {
+  color: var(--secondary);
+  font-size: calc(12px * var(--scale));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.model-note {
+  flex: none;
+  padding: 10px 14px;
+  color: var(--secondary);
+  font-size: calc(11px * var(--scale));
+  line-height: 1.4;
+  text-align: left;
+}
+.model-retry:hover {
+  color: var(--text);
+}
+.model-error {
+  color: var(--warning);
+}
+.model-options {
+  flex: none;
+  border-top: 0.5px solid rgba(var(--text-rgb), 0.1);
+  padding: 6px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.model-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px;
+}

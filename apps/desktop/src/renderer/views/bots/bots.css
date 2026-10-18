@@ -1,0 +1,315 @@
+/* Bot creation and editing (kit Bots/). */
+
+/* A rounded input box (`fieldBox`). */
+.field-box {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--background);
+  border-radius: 12px;
+  color: var(--text);
+  user-select: text;
+  cursor: text;
+}
+textarea.field-box {
+  line-height: 1.3;
+}
+
+.bot-form {
+  height: auto;
+  min-height: 0;
+  background: var(--background);
+}
+.bot-form-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 14px;
+  font-size: calc(12px * var(--scale));
+}
+
+.avatar-button {
+  padding: 12px;
+  background: var(--bubble-agent);
+  border-radius: 20px;
+  display: flex;
+}
+
+/* A selectable avatar shape or color, ringed when chosen. */
+.swatch {
+  padding: 4px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  box-shadow: inset 0 0 0 2px transparent;
+  transition: box-shadow var(--hover);
+}
+.swatch.on {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.swatch-row {
+  display: flex;
+  gap: 10px;
+  padding: 4px;
+  overflow-x: auto;
+}
+
+/* A picked bot: To: field and group editor. */
+.bot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 8px;
+  background: var(--bubble-agent);
+  border-radius: 999px;
+  flex: none;
+  animation: chip-in var(--layout) both;
+}
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+.chip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+/* Rows in the new message list and the group editor. */
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: background-color var(--hover), transform var(--press);
+}
+.pick-row.hover:hover {
+  background: var(--bubble-agent);
+}
+.key-cap {
+  min-width: 18px;
+  min-height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--secondary);
+  font-family: var(--mono);
+  font-size: calc(10px * var(--scale));
+}
+
+.compose-list {
+  max-height: 460px;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: 0 6px 32px rgba(0, 0, 0, 0.08);
+  max-width: 620px;
+  margin: 10px 22px 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.compose-box {
+  display: flex;
+  align-items: flex-end;
+  margin: 16px;
+  padding: 6px 6px 6px 18px;
+  background: var(--bubble-user);
+  border-radius: 24px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.06);
+}
+.compose-box textarea {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--conversation);
+  line-height: calc(round(up, calc(var(--conversation) * 1.25), 1px));
+  padding: 11px 0;
+  user-select: text;
+  cursor: text;
+}
+
+/* Folder levels slide in from the side they were opened toward. */
+.level-slide {
+  animation: level-in var(--layout) both;
+}
+.level-slide.from-trailing {
+  --from: 40px;
+}
+.level-slide.from-leading {
+  --from: -40px;
+}
+@keyframes level-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--from));
+  }
+}
+
+.fade-in {
+  animation: fade-in var(--fade) both;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Group editor (Grok Bot's group details): identity on top, then a plain member list. */
+.group-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 20px 24px;
+}
+
+/* Rows inside the group editor's cards: the card already provides padding. */
+.card-section-rows .member-row {
+  width: 100%;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.group-instructions,
+.group-path {
+  width: 100%;
+}
+.group-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.group-name,
+.group-about {
+  width: 100%;
+  text-align: center;
+  background: transparent;
+  color: var(--text);
+  resize: none;
+}
+.group-name {
+  font-size: calc(22px * var(--scale));
+  font-weight: 600;
+  margin-top: 6px;
+}
+.group-about {
+  font-size: calc(13px * var(--scale));
+  color: var(--secondary);
+  line-height: 1.35;
+}
+.group-name::placeholder,
+.group-about::placeholder {
+  color: var(--tertiary);
+}
+.group-section-title {
+  font-size: calc(13px * var(--scale));
+  font-weight: 600;
+  color: var(--secondary);
+  padding-bottom: 4px;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: calc(100% + 16px);
+  min-height: 48px;
+  margin: 0 -8px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  text-align: left;
+  transition: background-color var(--hover), transform var(--press);
+}
+button.member-row:hover {
+  background: var(--bubble-agent);
+}
+.member-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A member row that opens the bot's chat, with a remove button shown on hover. */
+.member-row.removable:hover {
+  background: var(--bubble-agent);
+}
+.member-open {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  text-align: left;
+}
+.member-row.removable > :last-child:not(.member-open) {
+  opacity: 0;
+  transition: opacity var(--hover);
+}
+.member-row.removable:hover > :last-child,
+.member-row.removable:focus-within > :last-child {
+  opacity: 1;
+}
+
+/* Settings accordion (Maus's All settings): quiet cards that open one at a time. */
+.settings-acc {
+  background: var(--surface);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.settings-acc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+}
+.settings-acc-title {
+  flex: 1;
+  font-size: calc(13px * var(--scale));
+  color: var(--text);
+}
+.settings-acc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 2px 16px 16px;
+}
+
+/* The New Bot hero: a big, shuffle-able avatar over the name. */
+.bot-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 6px;
+}
+.hero-name {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+  font-size: calc(17px * var(--scale));
+  font-weight: 600;
+  color: var(--text);
+}
+.hero-name::placeholder {
+  color: var(--tertiary);
+}
+
+.hero-role {
+  width: 100%;
+  margin-top: 2px;
+}

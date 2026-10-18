@@ -1,0 +1,291 @@
+/* Settings: a rail of pages and roomy cards (Maus's settings layout). */
+.settings {
+  display: flex;
+  height: 100%;
+  background: var(--background);
+  position: relative;
+}
+.settings-sidebar {
+  width: 220px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 22px 14px 12px;
+  overflow-y: auto;
+}
+.settings-search {
+  padding: 0 0 10px;
+}
+/* The rail's search reads as a field, not the roster's pill. */
+.settings-search .search-field {
+  border-radius: 10px;
+  background: rgba(var(--text-rgb), 0.06);
+  padding: 8px 10px;
+}
+.settings-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: calc(14px * var(--scale));
+  color: var(--text);
+  transition: background-color var(--hover);
+}
+.settings-item:hover {
+  background: rgba(var(--text-rgb), 0.05);
+}
+.settings-item.selected {
+  background: rgba(var(--text-rgb), 0.09);
+}
+.settings-icon {
+  width: 18px;
+  display: flex;
+  justify-content: center;
+  color: var(--secondary);
+  flex: none;
+}
+.settings-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-none {
+  padding: 8px 10px;
+  font-size: calc(12px * var(--scale));
+  color: var(--tertiary);
+}
+.settings-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.settings-title {
+  font-size: calc(20px * var(--scale));
+  font-weight: 600;
+  color: var(--text);
+  padding: 22px 28px 10px;
+}
+.settings-page {
+  flex: 1;
+  min-height: 0;
+  padding: 0 28px;
+  animation: settings-fade var(--fade) both;
+}
+/* The page's own card column carries no padding: the pane above provides it. */
+.settings .card-form-content {
+  padding: 4px 0 28px;
+  gap: 26px;
+}
+.settings-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+}
+@keyframes settings-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* One filled group, like a CardSection's. */
+.settings-card {
+  padding: 16px;
+  width: 100%;
+  background: var(--surface);
+  border-radius: 16px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 0 0 8px 4px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* Settings → AI: the agents this computer can run bots on (Maus's engine cards). */
+.engine-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.engine-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.engine-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px;
+}
+.engine-group-title {
+  font-size: calc(12px * var(--scale));
+  font-weight: 600;
+  color: var(--secondary);
+}
+.engine-group-count {
+  font-size: calc(11px * var(--scale));
+  color: var(--tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.engine-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.engine-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: left;
+  transition: background-color var(--hover), transform var(--press);
+}
+.engine-card:hover {
+  background: color-mix(in srgb, var(--text) 5%, var(--surface));
+}
+.engine-card:active {
+  transform: scale(0.99);
+}
+.engine-card-top {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.engine-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.engine-card-name {
+  font-size: calc(13px * var(--scale));
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.engine-card-sub {
+  font-size: calc(11px * var(--scale));
+  color: var(--secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.engine-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.engine-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: calc(11px * var(--scale));
+  font-weight: 500;
+  color: var(--secondary);
+  background: rgba(var(--text-rgb), 0.06);
+}
+.engine-pill.ready {
+  color: var(--added);
+  background: color-mix(in srgb, var(--added) 10%, transparent);
+}
+.engine-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.engine-setup {
+  font-size: calc(12px * var(--scale));
+  font-weight: 600;
+  color: var(--text);
+}
+.engine-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: calc(12px * var(--scale));
+  font-weight: 500;
+  color: var(--secondary);
+  transition: background-color var(--hover), color var(--hover);
+}
+.engine-check:hover {
+  background: rgba(var(--text-rgb), 0.06);
+  color: var(--text);
+}
+.engine-check:disabled {
+  opacity: 0.6;
+}
+.settings-field {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+}
+.settings-code {
+  font-family: var(--mono);
+  font-size: calc(10px * var(--scale));
+  padding: 6px;
+  flex: 1;
+  min-width: 0;
+  background: var(--code-background);
+  border-radius: 6px;
+}
+
+/* A row that appears fades in. */
+.settings-appear {
+  animation: settings-fade var(--layout) both;
+}
+
+/* Show/hide: fade with a short drop from the top (`.opacity.combined(with: .move(edge: .top))`). */
+.settings-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: grid-template-rows var(--layout), opacity var(--layout), transform var(--layout);
+}
+.settings-reveal.shown {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: none;
+}
+.settings-reveal > div {
+  min-height: 0;
+  overflow: hidden;
+}

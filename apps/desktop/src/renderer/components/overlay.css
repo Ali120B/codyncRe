@@ -1,0 +1,303 @@
+/* Sheets: a centered card over a dim, scaling in with the layout spring. */
+.modal-card {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+}
+.modal-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity var(--layout);
+}
+.modal-content {
+  position: relative;
+  background: var(--background);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 12px 60px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity var(--layout), transform var(--layout);
+  display: flex;
+  flex-direction: column;
+}
+.modal-card.shown .modal-dim {
+  opacity: 1;
+}
+.modal-card.shown .modal-content {
+  opacity: 1;
+  transform: none;
+}
+/* A layer fading away stays mounted until its exit timer fires (late in a background window):
+   it must never take the clicks meant for what's under it. */
+.modal-card:not(.shown),
+.dialog:not(.shown) {
+  pointer-events: none;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 10px 0 16px;
+  flex: none;
+}
+
+/* Sheets, dialogs and menus: one subtle outline over the fill. */
+.modal-content::after,
+.dialog-card::after,
+.anchored-panel::after,
+.account-panel::after,
+.action-menu::after,
+.command-menu::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Dialogs */
+.dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity var(--fade);
+}
+.dialog.shown {
+  opacity: 1;
+}
+.dialog.shown .dialog-card {
+  transform: none;
+}
+.dialog-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+.dialog-card {
+  position: relative;
+  transform: scale(0.98);
+  transition: transform var(--fade);
+  width: min(320px, calc(100vw - 48px));
+  padding: 18px;
+  background: var(--bubble-agent);
+  border-radius: 22px;
+  box-shadow: 0 10px 48px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dialog-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+  color: var(--text);
+}
+.dialog-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dialog-button {
+  font-size: calc(12px * var(--scale));
+  font-weight: 500;
+  text-align: center;
+  padding: 8px 0;
+  border-radius: 999px;
+  background: var(--bubble-user);
+  color: var(--text);
+  transition: transform var(--press), opacity var(--press);
+}
+.dialog-button.prominent {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+.dialog-button.destructive {
+  background: var(--danger);
+  color: #fff;
+}
+.dialog-button:active {
+  transform: scale(0.98);
+  opacity: 0.85;
+}
+
+/* Floating layers cover the title bar's drag regions (sidebar header, thread chrome), which
+   would turn clicks on them into window drags. A menu takes the whole window, so a click
+   anywhere closes it; sheets and dialogs only their card, so the window still moves. */
+.anchored,
+.modal-content,
+.dialog-card {
+  -webkit-app-region: no-drag;
+}
+
+/* Menus */
+.anchored {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  opacity: 0;
+  transition: opacity var(--fade);
+}
+.anchored.shown {
+  opacity: 1;
+}
+.anchored-panel {
+  background: var(--bubble-agent);
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  transform: scale(0.98);
+  transition: transform var(--layout);
+}
+.anchored.shown .anchored-panel {
+  transform: none;
+}
+.menu-panel {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.menu-divider {
+  height: 0.5px;
+  background: rgba(var(--text-rgb), 0.1);
+  margin: 4px 10px;
+}
+.menu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: calc(13px * var(--scale));
+  color: var(--text);
+  transition: background-color var(--hover);
+}
+.menu-row.destructive {
+  color: var(--danger);
+}
+.menu-row.highlight {
+  background: rgba(var(--text-rgb), 0.07);
+}
+.menu-icon {
+  width: 20px;
+  display: flex;
+  justify-content: center;
+  flex: none;
+}
+.menu-title {
+  flex: 1;
+  min-width: 0;
+  margin-right: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.menu-detail {
+  flex: none;
+  font-size: calc(11px * var(--scale));
+  color: var(--tertiary);
+}
+
+/* A title line above the rows (the approval-mode question). */
+.menu-header {
+  padding: 6px 10px 8px;
+  font-size: calc(13.5px * var(--scale));
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+  text-align: left;
+}
+
+/* A row with a description (subtitle) under its title: two-line, left-aligned. */
+.menu-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+.menu-text .menu-title {
+  flex: none;
+  margin-right: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+.menu-subtitle {
+  font-size: calc(12px * var(--scale));
+  line-height: 1.4;
+  color: var(--secondary);
+}
+.menu-row:has(.menu-text) { align-items: flex-start; }
+.menu-row:has(.menu-text) .menu-icon { margin-top: 1px; }
+.menu-check { display: flex; }
+.menu-row:has(.menu-text) .menu-check { align-self: center; }
+
+.reaction-button {
+  display: grid;
+  place-items: center;
+  transition: background-color var(--hover), transform var(--press);
+}
+.reaction-button span {
+  transition: transform var(--hover);
+}
+.reaction-button:hover {
+  background: rgba(var(--text-rgb), 0.06);
+}
+.reaction-button:hover span {
+  transform: scale(1.15);
+}
+.reaction-button:active span {
+  transform: scale(0.85);
+}
+.reaction-button.chosen {
+  background: rgba(var(--text-rgb), 0.12);
+}
+
+/* Icon buttons */
+.icon-button {
+  display: grid;
+  place-items: center;
+  color: var(--secondary);
+  flex: none;
+  transition: background-color var(--hover), color var(--hover), transform var(--press);
+}
+.icon-button:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(var(--text-rgb), 0.08);
+}
+.icon-button:active:not(:disabled) {
+  background: rgba(var(--text-rgb), 0.14);
+  transform: scale(0.98);
+}
+.icon-button.selected {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+.icon-button:disabled {
+  opacity: 0.35;
+}
+
+/* Modals center below the hidden title bar (28 pt on macOS). */
+html[data-platform="darwin"] .modal-card,
+html[data-platform="darwin"] .dialog {
+  padding-top: 28px;
+}

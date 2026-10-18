@@ -1,0 +1,45 @@
+name: Submit iOS
+
+# On each v* tag that changes the iPhone app, starts the Xcode Cloud archive on that tag,
+# waits for the upload and submits it for App Review. Host/macOS-only releases skip iOS.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to submit, e.g. 2.3.0"
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ios-submit
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 200
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: pip install pyjwt cryptography
+      - name: Submit for review
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          VERSION: ${{ inputs.version || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr list --state merged --limit 200 --json body,mergeCommit > "$RUNNER_TEMP/prs.json"
+          export PRS="$RUNNER_TEMP/prs.json"
+          # A manual run ships the version even without iPhone changes.
+          [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]] && export FORCE=1
+          # A tag run waits for the build Xcode Cloud starts now, not an older upload.
+          [[ "$GITHUB_EVENT_NAME" == push ]] && export SINCE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          python3 tools/asc-submit.py "${VERSION#v}"

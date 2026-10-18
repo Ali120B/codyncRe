@@ -1,0 +1,42 @@
+name: macOS screen helper
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths:
+      - "apps/screen-macos/**"
+      - "apps/project.yml"
+      - "apps/ios/Kit/Package.swift"
+      - "apps/ios/Kit/Package.resolved"
+      - ".github/workflows/screen-macos.yml"
+
+jobs:
+  build:
+    timeout-minutes: 25
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: command -v xcodegen >/dev/null || brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec apps/project.yml
+
+      - uses: actions/cache@v4
+        with:
+          path: build/screen-ci/SourcePackages
+          key: ${{ runner.os }}-screen-packages-${{ hashFiles('apps/project.yml', 'apps/ios/Kit/Package.swift', 'apps/ios/Kit/Package.resolved') }}
+
+      - name: Build screen helper
+        run: >-
+          xcodebuild build
+          -project apps/Codync.xcodeproj
+          -scheme Screen
+          -configuration Debug
+          -destination 'generic/platform=macOS'
+          -derivedDataPath build/screen-ci
+          CODE_SIGNING_ALLOWED=NO

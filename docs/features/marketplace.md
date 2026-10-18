@@ -1,0 +1,98 @@
+# Extensions and agent setup
+
+The Extensions screen configures capabilities installed on the selected computer. Account membership does not install the same capability on every computer.
+
+The desktop and iPhone installed count is labeled **Connectors & skills**, and opens a library with that same title. It includes connected apps (stored as connectors), but excludes agents; agents show their own installation status in the Agents section. The terminal already separates these categories and does not show a combined installed count.
+
+| Capability | Implementation | Behavior |
+| --- | --- | --- |
+| Agents | `host/src/agent/backends.rs`, `host/src/agent/registry.rs`, `host/src/agent/node.rs` | Detect installed harnesses, resolve ACP registry adapters, provide Node.js for npm agents |
+| Connectors | `host/src/market/mod.rs`, `registry.rs`, `install.rs` | Discover MCP servers or add one manually; install per computer; on for every bot unless a bot turns it off |
+| Connected apps | `host/src/market/composio.rs` | Expose connected Composio apps as connectors |
+| Skills | `host/src/market/skills.rs` | Instruction folders containing `SKILL.md`, stored under `~/.codync/skills/<id>`; on for every bot unless a bot turns it off |
+
+Install runs the CLI's own native installer where it has one, on Windows too (Claude Code, Codex, Grok, Qwen, Droid, Qoder, Cursor…, `Install` in `backends.rs`); CLIs published only on npm (Gemini, Cline, Auggie, Kilo…) install with `codync-host npm install -g <package>`, npm on the computer's own Node or else on Codync's. A CLI with its own ACP mode then runs as installed, without Node.js. Refreshing the agents re-reads the PATH a fresh login would get (the login shell's; on Windows the user's and machine's PATH from the registry), so a CLI found by an installer that just ran shows up without restarting the host. Many agents' ACP adapters run through `npx` (Claude, Codex, Gemini, Qwen…). On a computer without Node.js, the agent list marks each of them `node: "missing"` (only then is the field there; `added` once Codync's copy is in place) and they aren't available; Extensions shows one *Add Node.js* notice above the agents, each such agent reads *Needs Node.js*, and its setup sheet gets a Node.js step between Install and Sign in. Adding it (`agentSetup {step: "node"}`, a setup terminal running `codync-host node`) downloads the official Node.js of a pinned version (`VERSION` and SHA-256s in `node.rs`) once into `~/.codync/node/<version>`; npm installs with it go to `~/.codync/node/global`. Both folders come last on the agent search path, so the computer's own Node and CLIs always win, and nothing outside `~/.codync` changes. Linux builds of Node need glibc: on musl distros (Alpine) install Node.js yourself.
+
+The Connectors shelf opens with a short featured list, then pages through the whole MCP Registry (`marketConnectors {search, cursor}` → `{items, nextCursor}`, 60 metadata records per API page; the UI initially shows 12 and reveals another 12 only when *Load more connectors* is pressed). Apps through Composio use the same 12-at-a-time display with *Load more apps*. Searching resets the visible batch; late responses from an older search are ignored. Scrolling never triggers another catalog fetch. Listed: stdio npm/PyPI/OCI/NuGet packages (the registry's runtime and package arguments become inputs) and streamable-HTTP or SSE remotes (URL `{variables}` become inputs). Not listed: MCPB bundles and packages that serve HTTP locally; add those as a custom connector.
+
+Registry package installs use pinned package references: npm, PyPI and NuGet require the package’s own version; OCI uses the tag or SHA-256 digest already in its image identifier, even when the separate package version is omitted. Untagged images, `latest` tags without a digest, and invalid references are rejected; a server-level version does not pin the executable package.
+
+A custom connector is a command line (split like a shell), a URL, or a pasted MCP config (`importConnectors {config}`: the `mcpServers` / `servers` JSON from READMEs, Claude, Cursor or VS Code, or one server's entry); every server in a config is added.
+
+A connector installed on the computer (or an app connected through Composio) is turned on for every existing bot, and a new bot starts with all of them on; each bot can turn one off in its settings. An enabled connector is passed to the agent as an MCP server when its session starts or resumes. Local connectors are spawned by the agent; remote ones always go through the host's stdio proxy (`codync-host mcp remote`, `host/src/mcp.rs`), so they work with agents that only speak stdio and always carry a fresh token. The proxy speaks streamable HTTP and falls back to the older HTTP+SSE transport when the first POST fails with 400/404/405, as the MCP spec suggests.
+
+Skills follow the same rule: an installed or hand-written skill is turned on for every existing bot, a new bot starts with all of them on, and each bot can turn one off. An enabled skill reaches the agent as a line in its profile (name, description, path to `SKILL.md`). Skills installed before this rule were turned on for every bot once, at host start (kv `skillsOnForEveryBot`).
+
+Clicking a skill (an Extensions row, an installed skill, or the info button beside a skill's switch in bot settings; in the terminal, ↵ on a skill, or `i` on the bot form's Skills field) opens its details: the description and its instructions, with Add while it isn't installed. `skillDetails {id}` (installed) or `{source}` (catalog) returns `{markdown}`: the `SKILL.md` body without its front matter, at most 256 KB. The host looks names up in the installed list or the catalog cache, never as a path; the catalog fetch already downloads every `SKILL.md`, so the bodies stay in that cache. An Extensions row opens its details, or does what its button does when it has none (connectors open their install sheet).
+
+Registry-backed package connectors follow their upstream release. The host checks the Registry periodically after credentials are unlocked and checks again immediately before a package process starts. If a newer pinned npm, PyPI, OCI or NuGet reference is available, only that package/image argument is replaced; the running process is not interrupted, and the new version applies on its next launch. Network failures, missing packages and attempted downgrades leave the installed reference unchanged. Custom command connectors are never updated automatically.
+
+## Commands
+
+Typing `/` at the start of a message to a bot (desktop, iPhone, terminal; not in a group, where each member has its own agent and skills) lists that bot's commands, filtered by what follows the `/` (a command's name or title): the built-in ones first, then the skills the bot has on. Each row shows an icon, the title and what it does. The list floats above the box on the desktop (↑/↓ move the highlight, Tab or Return picks it, Escape hides the list until the draft changes, hover and click work too), sits inline above the box on the iPhone (a tap picks; it isn't a menu, so the system-menu rule doesn't apply), and is the highlighted list over the transcript in the terminal (↑/↓, Tab or ↵).
+
+| Command | Title | Does |
+| --- | --- | --- |
+| `/fast` | Fast mode | Switches [Fast mode](#fast-mode) with `updateBot`; listed only while the bot offers it. Its detail says what picking it does, or why the agent refused it (warning color). |
+| `/new` | New session | `newSession`: the agent starts over with a fresh context and the transcript stays. No confirmation, unlike the bot menu's New session, because typing the command is the confirmation. |
+| `/<skill id>` | the skill's name | Fills in `/<skill id> ` for the rest of the message. |
+
+Picking a built-in command, or sending a message that is just one (`/fast`, `/new`), runs it in the client and clears the box; nothing reaches the agent. Return on a skill whose name is already typed out sends the message. The host sees a message starting with `/<id of a skill the bot has on>` and hands the agent `[Codync: the user picked the "<name>" skill for this message. Read <path> first and follow it.]` followed by the rest of the message; the chat keeps the text as typed. Any other `/command`, including `/fast` for a bot without Fast mode on offer, reaches the agent unchanged, so its own commands keep working. Clients list skills and load skill instructions only from hosts 2.14.1 and newer.
+
+## Sign-in for remote connectors (`host/src/market/oauth.rs`)
+
+Installing a remote connector probes it: a 401 to `initialize`, or (with no headers given) protected-resource metadata naming an authorization server, for servers like Call2Me that only refuse tool calls, marks it `signedOut`, and bots don't get it until someone signs in. Sign-in follows the MCP authorization spec: protected-resource metadata → authorization-server metadata → dynamic client registration (both redirect URIs at once) → PKCE. Tokens stay on the computer and are refreshed on use (or after a 401).
+
+| Where the user signs in | Redirect URI | Who finishes |
+| --- | --- | --- |
+| On the computer (desktop app, TUI; loopback caller) | `http://127.0.0.1:<port>/oauth/callback` | the host's callback page |
+| On the phone (E2E channel caller) | `<cloud>/v1/oauth/callback` → 302 `codync://oauth?…` | the app's system sign-in sheet sends `connectorSignInFinish` |
+
+The cloud page is stateless and the code is useless without the PKCE verifier held by the host. Servers without dynamic client registration (e.g. GitHub) need a token header instead (custom connector, URL + headers). `connectorTarget` (loopback only) hands the proxy the URL and headers.
+
+Registry packages install only at the exact version the MCP Registry lists (no `latest`), since they run as the user. An enabled skill tells the bot where its instruction folder lives. These are distinct from the built-in `team` and `computer` MCP services.
+
+Registry and repository metadata are untrusted: the host validates names and paths before installing. Secret values stay on the computer; listings report whether required values are configured. Adapter downloads and external authorization depend on the selected provider.
+
+To check a change, use a disposable bot on the intended computer, verify discovery/install/configuration, start a new session as needed, and confirm the agent actually receives the capability. Listing an item alone does not verify its authentication or runtime behavior.
+
+See [file structure](../architecture/file-structure.md), [bot collaboration](bot-collaboration.md), and [remote screen](remote-screen.md).
+
+## Model selection
+
+The shared bot editor requests `agentModels {backend}` from the selected computer. The host starts an isolated ACP session under its probe directory with saved agent credentials, no MCP servers and no prompt, then closes the process. The response is `{models: [{id, name, description, options}], currentModelId, fastMode}`.
+
+Discovery prefers ACP `configOptions` with category `model` (including grouped options), with conventional `model`/`models` IDs as a compatibility fallback. Older agents may expose `models.availableModels`. Model names and IDs come from the agent; Codync does not bundle a provider catalog. See the [ACP config option contract](https://agentclientprotocol.com/protocol/v1/session-config-options).
+
+A model's `options` are its own settings, such as reasoning effort or fast mode: `[{id, name, values: [{id, name}], default}]`. Every `initialize` sends `clientCapabilities._meta.parameterizedModelPicker: true`; Cursor then lists plain models and, on `cursor/list_available_models` (asked only of the Cursor backend), each model's settings as ACP select config options. Without the flag Cursor offers one fixed variant per model (`grok-4.7[reasoning_effort=high,fast=true]`) and rejects every other. The bot stores the picks as `modelOptions` (option id → value; an absent id means the agent's default). After choosing the model with `session/set_config_option`, the host sets each option the same way, on new sessions and again after `session/load`, because Cursor resumes a session on its last-used model. A bot saved with a variant ID keeps working: when the agent lists the plain model instead, the bracket's `key=value` pairs become options (Auto's `default[]` becomes `default`). Some values change Cursor's billing: a larger context (Grok 4.7 at 500K) turns on its Max Mode. Changing the model or agent clears the options; the host also clears them when an app that predates them changes the model.
+
+The editor keeps Default, shows available models in a dropdown, and resets the selected model when changing agents. Under the model it shows one picker per option (iPhone and desktop: a row each, named by the agent, with Default first; terminal UI: an Options row, ←→ to move, space to change). Errors are visible and retryable. Custom commands and agents without model discovery retain manual ID entry; an existing unlisted ID is preserved. The probe uses an isolated directory, so project-specific agent configuration can differ from the real bot session. Changing the model restarts the bot's agent sessions with fresh model context and preserves the stored chat history. The agent remains responsible for validating availability when a session starts.
+
+## Fast mode
+
+Claude Code's and Codex's ACP adapters offer Fast mode (faster replies for more usage) as a session config option: Claude's `fast`, Codex's `fast-mode`, each a `select` of `on`/`off` (a boolean for clients that opt into boolean options), listed only while the session's model supports it. Only such an `on`/`off` or boolean option counts: Cursor's `fast` (`true`/`false`) is one of a model's options (see Model selection), so Fast mode leaves it to the bot's `modelOptions`. `fastMode` in `agentModels` says whether the probe session offered it, so it reflects the agent's default model.
+
+The host keeps each live session's Fast mode option as the agent last listed it: from `session/new` (after the model switch, whose answer can change the options), `session/load`, `session/fork`, `session/set_config_option` answers and `config_option_update` notifications. Before every turn it switches the session to the bot's `fastMode` with `session/set_config_option` when the value differs, so changing the setting needs no agent restart and keeps the context. The adapters start each session or process at their own default, which is why a resumed session is switched again.
+
+The bot's runtime carries what the agent says (`fastModeSupport`, `fastModeIssue` in the bot payload):
+
+| `fastModeSupport` | Meaning |
+|---|---|
+| `unknown` | No session has listed its options yet. A session that lists no config options at all settles it as `unsupported`. |
+| `offered` | The agent offers it for the session's model. |
+| `unsupported` | The session's model doesn't (the chat gets an info notice while the bot asks for it). |
+| `refused` | The agent turned it off right after the bot asked, or despite the switch: Claude does this for an account without extra usage and appends the reason to the option's description, which becomes `fastModeIssue`. The host stops asking until the user changes the setting or the host restarts. |
+
+`offered` and `unsupported` are kept across host restarts (`fast-mode.<bot>` in the kv store); a refusal isn't, so a new host asks again.
+
+Clients show Fast mode for an agent bot unless its runtime says `unsupported` (an `unknown` bot may offer it; its first session settles it), and always while it's on (so it can be turned off); never for a group:
+
+- Composer: the `/fast` [command](#commands), not a button. The terminal UI also shows `⚡ fast` or `⚡ refused` in the chat header.
+- Bot settings: a Fast mode switch row under Model when the agent's model list offers it (never for a custom command), when the bot's own sessions do, or while it's on. While refused, its detail gives the reason. The terminal UI form always lists the field and notes when the agent doesn't offer it.
+
+## Secure connection setup
+
+See [Connector setup and credentials](connector-credentials.md) for the shared
+macOS/Linux vault, optional 1Password references, in-chat connection requests and
+MCP readiness checks. Single-option connectors without setup fields start adding
+immediately; setup failures remain visible for retry.

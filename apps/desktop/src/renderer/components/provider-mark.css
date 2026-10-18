@@ -1,0 +1,11 @@
+/* The initial that stands in for an agent without a brand mark. */
+.provider-mark-fallback {
+  flex: none;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--text-rgb), 0.1);
+  font-weight: 500;
+  line-height: 1;
+  user-select: none;
+}

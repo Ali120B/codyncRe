@@ -1,0 +1,193 @@
+/* The bot's quick settings beside its chat: avatar, name, a tab row, and the open tab. */
+.bot-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.bot-panel-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 4px;
+  flex: none;
+}
+
+.bot-panel-name {
+  font-size: calc(15px * var(--scale));
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bot-panel-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--surface);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.bot-panel-tab {
+  flex: none;
+  padding: 5px 9px;
+  border-radius: 9px;
+  font-size: calc(12px * var(--scale));
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
+.bot-panel-tab[aria-pressed='true'] {
+  background: var(--bubble-agent);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.bot-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px 24px;
+}
+
+.bot-panel-details {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.bot-panel-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.bot-panel-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+
+.bot-panel-label {
+  font-size: calc(12px * var(--scale));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tertiary);
+}
+
+.bot-panel-link {
+  flex: none;
+  font-size: calc(12px * var(--scale));
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.bot-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+/* The switch hugs its track; the row's text column takes the rest. */
+.bot-panel-row .switch {
+  flex: none;
+  width: auto;
+}
+.bot-panel-row .bot-panel-row-name {
+  min-width: 0;
+}
+
+.bot-panel-row + .bot-panel-row {
+  border-top: 1px solid var(--border);
+}
+
+.bot-panel-rowtext {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bot-panel-row-name {
+  font-size: calc(13px * var(--scale));
+  color: var(--text);
+}
+
+.bot-panel-row-detail {
+  font-size: calc(12px * var(--scale));
+  color: var(--secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bot-panel-note {
+  font-size: calc(13px * var(--scale));
+  color: var(--secondary);
+}
+
+.bot-panel-intro {
+  margin-bottom: 6px;
+  font-size: calc(13px * var(--scale));
+  color: var(--text);
+}
+
+.bot-panel-foot {
+  margin-top: 10px;
+  font-size: calc(12px * var(--scale));
+  color: var(--tertiary);
+}
+
+/* The Details tab's profile rows (Maus): label on the left, value on the right, one card. */
+.details-rows {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.details-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px;
+  text-align: left;
+  transition: background var(--hover);
+}
+
+.details-row:hover {
+  background: var(--hover-fill);
+}
+
+.details-row + .details-row {
+  border-top: 1px solid var(--hairline);
+}
+
+.details-row-label {
+  color: var(--text);
+  flex: none;
+}
+
+.details-row-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--secondary);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.details-row.all:hover {
+  background: var(--hover-fill);
+}

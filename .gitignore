@@ -1,0 +1,32 @@
+.DS_Store
+
+# Xcode
+xcuserdata/
+DerivedData/
+build/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+# Xcode Cloud resolves packages only from the checked-in pins
+!apps/Codync.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+# Secrets
+*.p8
+.dev.vars
+.wrangler/
+.claude/worktrees/
+
+# /brag launch video renders
+brag-output*/
+
+# Launch video projects
+videos/
+
+# Builds and dependencies
+node_modules/
+target/
+out/
+dist/
+*.tsbuildinfo

@@ -1,0 +1,28 @@
+name: Rust cache
+
+# Saves on main the Rust cache the desktop release's macOS job restores. A run can only read caches
+# saved on its own ref or on main, so the caches PR and tag runs save never reach the next run, and
+# without this one each release builds the host's dependencies from scratch (about 5 minutes).
+on:
+  push:
+    branches: [main]
+    paths: ["host/Cargo.lock", "rust-toolchain.toml", ".github/workflows/rust-cache.yml"]
+  workflow_dispatch:
+
+jobs:
+  desktop-macos:
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: host
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup toolchain install
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: host
+          shared-key: desktop-macos
+      # The same targets and profile as tools/native-host.mjs builds for the release.
+      - run: cargo build --release --target aarch64-apple-darwin --target x86_64-apple-darwin

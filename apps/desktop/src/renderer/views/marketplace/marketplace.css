@@ -1,0 +1,295 @@
+.market-page {
+  position: relative;
+  height: 100%;
+  background: var(--background);
+}
+.market-scroll {
+  height: 100%;
+  overflow-y: auto;
+}
+.market-page-content {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 26px 30px 44px;
+  max-width: 880px;
+  margin: 0 auto;
+}
+.market-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+/* Title, description and trailing links at the top of the Plugins sheet. */
+.market-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-right: 34px;
+}
+
+/* Installed ⇄ page: slides like `.move(edge:)` + opacity. */
+.market-stack {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  background: var(--background);
+}
+.market-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--layout), opacity var(--layout);
+}
+.market-layer.off-leading {
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.market-layer.off-trailing {
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.market-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 40px;
+  flex: 1;
+  min-width: 0;
+  background: rgba(var(--text-rgb), 0.05);
+  border-radius: 10px;
+}
+.market-search input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The MCP servers pill beside the search field (Maus's Apps header). */
+.mcp-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  flex: none;
+  border-radius: 10px;
+  background: rgba(var(--text-rgb), 0.07);
+  font-size: calc(13px * var(--scale));
+  font-weight: 500;
+  color: var(--text);
+  transition: background-color var(--hover);
+}
+.mcp-button:hover { background: rgba(var(--text-rgb), 0.11); }
+
+/* The kind filter chips (All / Apps / Connectors / Skills). */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: calc(12.5px * var(--scale));
+  color: var(--text);
+  background: rgba(var(--text-rgb), 0.06);
+  transition: background-color var(--hover);
+}
+.chip:hover { background: rgba(var(--text-rgb), 0.1); }
+.chip.selected {
+  background: rgba(var(--text-rgb), 0.14);
+  font-weight: 500;
+}
+
+.market-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.market-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 26px;
+  padding: 0 10px;
+}
+.market-section-title {
+  font-size: calc(13px * var(--scale));
+  font-weight: 500;
+  color: var(--secondary);
+}
+/* A quiet trailing link ("View all", "Connected"). */
+.market-link {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: calc(13px * var(--scale));
+  color: var(--secondary);
+  transition: color var(--hover);
+}
+.market-link:hover { color: var(--text); }
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  column-gap: 24px;
+  row-gap: 2px;
+}
+
+/* Node.js missing for some agents: one filled row above the grid (no border on a fill). */
+.node-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bubble-agent);
+}
+
+.agent-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  text-align: left;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  min-width: 0;
+  background: transparent;
+  transition: background-color var(--hover), transform var(--press);
+}
+.agent-card:hover {
+  background: color-mix(in srgb, var(--bubble-agent) 80%, transparent);
+}
+.agent-card:active {
+  transform: scale(0.98);
+}
+
+.market-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  min-width: 0;
+  transition: background-color var(--hover);
+}
+.market-row.openable:hover {
+  background: rgba(var(--text-rgb), 0.05);
+}
+
+/* The quiet capsule action ("Connect", "Set up", "New"). */
+.capsule-action {
+  font-size: calc(12.5px * var(--scale));
+  font-weight: 500;
+  color: var(--text);
+  padding: 6px 14px;
+  background: rgba(var(--text-rgb), 0.08);
+  border-radius: 999px;
+  white-space: nowrap;
+  flex: none;
+  transition: background-color var(--hover), transform var(--press);
+}
+.capsule-action:hover { background: rgba(var(--text-rgb), 0.12); }
+.capsule-action:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* An installed row's trailing state ("Included"). */
+.market-added {
+  flex: none;
+  padding-right: 6px;
+  font-size: calc(12.5px * var(--scale));
+  color: var(--secondary);
+}
+
+.skeleton {
+  animation: market-pulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes market-pulse {
+  to {
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+.plain-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-align: left;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.option-row:disabled {
+  opacity: 0.5;
+}
+
+.plain-row-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.market-field {
+  width: 100%;
+  display: block;
+}
+textarea.market-field {
+  field-sizing: content;
+}
+/* A chat request card has no fill, so each of its fields gets one (fill, no border). */
+.request-card .market-field {
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: var(--bubble-agent);
+  box-sizing: border-box;
+}
+
+.setup-terminal {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 10px 0;
+}
+.setup-terminal .xterm {
+  height: 100%;
+}
+.setup-terminal .xterm-viewport {
+  background: transparent !important;
+}
+
+.fade-in {
+  animation: market-fade-in var(--fade) both;
+}
+@keyframes market-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.market-heading { display: flex; align-items: center; gap: 12px; padding-right: 10px; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .market-page-content { padding: 28px 18px; }
+  .item-grid { grid-template-columns: minmax(0, 1fr); }
+  .agent-grid { grid-template-columns: minmax(0, 1fr); }
+}

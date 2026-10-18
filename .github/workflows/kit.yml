@@ -1,0 +1,27 @@
+name: iOS Kit
+
+# The iPhone app's Swift package (apps/ios/Kit): models, client, stores and screens.
+on:
+  pull_request:
+    paths: ["apps/ios/Kit/**", "docs/reference/fixtures/remote-relay-vectors.json", ".github/workflows/kit.yml"]
+
+# A newer push to the same PR supersedes the run in progress; tag runs always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/ios/Kit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Test on an iPhone simulator
+        run: |
+          DEVICE=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [^(]+\(([0-9A-F-]{36})\)' | grep -oE '[0-9A-F-]{36}')
+          xcodebuild test -scheme CodyncKit-Package -destination "platform=iOS Simulator,id=$DEVICE" -quiet

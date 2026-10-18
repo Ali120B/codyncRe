@@ -1,0 +1,98 @@
+/* The decision strip above the composer while a permission request waits (Maus's). */
+.approval-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 10px 12px 9px;
+  border-radius: 16px;
+  background: var(--bubble-agent);
+}
+
+.approval-bar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.approval-bar-tag {
+  font-size: calc(10.5px * var(--scale));
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--secondary);
+}
+.approval-bar-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(var(--text-rgb), 0.07);
+  font-size: calc(11px * var(--scale));
+  color: var(--secondary);
+  font-variant-numeric: tabular-nums;
+}
+.approval-bar-title {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(13.5px * var(--scale));
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.approval-bar-slug { color: var(--tertiary); }
+
+.approval-bar-detail {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--code-background);
+  font-family: var(--mono);
+  font-size: calc(11px * var(--scale));
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approval-bar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.approval-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: calc(13px * var(--scale));
+  transition: background-color var(--hover), color var(--hover), opacity var(--hover);
+}
+.approval-action:disabled { opacity: 0.5; }
+.approval-action.quiet {
+  margin-right: auto;
+  padding: 0 10px;
+  color: var(--secondary);
+}
+.approval-action.quiet:hover:not(:disabled),
+.approval-action.plain:hover:not(:disabled) { background: rgba(var(--text-rgb), 0.06); }
+.approval-action.quiet:hover:not(:disabled) { color: var(--text); }
+.approval-action.plain {
+  border: 1px solid var(--chrome-stroke);
+  color: var(--text);
+}
+.approval-action.danger {
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+.approval-action.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.approval-action.primary {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+.approval-action.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-fill) 88%, var(--text)); }

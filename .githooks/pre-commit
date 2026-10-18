@@ -1,0 +1,80 @@
+#!/bin/sh
+# Runs CI's checks for the parts of the repo a commit touches, on the staged files only: other
+# agents' uncommitted edits in this checkout don't count. Skip with `git commit --no-verify`.
+set -eu
+
+staged_files=$(git diff --cached --name-only)
+touches() { printf '%s\n' "$staged_files" | grep -Eq "$1"; }
+
+repo=$(git rev-parse --show-toplevel)
+git_dir=$(git rev-parse --absolute-git-dir)
+# A fixed path keeps cargo's build cache; the lock keeps two commits from sharing it at once.
+snapshot="$git_dir/precommit-snapshot"
+lock="$git_dir/precommit.lock"
+locked=""
+
+# Runs a command, and everything it starts, for at most $1 seconds: a hung test would otherwise hold
+# the commit, and every other commit waiting on the lock, until someone notices.
+within() {
+    perl -e '$s = shift; $pid = fork // die "fork: $!\n";
+        if (!$pid) { setpgrp; exec @ARGV or die "exec: $!\n" }
+        $SIG{ALRM} = sub { kill "KILL", -$pid; die "Still running after $s s, so a test hangs: stopped it.\n" };
+        alarm $s; waitpid $pid, 0; exit(($? >> 8) || ($? & 127))' "$@"
+}
+
+staged_copy() {
+    [ -n "$locked" ] && return
+    until mkdir "$lock" 2>/dev/null; do
+        echo "Waiting for another commit's checks..."
+        sleep 5
+    done
+    locked=1
+    trap 'rm -rf "$lock"' EXIT
+    trap 'exit 1' INT TERM
+    rm -rf "$snapshot"
+    mkdir -p "$snapshot"
+    git archive "$(git write-tree)" | tar -x -C "$snapshot"
+}
+
+if touches '^(host/|packaging/(updates|engram)/|docs/reference/fixtures/remote-relay-vectors\.json)'; then
+    staged_copy
+    echo "Checking the host (cargo fmt, clippy, test)..."
+    # CI's pinned memory runtime (fetched once): without it every test turn waits on installing one.
+    engram=$(python3 "$repo/packaging/engram/test-runtime.py")
+    (cd "$snapshot/host" && export CARGO_TARGET_DIR="$repo/host/target/precommit" CODYNC_TEST_ENGRAM="$engram" &&
+        cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --no-run &&
+        within 300 sh -c 'cargo test && cargo test --test memory_e2e -- --ignored &&
+            cargo test --bin codync-host native_memory_survives_restart -- --ignored')
+fi
+
+if touches '^apps/desktop/'; then
+    staged_copy
+    echo "Checking the desktop app (typecheck, test)..."
+    ln -s "$repo/apps/desktop/node_modules" "$snapshot/apps/desktop/node_modules"
+    (cd "$snapshot/apps/desktop" && npm run typecheck && npm test)
+fi
+
+for dir in cloud relay discord; do
+    if touches "^(cloud/|relay/|discord/|docs/reference/fixtures/remote-relay-vectors\\.json)"; then
+        staged_copy
+        echo "Checking $dir (typecheck, test)..."
+        ln -s "$repo/$dir/node_modules" "$snapshot/$dir/node_modules"
+        (cd "$snapshot/$dir" && npm run typecheck && npm test)
+    fi
+done
+
+if touches '^apps/screen-linux/'; then
+    staged_copy
+    echo "Checking Linux screen helper formatting..."
+    cargo fmt --manifest-path "$snapshot/apps/screen-linux/Cargo.toml" -- --check
+fi
+
+if touches '^apps/screen-macos/'; then
+    if [ "$(uname -s)" = "Darwin" ]; then
+        staged_copy
+        echo "Checking macOS screen helper syntax..."
+        xcrun swiftc -parse "$snapshot"/apps/screen-macos/*.swift
+    else
+        echo "Skipping macOS screen helper syntax check (requires macOS)."
+    fi
+fi
