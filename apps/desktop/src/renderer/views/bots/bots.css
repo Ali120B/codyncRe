@@ -313,3 +313,24 @@ button.member-row:hover {
   width: 100%;
   margin-top: 2px;
 }
+
+/* The settings walk: "3 of 10" and the Next step at the end of an open section. */
+.settings-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.settings-next {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: calc(12.5px * var(--scale));
+  font-weight: 500;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}

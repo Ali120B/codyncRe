@@ -26,6 +26,20 @@ const other = <T,>(list: readonly T[], current: T): T => {
   return rest[Math.floor(Math.random() * rest.length)] ?? current
 }
 
+/** The settings sections in order: the Next stepper walks them, Details rows jump by id. */
+const SECTIONS: { id: string; title: string }[] = [
+  { id: 'overview', title: 'Overview' },
+  { id: 'identity', title: 'Identity' },
+  { id: 'instructions', title: 'Instructions' },
+  { id: 'model', title: 'Model' },
+  { id: 'permissions', title: 'Permissions' },
+  { id: 'access', title: 'Access' },
+  { id: 'skills', title: 'Skills' },
+  { id: 'memory', title: 'Memory' },
+  { id: 'routines', title: 'Routines' },
+  { id: 'alerts', title: 'Voice & alerts' },
+]
+
 /** Create or edit a bot in a modal: the settings form plus Close / Save. */
 export function BotEditorView({ draft: initial }: { draft: BotDraft }) {
   const store = useStore()
@@ -130,6 +144,30 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
   const toggleSection = (id: string) => setOpenSection((cur) => (cur === id ? '' : id))
   const matches = (title: string) => !query.trim() || title.toLowerCase().includes(query.trim().toLowerCase())
 
+  // One-by-one walk through the settings: Next closes this section and opens the next.
+  const stepSections = SECTIONS.filter((s) => matches(s.title) && (draft.id || (s.id !== 'memory' && s.id !== 'routines')))
+  const revealSection = (id: string) => {
+    setOpenSection(id)
+    setTimeout(() => {
+      document.querySelector(`[data-acc="${id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    }, 60)
+  }
+  const stepFooter = (id: string) => {
+    const index = stepSections.findIndex((s) => s.id === id)
+    if (index < 0) return null
+    const next = stepSections[index + 1]
+    return (
+      <>
+        <span style={{ ...font('caption'), color: 'var(--tertiary)' }}>{index + 1} of {stepSections.length}</span>
+        <span style={{ flex: 1 }} />
+        <button className="settings-next press" onClick={() => (next ? revealSection(next.id) : setOpenSection(''))}>
+          {next ? `Next: ${next.title}` : 'Done'}
+          <Icon name={next ? 'chevron.down' : 'checkmark'} size={11} weight="semibold" />
+        </button>
+      </>
+    )
+  }
+
   // Jumped here from a Details row: bring the open section into view.
   useEffect(() => {
     if (!opened) return
@@ -169,7 +207,7 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
           </div>
         ) : null}
 
-        {matches('Overview') ? <Accordion id="overview" icon="square.grid.2x2" title="Overview" open={openSection} onToggle={toggleSection}>
+        {matches('Overview') ? <Accordion id="overview" icon="square.grid.2x2" title="Overview" open={openSection} onToggle={toggleSection} footer={stepFooter('overview')}>
           {draft.id ? (
             <Field label="Name">
               <input className="field-box" value={draft.name} placeholder="Name" onChange={(e) => set('name', e.target.value)} />
@@ -180,7 +218,7 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
           </ValueRow>
         </Accordion> : null}
 
-        {matches('Identity') ? <Accordion id="identity" icon="person.crop.circle" title="Identity" open={openSection} onToggle={toggleSection}>
+        {matches('Identity') ? <Accordion id="identity" icon="person.crop.circle" title="Identity" open={openSection} onToggle={toggleSection} footer={stepFooter('identity')}>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button ref={avatarRef} className="avatar-button" title="Edit Bot avatar" aria-label="Edit Bot avatar" onClick={() => setPickingAvatar((p) => !p)}>
               <CharacterAvatar shape={draft.avatarShape} color={draft.avatarColor} size={56} />
@@ -193,13 +231,13 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
           </div>
         </Accordion> : null}
 
-        {matches('Instructions') ? <Accordion id="instructions" icon="square.and.pencil" title="Instructions" open={openSection} onToggle={toggleSection}>
+        {matches('Instructions') ? <Accordion id="instructions" icon="square.and.pencil" title="Instructions" open={openSection} onToggle={toggleSection} footer={stepFooter('instructions')}>
           <Field label="Standing instructions" detail="Rules that always apply. Put task-specific requests in the chat instead.">
             <AutoTextArea className="field-box" value={draft.description} placeholder="e.g. Reviews PRs. Never pushes without asking." minRows={3} maxRows={8} onChange={(v) => set('description', v)} />
           </Field>
         </Accordion> : null}
 
-        {matches('Model') ? <Accordion id="model" icon="slider.horizontal.3" title="Model" open={openSection} onToggle={toggleSection}>
+        {matches('Model') ? <Accordion id="model" icon="slider.horizontal.3" title="Model" open={openSection} onToggle={toggleSection} footer={stepFooter('model')}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <ValueRow label="Agent">
               <ChoicePicker
@@ -234,7 +272,7 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
           ) : null}
         </Accordion> : null}
 
-        {matches('Permissions') ? <Accordion id="permissions" icon="checkmark.shield" title="Permissions" open={openSection} onToggle={toggleSection}>
+        {matches('Permissions') ? <Accordion id="permissions" icon="checkmark.shield" title="Permissions" open={openSection} onToggle={toggleSection} footer={stepFooter('permissions')}>
           <ValueRow
             label="Permissions"
             detail={
@@ -257,7 +295,7 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
           </ValueRow>
         </Accordion> : null}
 
-        {matches('Access') ? <Accordion id="access" icon="lock.shield" title="Access" open={openSection} onToggle={toggleSection}>
+        {matches('Access') ? <Accordion id="access" icon="lock.shield" title="Access" open={openSection} onToggle={toggleSection} footer={stepFooter('access')}>
           <ValueRow
             label="Workspace"
             detail={
@@ -323,7 +361,7 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
           ) : null}
         </Accordion> : null}
 
-        {matches('Skills') ? <Accordion id="skills" icon="list.bullet" title="Skills" open={openSection} onToggle={toggleSection}>
+        {matches('Skills') ? <Accordion id="skills" icon="list.bullet" title="Skills" open={openSection} onToggle={toggleSection} footer={stepFooter('skills')}>
           <PluginToggles
             title="Skills"
             empty="No skills yet. Get some from Extensions, or write your own."
@@ -334,15 +372,15 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
           />
         </Accordion> : null}
 
-        {draft.id && matches('Memory') ? <Accordion id="memory" icon="doc.plaintext" title="Memory" open={openSection} onToggle={toggleSection}>
+        {draft.id && matches('Memory') ? <Accordion id="memory" icon="doc.plaintext" title="Memory" open={openSection} onToggle={toggleSection} footer={stepFooter('memory')}>
           <MemoryCard botId={draft.id} />
         </Accordion> : null}
 
-        {draft.id && matches('Routines') ? <Accordion id="routines" icon="arrow.clockwise" title="Routines" open={openSection} onToggle={toggleSection}>
+        {draft.id && matches('Routines') ? <Accordion id="routines" icon="arrow.clockwise" title="Routines" open={openSection} onToggle={toggleSection} footer={stepFooter('routines')}>
           <RoutinesView botId={draft.id} initialId={null} />
         </Accordion> : null}
 
-        {matches('Voice & alerts') ? <Accordion id="alerts" icon="bell.badge" title="Voice & alerts" open={openSection} onToggle={toggleSection}>
+        {matches('Voice & alerts') ? <Accordion id="alerts" icon="bell.badge" title="Voice & alerts" open={openSection} onToggle={toggleSection} footer={stepFooter('alerts')}>
           <SwitchRow title="Notifications" detail="Get notified when this bot finishes or needs you" on={draft.notify ?? true} onChange={(on) => set('notify', on)} />
         </Accordion> : null}
 

@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import type { Bot, BotDraft } from '@shared/models'
+import { useModel } from '../../lib/observable'
 import { AVATAR_COLORS, AVATAR_SHAPES } from '../../lib/theme'
 import type { BotStore } from '../../store/bot-store'
+import { pluginsFor } from '../marketplace/plugins'
 
 /** An installed connector (host `connectors`). */
 export interface InstalledConnector {
@@ -65,16 +67,14 @@ export async function loadPlugins(store: BotStore): Promise<Plugins> {
 }
 
 export function usePlugins(store: BotStore): Plugins | null {
-  const [plugins, setPlugins] = useState<Plugins | null>(null)
+  // The Marketplace's live model: an install in any sheet updates every panel at once.
+  const model = useModel(pluginsFor(store))
   const online = store.connection.kind === 'online'
   useEffect(() => {
-    let live = true
-    void loadPlugins(store).then((p) => live && setPlugins(p))
-    return () => {
-      live = false
-    }
-  }, [store, online])
-  return plugins
+    if (online) void model.refresh()
+    else void model.ensureLoaded()
+  }, [model, online])
+  return model.loaded ? { connectors: model.installedConnectors, skills: model.installedSkills } : null
 }
 
 /** Creates an unnamed bot with sensible defaults and opens it (desktop compose flow). */

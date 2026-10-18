@@ -2,12 +2,14 @@ import type { ReactNode } from 'react'
 import { Icon } from '../../components/Icon'
 
 /** One row of the settings accordion (Maus's All settings): a quiet card that opens one at a time. */
-export function Accordion({ id, icon, title, open, onToggle, children }: {
+export function Accordion({ id, icon, title, open, onToggle, footer, children }: {
   id: string
   icon: string
   title: string
   open: string
   onToggle: (id: string) => void
+  /** Below the section's content, still inside the open card (the Next step). */
+  footer?: ReactNode
   children: ReactNode
 }) {
   const expanded = open === id
@@ -18,7 +20,12 @@ export function Accordion({ id, icon, title, open, onToggle, children }: {
         <span className="settings-acc-title">{title}</span>
         <Icon name={expanded ? 'chevron.up' : 'chevron.down'} size={11} weight="semibold" color="var(--tertiary)" />
       </button>
-      {expanded ? <div className="settings-acc-body" data-acc={id}>{children}</div> : null}
+      {expanded ? (
+        <div className="settings-acc-body" data-acc={id}>
+          {children}
+          {footer ? <div className="settings-step">{footer}</div> : null}
+        </div>
+      ) : null}
     </div>
   )
 }

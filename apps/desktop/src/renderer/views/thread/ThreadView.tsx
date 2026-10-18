@@ -74,6 +74,20 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   }, [focus?.nonce])
   useFocusMessage(focus, (nonce) => app.consumeMessageFocus(nonce))
 
+  // The roster's Edit Profile: land straight in the settings, not the small details.
+  const settingsReq = app.settingsRequest?.ref.botId === botId && app.settingsRequest.ref.computerId === store.computer.id ? app.settingsRequest : null
+  useEffect(() => {
+    if (!settingsReq) return
+    app.consumeSettingsRequest(settingsReq.nonce)
+    setOpenThread(null)
+    setShowComputer(false)
+    setFindOpen(false)
+    setEditingDetails(true)
+    setShowSettings(true)
+    setCompactDetails(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsReq?.nonce])
+
   useLayoutEffect(() => {
     const el = root.current
     if (!el) return

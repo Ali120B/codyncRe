@@ -54,6 +54,9 @@ export class AppModel extends Observable {
   selection: BotRef | null = null
   /** The search hit `ThreadView` is landing on (see `useFocusMessage`). */
   focus: MessageFocus | null = null
+  /** The roster's Edit Profile: the chat consumes it and opens its settings. */
+  settingsRequest: { ref: BotRef; nonce: number } | null = null
+  private settingsNonce = 0
   lastError: string | null = null
   private focusNonce = 0
   /** Codync Screen waits for the user to allow it in System Settings → Login Items. */
@@ -177,6 +180,20 @@ export class AppModel extends Observable {
   consumeMessageFocus(nonce: number) {
     if (this.focus?.nonce !== nonce) return
     this.focus = null
+    this.changed()
+  }
+
+  /** The roster's Edit Profile: opens the chat's settings, not a modal editor. */
+  openSettings(ref: BotRef) {
+    this.settingsRequest = { ref, nonce: ++this.settingsNonce }
+    this.select(ref)
+    this.changed()
+  }
+
+  /** The chat opened its settings; the request is done. */
+  consumeSettingsRequest(nonce: number) {
+    if (this.settingsRequest?.nonce !== nonce) return
+    this.settingsRequest = null
     this.changed()
   }
 

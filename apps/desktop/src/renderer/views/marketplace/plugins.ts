@@ -6,9 +6,23 @@ import { market, needsSignIn, sleep, type InstalledConnector, type InstalledSkil
 export class Plugins extends Observable {
   installedConnectors: InstalledConnector[] = []
   installedSkills: InstalledSkill[] = []
+  /** True once a refresh has completed: panels show "no skills yet" only when it's. */
+  loaded = false
+  private loading = false
 
   constructor(readonly store: BotStore) {
     super()
+  }
+
+  /** Loads once, for panels that may mount before the Marketplace ever does. */
+  async ensureLoaded() {
+    if (this.loaded || this.loading) return
+    this.loading = true
+    try {
+      await this.refresh()
+    } finally {
+      this.loading = false
+    }
   }
 
   async refresh() {
@@ -17,6 +31,7 @@ export class Plugins extends Observable {
     const [c, s] = await Promise.allSettled([market.connectors(client), market.skills(client)])
     if (c.status === 'fulfilled') this.installedConnectors = c.value
     if (s.status === 'fulfilled') this.installedSkills = s.value
+    this.loaded = true
     this.changed()
   }
 
