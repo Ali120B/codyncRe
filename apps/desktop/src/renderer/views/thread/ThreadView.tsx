@@ -242,11 +242,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             store={store}
             width={panelWidth}
             onWidth={setPanelWidth}
-            settings={() => {
-              setShowComputer(false)
-              setEditingDetails(true)
-              setShowSettings(true)
-            }}
+            settings={openSettingsPanel}
             close={() => setShowComputer(false)}
           />
         ) : (
@@ -254,7 +250,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
         )}
       </ChatSidePanel>
 
-      <Sheet open={compactDetails} onClose={() => setCompactDetails(false)} width={400} height={600}>
+      <Sheet open={compactDetails && !wide} onClose={() => setCompactDetails(false)} width={400} height={600}>
         {details}
       </Sheet>
       <Sheet open={showComputer && !wide && !!bot && !isGroup(bot)} onClose={() => setShowComputer(false)} width={panelWidth} height={Math.min(720, window.innerHeight - 60)}>

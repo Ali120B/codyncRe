@@ -3,6 +3,7 @@ import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
 import { useApp } from '../../store/context'
 import type { BotStore } from '../../store/bot-store'
+import { PhonesSection } from './PhonesSection'
 import { SwitchRow } from '../bots/parts'
 
 /** The Computer tab: this computer's screen state, who may use it, and this bot's switch. */
@@ -70,6 +71,7 @@ export function ComputerTab({ bot, store }: { bot: Bot; store: BotStore }) {
       <p className="computer-hint" style={font('footnote')}>
         Watching the screen from this panel lands with the Linux screen work; for now the phone shows it.
       </p>
+      <PhonesSection store={store} />
     </div>
   )
 }

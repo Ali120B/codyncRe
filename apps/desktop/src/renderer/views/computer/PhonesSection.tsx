@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import type { AuthorizedDevice, Bot } from '@shared/models'
+import type { AuthorizedDevice } from '@shared/models'
 import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
 import type { BotStore } from '../../store/bot-store'
 
 /**
- * The Android tab: the bot's phone surface. Until the Android app (§7) ships, this shows
- * the phones actually paired with this computer — real host state, nothing faked.
+ * Phones paired with this computer, the Android app's surface — part of the Computer tab.
+ * Until the Android app ships this lists the phones actually paired (host `devices`).
  */
-export function AndroidTab({ bot, store }: { bot: Bot; store: BotStore }) {
+export function PhonesSection({ store }: { store: BotStore }) {
   const [devices, setDevices] = useState<AuthorizedDevice[] | null>(null)
   useEffect(() => {
     let alive = true
@@ -29,10 +29,8 @@ export function AndroidTab({ bot, store }: { bot: Bot; store: BotStore }) {
   }, [store])
 
   return (
-    <div className="computer-pad">
-      <p className="computer-hint" style={{ ...font('footnote'), color: 'var(--text)' }}>
-        {bot.name}'s Android surface: its phone screen and apps, once the Android app is installed on a phone.
-      </p>
+    <>
+      <span style={{ ...font('caption'), color: 'var(--tertiary)' }}>Phones</span>
       {devices === null ? (
         <p className="computer-hint" style={font('footnote')}>Checking paired phones…</p>
       ) : devices.length ? (
@@ -50,6 +48,6 @@ export function AndroidTab({ bot, store }: { bot: Bot; store: BotStore }) {
           No Android phone paired yet — pairing arrives with the Android app.
         </p>
       )}
-    </div>
+    </>
   )
 }

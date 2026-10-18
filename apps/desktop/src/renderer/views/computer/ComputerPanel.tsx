@@ -5,21 +5,19 @@ import { font } from '../../lib/fonts'
 import type { BotStore } from '../../store/bot-store'
 import { MacChatButton } from '../thread/MacChatButton'
 import { RoutinesView } from '../routines/RoutinesView'
-import { AndroidTab } from './AndroidTab'
 import { BrowserTab } from './BrowserTab'
 import { CloudTab } from './CloudTab'
 import { ComputerTab } from './ComputerTab'
 import { FilesTab } from './FilesTab'
 import './computer-panel.css'
 
-type TabId = 'computer' | 'browser' | 'files' | 'routines' | 'android' | 'cloud'
+type TabId = 'computer' | 'browser' | 'files' | 'routines' | 'cloud'
 
 const TABS: { id: TabId; title: string; icon: string }[] = [
   { id: 'computer', title: 'Computer', icon: 'display' },
   { id: 'browser', title: 'Browser', icon: 'safari' },
   { id: 'files', title: 'Files', icon: 'folder' },
   { id: 'routines', title: 'Routines', icon: 'arrow.clockwise' },
-  { id: 'android', title: 'Android', icon: 'iphone' },
   { id: 'cloud', title: 'Cloud', icon: 'cloud' },
 ]
 
@@ -82,7 +80,6 @@ export function ComputerPanel({ bot, store, width, onWidth, settings, close }: {
         {tab === 'browser' ? <BrowserTab bot={bot} store={store} /> : null}
         {tab === 'files' ? <FilesTab bot={bot} store={store} /> : null}
         {tab === 'routines' && bot.kind !== 'group' ? <RoutinesView botId={bot.id} initialId={null} /> : null}
-        {tab === 'android' ? <AndroidTab bot={bot} store={store} /> : null}
         {tab === 'cloud' ? <CloudTab store={store} /> : null}
       </div>
     </div>

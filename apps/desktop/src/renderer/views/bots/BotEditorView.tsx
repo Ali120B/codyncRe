@@ -153,6 +153,8 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
     }, 60)
   }
   const stepFooter = (id: string) => {
+    // The walk belongs to creating a bot; editing an existing one keeps plain sections.
+    if (draft.id) return null
     const index = stepSections.findIndex((s) => s.id === id)
     if (index < 0) return null
     const next = stepSections[index + 1]
