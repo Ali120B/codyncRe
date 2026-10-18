@@ -21,6 +21,8 @@ concurrency:
 
 jobs:
   submit:
+    # Apple is parked in this fork: set the repo variable IOS_SUBMIT to true to submit.
+    if: vars.IOS_SUBMIT == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 200
     steps:
