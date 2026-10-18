@@ -18,6 +18,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  # No Apple certificate in the fork yet: the mac job skips itself (add the secrets and it runs again).
+  APPLE_SIGNING: ${{ secrets.APPLE_CERTIFICATE_P12 != '' && '1' || '' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -46,7 +50,7 @@ jobs:
     needs: check
     # Fork PRs get no signing secrets, so they stop at check, Windows and Linux; the release PR into main
     # builds the Mac app before the tag.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && env.APPLE_SIGNING != ''
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4

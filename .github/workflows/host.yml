@@ -39,6 +39,9 @@ jobs:
       - run: cargo test --bin codync-host native_memory_survives_restart -- --ignored
 
   release:
+    # A fresh fork has no signing key: skip signatures, publish binaries, resume later.
+    env:
+      HOST_UPDATE_SIGNING_KEY: ${{ secrets.HOST_UPDATE_SIGNING_KEY }}
     if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       matrix:
@@ -89,8 +92,7 @@ jobs:
           tar czf $NAME.tar.gz $NAME
           shasum -a 256 $NAME.tar.gz > $NAME.tar.gz.sha256
       - name: Sign host update manifest
-        env:
-          HOST_UPDATE_SIGNING_KEY: ${{ secrets.HOST_UPDATE_SIGNING_KEY }}
+        if: env.HOST_UPDATE_SIGNING_KEY != ''
         run: |
           python3 -m venv "$RUNNER_TEMP/update-signing"
           "$RUNNER_TEMP/update-signing/bin/pip" install 'cryptography>=44,<47'
@@ -102,15 +104,16 @@ jobs:
           files: |
             codync-host-*.tar.gz
             codync-host-*.tar.gz.sha256
-            codync-host-*.compat.json
-            codync-host-*.compat.json.sig
-      # The update manifest last: hosts offer the release once they see it, so the archive
-      # it points at must already be downloadable.
+      # The signed manifests last: hosts offer the release once they see it, so the archive
+      # it points at must already be downloadable (skipped while the fork has no signing key).
       - uses: softprops/action-gh-release@v2
+        if: env.HOST_UPDATE_SIGNING_KEY != ''
         with:
           files: |
             codync-host-*.update.json
             codync-host-*.update.json.sig
+            codync-host-*.compat.json
+            codync-host-*.compat.json.sig
 
   homebrew:
     # Keeps the tap's codync-host formula in step with releases. The fork's tap may not
