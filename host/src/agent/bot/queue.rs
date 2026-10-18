@@ -110,6 +110,14 @@ impl Actor {
                     // A running prompt now fails; finish_turn reports it.
                 }
             }
+            Cmd::ThreadModel { root } => {
+                // The pin lives in the store; an open session switches now, so the next
+                // turn runs on it. Closed threads pick it up when their session opens.
+                if let Some(sid) = self.session_for(Some(root.as_str())) {
+                    self.model_on_session.remove(&sid);
+                    self.sync_thread_model(&sid, Some(root.as_str())).await;
+                }
+            }
             Cmd::Shutdown => return false,
         }
         true

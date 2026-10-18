@@ -225,6 +225,23 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
             hub.send_cmd(str_arg(&b, "botId")?, Cmd::NewSession)?;
             json!({})
         }
+        // Thread models: a thread can pin its own; without one it follows the bot's.
+        "threadModels" => {
+            let models = hub.store.thread_models(str_arg(&b, "botId")?);
+            json!({"models": models})
+        }
+        "setThreadModel" => {
+            let bot = str_arg(&b, "botId")?;
+            let root = str_arg(&b, "threadId")?;
+            match hub.store.bot(bot)? {
+                Some(row) if !row.config.is_group() => {}
+                _ => anyhow::bail!("unknown bot"),
+            }
+            let model = b["model"].as_str();
+            hub.store.set_thread_model(bot, root, model)?;
+            hub.send_cmd(bot, Cmd::ThreadModel { root: root.to_owned() })?;
+            json!({})
+        }
         "memory" | "saveMemory" | "memoryDetail" | "pinMemory" | "reviewMemory" | "forgetMemory" | "clearMemory"
         | "exportMemory" | "importMemory" => crate::chat::memory::manage::call(hub, method, &b).await?,
         "react" => {

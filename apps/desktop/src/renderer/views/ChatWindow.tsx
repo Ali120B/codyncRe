@@ -15,6 +15,7 @@ import type { BotStore } from '../store/bot-store'
 import { useComputerRoster } from '../store/computer-roster'
 import { BotRoster } from './BotRoster'
 import { SidebarFooter } from './SidebarFooter'
+import { TeamMapView } from './team/TeamMapView'
 import { UpdateBadge } from './UpdateButton'
 import { ComputerFilterHeader, computerSelection } from './ComputerFilterHeader'
 import { ThreadView } from './thread/ThreadView'
@@ -172,6 +173,7 @@ function ChatSplitView() {
   const [railNewMenu, setRailNewMenu] = useState(false)
   const [contextBot, setContextBot] = useState<{ target: BotTarget; x: number; y: number } | null>(null)
   const [editing, setEditing] = useState<EditTarget | null>(null)
+  const [teamMap, setTeamMap] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<BotTarget | null>(null)
   const [newSessionBot, setNewSessionBot] = useState<BotTarget | null>(null)
   const [marketplace, setMarketplace] = useState<string | null>(null)
@@ -424,7 +426,7 @@ function ChatSplitView() {
             </button>
           </div>
         ) : (
-          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={openMarketplace} />
+          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={openMarketplace} onTeamMap={() => setTeamMap(true)} />
         )}
       </aside>
       <div className="sidebar-divider" onPointerDown={onDividerDown} onPointerMove={onDividerMove} onPointerUp={() => (dragStart.current = null)} role="separator" aria-label="Resize sidebar" aria-valuenow={width} />
@@ -460,6 +462,9 @@ function ChatSplitView() {
       ) : null}
 
       <SearchPalette open={searching} items={visibleRoster} onPick={(ref) => app.select(ref)} onClose={() => setSearching(false)} />
+      <Sheet open={teamMap} onClose={() => setTeamMap(false)} width={680} height={Math.min(640, window.innerHeight - 60)}>
+        {selectedStore ? <TeamMapView store={selectedStore} close={() => setTeamMap(false)} /> : null}
+      </Sheet>
       <Sheet open={editing !== null} onClose={() => setEditing(null)} width={520} height={Math.min(680, sheetHeight)}>
         {editing ? (
           <StoreContext.Provider value={editing.store}>

@@ -212,6 +212,8 @@ impl Actor {
         // Claude gets the frozen instructions as its system prompt. When a compaction
         // re-rendered them, loading the session again swaps the prompt in (the adapter
         // rebuilds its query and resumes the same conversation).
+        // A thread with its own model creates (or resumes) its session on that model.
+        let cfg_thread = self.cfg_for_thread(slot);
         let current = self.session_for(slot);
         let snapshot = match (&current, claude) {
             (Some(sid), true) => Some(self.snapshot(sid).await?),
@@ -251,12 +253,13 @@ impl Actor {
                     // A resumed session can come back on the agent's last-used model (Cursor
                     // keeps one for all its sessions), so the bot's own is set again.
                     let res = if res.get("configOptions").is_some() || res.get("models").is_some() {
-                        select_model(&conn.acp, &res, &sid, &self.cfg).await?
+                        select_model(&conn.acp, &res, &sid, &cfg_thread).await?
                     } else {
                         res
                     };
                     conn.loaded.insert(sid.clone(), Instant::now());
                     self.note_options(&sid, &res, Listing::Session);
+                    self.model_on_session.insert(sid.clone(), cfg_thread.model.clone().unwrap_or_default());
                     if let Some(s) = snapshot {
                         // Its system prompt now names the bot as rendered.
                         context::mark_announced(&self.hub.store, &self.cfg.id, &s, s.system_identity.clone())?;
@@ -284,8 +287,9 @@ impl Actor {
         let Some(conn) = self.conn.as_mut() else { bail!("agent not running") };
         let sid = res["sessionId"].as_str().ok_or_else(|| anyhow!("agent returned no sessionId"))?.to_owned();
         conn.loaded.insert(sid.clone(), Instant::now());
-        let options = select_model(&conn.acp, &res, &sid, &self.cfg).await?;
+        let options = select_model(&conn.acp, &res, &sid, &cfg_thread).await?;
         self.note_options(&sid, &options, Listing::Session);
+        self.model_on_session.insert(sid.clone(), cfg_thread.model.clone().unwrap_or_default());
         self.set_session(slot, Some(&sid));
         self.session_fresh = true;
         self.turn_session = Some(sid.clone());

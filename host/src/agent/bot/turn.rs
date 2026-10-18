@@ -85,6 +85,7 @@ impl Actor {
         }
         if let Some(sid) = self.turn_session.clone() {
             self.sync_fast_mode(&sid).await;
+            self.sync_thread_model(&sid, slot.as_deref()).await;
         }
         if hidden && self.session_fresh {
             // A new session must never silently repeat an interrupted routine.

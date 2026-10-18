@@ -199,6 +199,19 @@ mod tests {
     use crate::store::tests::temp_store;
 
     #[test]
+    fn thread_models_pin_and_clear() {
+        let s = temp_store();
+        assert!(s.thread_model("b1", "root-1").is_none());
+        s.set_thread_model("b1", "root-1", Some("opus")).unwrap();
+        s.set_thread_model("b1", "root-2", Some(" haiku ")).unwrap();
+        assert_eq!(s.thread_model("b1", "root-1").as_deref(), Some("opus"));
+        assert_eq!(s.thread_model("b1", "root-2").as_deref(), Some("haiku"));
+        s.set_thread_model("b1", "root-1", None).unwrap();
+        assert!(s.thread_model("b1", "root-1").is_none());
+        assert_eq!(s.thread_models("b1").len(), 1);
+    }
+
+    #[test]
     fn rev_sync_and_unread() {
         let s = temp_store();
         let cfg = BotConfig {

@@ -17,6 +17,7 @@ pub use model::{BotConfig, BotKind, BotRow, Entry, EntryKind, Lane, Permission, 
 use crate::LockExt;
 use anyhow::Result;
 use rusqlite::{Connection, OptionalExtension, params};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 pub struct Store {
@@ -45,6 +46,10 @@ fn next_rev(c: &Connection) -> Result<i64> {
     )?)
 }
 
+fn thread_models_key(bot: &str) -> String {
+    format!("thread-models.{bot}")
+}
+
 impl Store {
     /// Durable control state must distinguish a missing key from a failed read.
     pub fn kv_read(&self, k: &str) -> Result<Option<String>> {
@@ -60,6 +65,31 @@ impl Store {
         let c = self.db.locked();
         c.execute("INSERT INTO kv(k, v) VALUES(?1, ?2) ON CONFLICT(k) DO UPDATE SET v = ?2", params![k, v])?;
         Ok(())
+    }
+
+    /// A thread's pinned model (`None` follows the bot's own).
+    pub fn thread_model(&self, bot: &str, root: &str) -> Option<String> {
+        self.thread_models(bot).remove(root)
+    }
+
+    /// Every pinned thread model for one bot (thread root → model id).
+    pub fn thread_models(&self, bot: &str) -> HashMap<String, String> {
+        self.kv_get(&thread_models_key(bot)).and_then(|raw| serde_json::from_str(&raw).ok()).unwrap_or_default()
+    }
+
+    /// Pins (`Some`) or clears (`None`) one thread's model; the whole map comes back.
+    pub fn set_thread_model(&self, bot: &str, root: &str, model: Option<&str>) -> Result<HashMap<String, String>> {
+        let mut models = self.thread_models(bot);
+        match model.map(str::trim).filter(|m| !m.is_empty()) {
+            Some(model) => {
+                models.insert(root.to_owned(), model.to_owned());
+            }
+            None => {
+                models.remove(root);
+            }
+        }
+        self.kv_set(&thread_models_key(bot), &serde_json::to_string(&models)?)?;
+        Ok(models)
     }
 
     /// Keys starting with `prefix`.

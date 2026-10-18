@@ -6,10 +6,11 @@ import { UpdateBadge } from './UpdateButton'
 import './sidebar-footer.css'
 
 /** The profile box at the foot of the sidebar: who you are, and the plugins button beside it. */
-export function SidebarFooter({ accountOpen, onAccount, onExtensions }: {
+export function SidebarFooter({ accountOpen, onAccount, onExtensions, onTeamMap }: {
   accountOpen: boolean
   onAccount: () => void
   onExtensions: () => void
+  onTeamMap: () => void
 }) {
   const [saved] = usePref(prefs.profileName)
   const name = localAccountName(saved)
@@ -28,6 +29,7 @@ export function SidebarFooter({ accountOpen, onAccount, onExtensions }: {
           <span className="profile-name">{name}</span>
         </button>
         <IconButton title="Plugins" icon="puzzlepiece" size={34} onClick={onExtensions} />
+        <IconButton title="Team map" icon="point.3.connected.trianglepath.dotted" size={34} onClick={onTeamMap} />
       </div>
       <UpdateBadge size={38} />
     </div>

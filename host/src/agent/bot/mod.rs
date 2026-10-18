@@ -20,6 +20,7 @@ mod files;
 mod lifecycle;
 mod queue;
 mod session;
+mod thread_model;
 mod turn;
 mod updates;
 
@@ -86,6 +87,10 @@ pub enum Cmd {
     },
     NewSession,
     Reconfigure(Box<BotConfig>),
+    /// A thread's model changed (the pin lives in the store); open sessions switch now.
+    ThreadModel {
+        root: String,
+    },
     Shutdown,
 }
 
@@ -156,6 +161,7 @@ pub fn spawn(hub: Arc<Hub>, cfg: BotConfig) -> BotHandle {
         exit_tail: None,
         tools_changed: false,
         fast_support,
+        model_on_session: HashMap::new(),
         idle_checked: Instant::now(),
     };
     let task = tokio::spawn(actor.run(rx, interrupted));
@@ -260,6 +266,8 @@ struct Actor {
     tools_changed: bool,
     /// What the agent says about Fast mode; clients see it in the bot's runtime.
     fast_support: FastModeSupport,
+    /// The model each open session was last set to (the bot's, or a thread's own).
+    model_on_session: HashMap<String, String>,
     /// When idle sessions and agents were last looked for.
     idle_checked: Instant,
 }

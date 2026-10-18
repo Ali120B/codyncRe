@@ -1,0 +1,63 @@
+/* The thread-models line under a chat's title. */
+
+.thread-models-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: calc(11px * var(--scale));
+  color: var(--secondary);
+  background: var(--surface);
+  transition: color var(--hover), background var(--hover);
+}
+
+.thread-models-line:hover {
+  color: var(--text);
+  background: var(--hover-fill);
+}
+
+.thread-models-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  width: 320px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.thread-models-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.thread-models-title {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(12.5px * var(--scale));
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-models-clear {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: calc(12.5px * var(--scale));
+  color: var(--secondary);
+  transition: background var(--hover), color var(--hover);
+}
+
+.thread-models-clear:hover {
+  background: var(--hover-fill);
+  color: var(--text);
+}

@@ -1,0 +1,36 @@
+/* The team map: bots and groups as a ring with who-asked-whom arrows. */
+
+.team-map {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background);
+}
+
+.team-map-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 20px;
+}
+
+.team-map-body svg {
+  width: 100%;
+  max-width: 660px;
+  height: auto;
+}
+
+.team-map-note {
+  max-width: 460px;
+  text-align: center;
+  color: var(--tertiary);
+}
+
+.team-map-empty {
+  color: var(--secondary);
+  padding: 40px 0;
+}

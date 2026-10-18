@@ -26,6 +26,7 @@ import { BotTemplateView } from '../bots/BotTemplateView'
 import { CallView } from '../call/CallView'
 import { MacChatButton } from './MacChatButton'
 import { ModelChip } from './ModelChip'
+import { ThreadModelsLine } from './ThreadModelsLine'
 import './thread.css'
 import './composer.css'
 import './chat-controls.css'
@@ -207,6 +208,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             </span>
             {store.shownConnection.kind !== 'online' || store.mismatch ? <ConnectionSubtitle /> : null}
           </button>
+          {bot && !isGroup(bot) && !calling ? <ThreadModelsLine bot={bot} store={store} /> : null}
         </div>
         {findOpen && !calling ? <ChatFindBar botId={botId} store={store} close={() => setFindOpen(false)} /> : null}
         <Transcript botId={botId} openTrace={openTrace} openThread={openThreadOn} openRoutine={presentRoutine} openBotChat={setBotChat} focusEntryId={focus && !focus.threadId ? focus.entryId : null} />

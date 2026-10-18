@@ -40,6 +40,24 @@ export class BotStore extends BotSync {
 
   private outgoingFiles = new Map<string, OutgoingFile[]>()
 
+  /** Pinned thread models by bot (thread root → model), from the host's `threadModels`. */
+  threadModels = new Map<string, Record<string, string>>()
+
+  /** Reads a bot's pinned thread models into the mirror. */
+  async loadThreadModels(botId: string): Promise<Record<string, string>> {
+    const res = await (await this.ready()).call<{ models?: Record<string, string> }>('threadModels', { botId })
+    const models = res.models ?? {}
+    this.threadModels.set(botId, models)
+    this.changed()
+    return models
+  }
+
+  /** Pins a thread's model (`null` follows the bot's again) and refreshes the mirror. */
+  async setThreadModel(botId: string, threadId: string, model: string | null): Promise<void> {
+    await (await this.ready()).call('setThreadModel', { botId, threadId, model })
+    await this.loadThreadModels(botId)
+  }
+
   send(text: string, botId: string, thread: string | null = null, files: OutgoingFile[] = [], nonce: string = crypto.randomUUID()) {
     const trimmed = text.trim()
     if ((!trimmed && !files.length) || this.retired) return
