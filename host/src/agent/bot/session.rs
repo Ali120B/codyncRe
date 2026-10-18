@@ -11,25 +11,35 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 impl Actor {
-    /// Which session a lane's turns use: a thread of the bot's own chat has its own
-    /// (by root); its chat and every group lane use the main one.
+    /// The storage key of the session a lane's turns use; `None` is the bot's own chat.
+    /// A thread of the bot's chat and every group lane (main room or thread) get their own.
     pub(super) fn slot(&self, lane: &Lane) -> Option<String> {
-        (lane.chat == self.cfg.id).then(|| lane.thread.clone()).flatten()
+        if lane.chat == self.cfg.id && lane.thread.is_none() {
+            return None;
+        }
+        Some(lane_key("session", &self.cfg.id, lane))
+    }
+
+    /// The bot-chat thread root this lane runs on, when it is one of the bot's own threads.
+    pub(super) fn own_thread<'a>(&self, lane: &'a Lane) -> Option<&'a str> {
+        if lane.chat != self.cfg.id {
+            return None;
+        }
+        lane.thread.as_deref()
     }
 
     pub(super) fn session_for(&mut self, slot: Option<&str>) -> Option<String> {
-        let Some(root) = slot else { return self.session_id.clone() };
-        if let Some(sid) = self.thread_sessions.get(root) {
+        let Some(key) = slot else { return self.session_id.clone() };
+        if let Some(sid) = self.lane_sessions.get(key) {
             return Some(sid.clone());
         }
-        let sid = self.hub.store.kv_get(&lane_key("session", &self.cfg.id, &Lane::in_thread(&self.cfg.id, root)));
-        let sid = sid.filter(|s| !s.is_empty())?;
-        self.thread_sessions.insert(root.to_owned(), sid.clone());
+        let sid = self.hub.store.kv_get(key).filter(|s| !s.is_empty())?;
+        self.lane_sessions.insert(key.to_owned(), sid.clone());
         Some(sid)
     }
 
     pub(super) fn set_session(&mut self, slot: Option<&str>, sid: Option<&str>) {
-        let Some(root) = slot else {
+        let Some(key) = slot else {
             self.session_id = sid.map(str::to_owned);
             if let Err(error) = self.hub.store.set_session(&self.cfg.id, sid) {
                 tracing::warn!(bot = %self.cfg.id, error = format!("{error:#}"), "couldn't store the session");
@@ -37,25 +47,31 @@ impl Actor {
             return;
         };
         match sid {
-            Some(s) => self.thread_sessions.insert(root.to_owned(), s.to_owned()),
-            None => self.thread_sessions.remove(root),
+            Some(s) => self.lane_sessions.insert(key.to_owned(), s.to_owned()),
+            None => self.lane_sessions.remove(key),
         };
-        let key = lane_key("session", &self.cfg.id, &Lane::in_thread(&self.cfg.id, root));
-        if let Err(error) = self.hub.store.kv_set(&key, sid.unwrap_or_default()) {
-            tracing::warn!(bot = %self.cfg.id, error = format!("{error:#}"), "couldn't store the thread session");
+        if let Err(error) = self.hub.store.kv_set(key, sid.unwrap_or_default()) {
+            tracing::warn!(bot = %self.cfg.id, error = format!("{error:#}"), "couldn't store a session");
         }
     }
 
-    /// Roots of the threads that have a session (stored or loaded).
-    pub(super) fn thread_roots(&self) -> Vec<String> {
-        let prefix = lane_key("session", &self.cfg.id, &Lane::main(&self.cfg.id)) + "/";
-        let mut roots: Vec<String> = self.thread_sessions.keys().cloned().collect();
-        roots.extend(
-            self.hub.store.kv_prefix(&prefix).into_iter().filter_map(|k| k.strip_prefix(&prefix).map(str::to_owned)),
-        );
-        roots.sort();
-        roots.dedup();
-        roots
+    /// Drops every non-main session: the bot-chat threads and all of its group lanes.
+    pub(super) fn forget_sessions(&mut self) {
+        self.forget_sessions_with_prefix(&format!("lane.session.{}@", self.cfg.id));
+    }
+
+    /// Drops the sessions for one group (its main room and every thread in it).
+    pub(super) fn forget_group_sessions(&mut self, group: &str) {
+        self.forget_sessions_with_prefix(&format!("lane.session.{}@{group}", self.cfg.id));
+    }
+
+    fn forget_sessions_with_prefix(&mut self, prefix: &str) {
+        for key in self.hub.store.kv_prefix(prefix) {
+            if let Err(error) = self.hub.store.kv_set(&key, "") {
+                tracing::warn!(bot = %self.cfg.id, error = format!("{error:#}"), "couldn't forget a session");
+            }
+        }
+        self.lane_sessions.retain(|key, _| !key.starts_with(prefix));
     }
 
     /// What a new thread session is told first: where the thread branches off.
@@ -119,7 +135,7 @@ impl Actor {
         ];
         for name in builtin.into_iter().flatten() {
             let env = if name == "memory" {
-                json!([{"name":"CODYNC_MEMORY_LANE", "value":self.slot(&self.lane).unwrap_or_default()}])
+                json!([{"name":"CODYNC_MEMORY_LANE", "value":self.own_thread(&self.lane).unwrap_or_default()}])
             } else {
                 json!([])
             };
@@ -134,7 +150,9 @@ impl Actor {
 
     /// Makes sure the agent runs and `slot`'s session (main, or a thread's) is live;
     /// sets `turn_session`. A thread without one forks the main session when it can.
-    pub(super) async fn ensure_session(&mut self, slot: Option<&str>) -> Result<()> {
+    pub(super) async fn ensure_session(&mut self, lane: &Lane) -> Result<()> {
+        let slot = self.slot(lane);
+        let root = self.own_thread(lane).map(str::to_owned);
         // Memory is best-effort: a bot without it still answers.
         if let Err(error) = crate::chat::memory::prepare(&self.cfg.id).await {
             self.memory_unavailable(&error);
@@ -184,8 +202,8 @@ impl Actor {
         let servers = self.mcp_servers()?;
         let claude = self.conn.as_ref().is_some_and(|c| c.claude);
         let mut forked = false;
-        if let Some(root) = slot
-            && self.session_for(slot).is_none()
+        if let Some(root) = root.as_deref()
+            && self.session_for(slot.as_deref()).is_none()
             && let Some(main) = self.session_id.clone()
             && self.conn.as_ref().is_some_and(|c| c.sessions.fork)
         {
@@ -199,7 +217,7 @@ impl Actor {
                 && let Some(conn) = self.conn.as_mut()
             {
                 conn.loaded.insert(sid.clone(), Instant::now());
-                self.set_session(slot, Some(&sid));
+                self.set_session(slot.as_deref(), Some(&sid));
                 self.note_options(&sid, &res, Listing::Session);
                 forked = true;
             } else {
@@ -213,8 +231,8 @@ impl Actor {
         // re-rendered them, loading the session again swaps the prompt in (the adapter
         // rebuilds its query and resumes the same conversation).
         // A thread with its own model creates (or resumes) its session on that model.
-        let cfg_thread = self.cfg_for_thread(slot);
-        let current = self.session_for(slot);
+        let cfg_thread = self.cfg_for_thread(root.as_deref());
+        let current = self.session_for(slot.as_deref());
         let snapshot = match (&current, claude) {
             (Some(sid), true) => Some(self.snapshot(sid).await?),
             _ => None,
@@ -232,8 +250,8 @@ impl Actor {
                     "This agent can't resume sessions after a restart — starting a fresh one.",
                     NoticeStyle::Divider,
                 );
-                self.set_session(slot, None);
-                return Box::pin(self.ensure_session(slot)).await;
+                self.set_session(slot.as_deref(), None);
+                return Box::pin(self.ensure_session(lane)).await;
             }
             self.hub.set_runtime(&self.cfg.id, |r| r.activity = "Resuming session…".into());
             let mut params = json!({"sessionId": sid, "cwd": self.cfg.cwd, "mcpServers": servers});
@@ -290,10 +308,10 @@ impl Actor {
         let options = select_model(&conn.acp, &res, &sid, &cfg_thread).await?;
         self.note_options(&sid, &options, Listing::Session);
         self.model_on_session.insert(sid.clone(), cfg_thread.model.clone().unwrap_or_default());
-        self.set_session(slot, Some(&sid));
+        self.set_session(slot.as_deref(), Some(&sid));
         self.session_fresh = true;
         self.turn_session = Some(sid.clone());
-        if let Some(root) = slot {
+        if let Some(root) = root.as_deref() {
             self.thread_intro = Some(self.thread_intro(root, false));
         }
         context::adopt(&self.hub.store, &self.cfg, &sid, system.clone())?;

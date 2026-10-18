@@ -75,17 +75,16 @@ impl Actor {
             r.lane = Some(lane.clone());
         });
 
-        let slot = self.slot(&lane);
         if let Some(deadline) = self.routine_deadline {
-            tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), self.ensure_session(slot.as_deref()))
+            tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), self.ensure_session(&lane))
                 .await
                 .context("routine session setup timed out")??;
         } else {
-            self.ensure_session(slot.as_deref()).await?;
+            self.ensure_session(&lane).await?;
         }
         if let Some(sid) = self.turn_session.clone() {
             self.sync_fast_mode(&sid).await;
-            self.sync_thread_model(&sid, slot.as_deref()).await;
+            self.sync_thread_model(&sid, self.own_thread(&lane)).await;
         }
         if hidden && self.session_fresh {
             // A new session must never silently repeat an interrupted routine.

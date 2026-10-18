@@ -144,11 +144,14 @@ pub async fn models(store: &Store, backend: &str) -> Result<Value> {
 pub(crate) fn model_config(session: &Value) -> Option<&Value> {
     let options = session["configOptions"].as_array()?;
     let is_select = |v: &&Value| v["type"] == "select" || v.get("type").is_none();
+    // The option named `model`/`models` is the model list itself. Other selects also carry
+    // category "model" — Cline parks its provider selector there, before the real one — and
+    // must not shadow it; that order is the fallback for agents naming it differently.
     options
         .iter()
         .filter(is_select)
-        .find(|v| v["category"] == "model")
-        .or_else(|| options.iter().filter(is_select).find(|v| v["id"] == "model" || v["id"] == "models"))
+        .find(|v| v["id"] == "model" || v["id"] == "models")
+        .or_else(|| options.iter().filter(is_select).find(|v| v["category"] == "model"))
 }
 
 /// The model ids the agent lists, in its order.
@@ -502,13 +505,19 @@ mod tests {
     }
 
     #[test]
-    fn model_config_prefers_category_and_ignores_unknown_types() {
+    fn model_config_prefers_the_named_model_option_and_ignores_unknown_types() {
         let session = json!({"configOptions": [
             {"id": "model", "type": "boolean"},
             {"id": "models", "type": "select"},
             {"id": "engine", "category": "model", "type": "select"}
         ]});
-        assert_eq!(model_config(&session).unwrap()["id"], "engine");
+        assert_eq!(model_config(&session).unwrap()["id"], "models");
+        // Cline lists its provider selector (category "model") before the real model list.
+        let cline = json!({"configOptions": [
+            {"id": "provider", "name": "Provider", "category": "model", "type": "select"},
+            {"id": "model", "name": "Model", "category": "model", "type": "select"}
+        ]});
+        assert_eq!(model_config(&cline).unwrap()["id"], "model");
         assert!(model_config(&json!({"configOptions": [{"id": "model", "type": "boolean"}]})).is_none());
     }
 

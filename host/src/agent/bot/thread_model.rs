@@ -3,7 +3,7 @@
 //! can't switch on starts fresh with the pinned model.
 
 use super::{Actor, NoticeStyle};
-use crate::store::BotConfig;
+use crate::store::{BotConfig, Lane, lane_key};
 use serde_json::json;
 
 impl Actor {
@@ -39,7 +39,8 @@ impl Actor {
                         "This agent can't change models mid-session — this thread starts fresh with its own model.",
                         NoticeStyle::Info,
                     );
-                    self.set_session(Some(root), None);
+                    let key = lane_key("session", &self.cfg.id, &Lane::in_thread(&self.cfg.id, root));
+                    self.set_session(Some(&key), None);
                 }
             }
         }

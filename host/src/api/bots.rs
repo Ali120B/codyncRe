@@ -222,7 +222,11 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
             json!({})
         }
         "newSession" => {
-            hub.send_cmd(str_arg(&b, "botId")?, Cmd::NewSession)?;
+            let bot = str_arg(&b, "botId")?;
+            match hub.store.bot(bot)? {
+                Some(row) if row.config.is_group() => hub.groups.new_session(hub, bot),
+                _ => hub.send_cmd(bot, Cmd::NewSession)?,
+            }
             json!({})
         }
         // Thread models: a thread can pin its own; without one it follows the bot's.

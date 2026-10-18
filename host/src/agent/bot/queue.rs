@@ -4,7 +4,7 @@ use super::{Actor, CANCEL_GRACE, Cmd, Done, NoticeStyle, Queued, RESUME_PROMPT, 
 use crate::chat::memory;
 use crate::hub::BotStatus;
 use crate::market::requests;
-use crate::store::{Lane, now_ms};
+use crate::store::{Lane, lane_key, now_ms};
 use anyhow::{Result, anyhow};
 use serde_json::json;
 use std::time::Instant;
@@ -97,9 +97,7 @@ impl Actor {
                     if let Some(c) = self.conn.take() {
                         c.acp.kill().await;
                     }
-                    for root in self.thread_roots() {
-                        self.set_session(Some(&root), None);
-                    }
+                    self.forget_sessions();
                     if self.session_id.is_some() {
                         self.forget_session();
                         self.notice(
@@ -113,10 +111,18 @@ impl Actor {
             Cmd::ThreadModel { root } => {
                 // The pin lives in the store; an open session switches now, so the next
                 // turn runs on it. Closed threads pick it up when their session opens.
-                if let Some(sid) = self.session_for(Some(root.as_str())) {
+                let key = lane_key("session", &self.cfg.id, &Lane::in_thread(&self.cfg.id, &root));
+                if let Some(sid) = self.session_for(Some(&key)) {
                     self.model_on_session.remove(&sid);
                     self.sync_thread_model(&sid, Some(root.as_str())).await;
                 }
+            }
+            Cmd::GroupNewSession { group } => {
+                // Its room turn (if any) and every session it had for this group go away.
+                if self.active_group.as_ref().is_some_and(|g| g.lane.chat == group) {
+                    self.stop().await;
+                }
+                self.forget_group_sessions(&group);
             }
             Cmd::Shutdown => return false,
         }
@@ -342,7 +348,8 @@ impl Actor {
     /// the agent is told, in the same session, to finish without redoing steps.
     pub(super) async fn resume_interrupted(&mut self, lane: Lane, done_tx: &mpsc::UnboundedSender<Done>) {
         self.set_inflight(false);
-        if self.session_for(lane.thread.as_deref()).is_none() {
+        let slot = self.slot(&lane);
+        if self.session_for(slot.as_deref()).is_none() {
             self.finish_routine(
                 crate::routines::Status::Interrupted,
                 Some("No saved agent session is available; inspect this run before retrying".into()),

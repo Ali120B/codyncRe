@@ -57,6 +57,24 @@ impl Rooms {
         self.0.locked().get(&lane.key()).copied() == Some(epoch)
     }
 
+    /// New session on a group: the room starts from a fresh context — every member forgets
+    /// its sessions for this group (their own chats keep theirs). The transcript stays.
+    pub fn new_session(&self, hub: &Hub, group: &str) {
+        self.stop(hub, group);
+        let Ok(Some(row)) = hub.store.bot(group) else { return };
+        for member in &row.config.members {
+            let _ = hub.send_cmd(member, Cmd::GroupNewSession { group: group.to_owned() });
+        }
+        let lane = Lane::main(group);
+        let turn = hub.store.max_turn(group);
+        hub.add_entry(
+            &lane,
+            EntryKind::Notice,
+            turn,
+            &serde_json::json!({"text": "New session — the room starts with a fresh context.", "style": "divider"}),
+        );
+    }
+
     /// Stop: ends every room turn in `group` (main chat and threads) and the member turns in it.
     pub fn stop(&self, hub: &Hub, group: &str) {
         let thread_prefix = format!("{group}/");
@@ -121,11 +139,13 @@ pub fn start(hub: &Arc<Hub>, group: &BotConfig, lane: Lane) {
 async fn run(hub: &Arc<Hub>, group_id: &str, lane: &Lane, epoch: u64) -> Result<()> {
     let mut replies = 0;
     let mut last_reply: Option<(String, String, String)> = None;
+    // Only the user's message picks speakers: a bot @-mentioning another member in its
+    // reply doesn't pull that member into a later round.
+    let user_said = last_user_message(hub, lane)?.into_iter().collect::<Vec<_>>();
     'rounds: for round in 0..MAX_ROUNDS {
         let group = hub.store.bot(group_id)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("group deleted"))?.config;
         let members = members(hub, &group);
-        let since_user = since_last_user_message(hub, lane)?;
-        let mut speakers = responders(&members, &since_user);
+        let mut speakers = responders(&members, &user_said);
         // A leader speaks first every round; otherwise each round starts one member later.
         if let Some(i) = speakers.iter().position(|m| !group.leader.is_empty() && m.id == group.leader) {
             speakers.swap(0, i);
@@ -177,14 +197,13 @@ fn members(hub: &Hub, group: &BotConfig) -> Vec<BotConfig> {
         .collect()
 }
 
-/// The lane's messages since the user last wrote there, that message included.
-fn since_last_user_message(hub: &Hub, lane: &Lane) -> Result<Vec<Entry>> {
+/// The user's most recent message in the lane: the one that started this room turn.
+fn last_user_message(hub: &Hub, lane: &Lane) -> Result<Option<Entry>> {
     let recent = hub.store.messages_after(lane, 0, HISTORY_LINES)?;
-    let start = recent.iter().rposition(|e| e.kind == EntryKind::User.as_str()).unwrap_or(0);
-    Ok(recent[start..].to_vec())
+    Ok(recent.into_iter().rev().find(|e| e.kind == EntryKind::User.as_str()))
 }
 
-/// Who answers: the members @-mentioned since the user's last message, or everyone
+/// Who answers: the members @-mentioned in the user's message, or everyone
 /// when nobody (or `@all` / `@everyone`) is.
 fn responders<'a>(members: &'a [BotConfig], messages: &[Entry]) -> Vec<&'a BotConfig> {
     let texts: Vec<&str> = messages.iter().filter_map(|e| e.data["text"].as_str()).collect();

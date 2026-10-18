@@ -91,6 +91,10 @@ pub enum Cmd {
     ThreadModel {
         root: String,
     },
+    /// New session on a group: this member forgets its sessions for that room.
+    GroupNewSession {
+        group: String,
+    },
     Shutdown,
 }
 
@@ -128,7 +132,7 @@ pub fn spawn(hub: Arc<Hub>, cfg: BotConfig) -> BotHandle {
         cfg,
         conn: None,
         session_id,
-        thread_sessions: HashMap::new(),
+        lane_sessions: HashMap::new(),
         lane,
         turn_session: None,
         thread_intro: None,
@@ -217,7 +221,7 @@ struct Actor {
     /// The main session: the bot's own chat and its group turns.
     session_id: Option<String>,
     /// Thread root -> the thread's session (loaded from kv on first use).
-    thread_sessions: HashMap<String, String>,
+    lane_sessions: HashMap<String, String>,
     /// Where the current (or last) turn talks; entries go there.
     lane: Lane,
     /// The session the current turn prompts.
