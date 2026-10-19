@@ -483,4 +483,6 @@ export interface GroupDraft {
   instructions?: string
   workspace?: string
   pinned?: boolean
+  hidden?: boolean
+  notify?: boolean | null
 }

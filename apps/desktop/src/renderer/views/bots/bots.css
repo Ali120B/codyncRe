@@ -47,11 +47,13 @@ textarea.field-box {
 .swatch.on {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
+/* Wrap instead of a hidden horizontal strip: every shape and color is reachable
+   with the mouse wheel, not only with the keyboard. */
 .swatch-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 4px;
-  overflow-x: auto;
 }
 
 /* A picked bot: To: field and group editor. */

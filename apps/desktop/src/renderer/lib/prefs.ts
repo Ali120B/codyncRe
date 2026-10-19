@@ -70,6 +70,8 @@ export const prefs = {
   computerAccessSetup: pref<'ready' | 'later' | null>('computerAccessSetup', null),
   /** The Computer panel's width (the aside it shares with details). */
   computerPanelWidth: pref('desktopComputerPanelWidth', 400),
+  /** Workspace folders bots and groups can start in with one click (newest first). */
+  workspaces: pref<string[]>('workspaceFolders', []),
   starAsk: pref<StarAsk>('githubStarAsk', { kind: 'never' }),
 }
 

@@ -18,6 +18,7 @@ import { VoiceChatSettingsView } from './VoiceChatSettingsView'
 import { ComputerAccessView } from '../computer-access/ComputerAccessView'
 import { FormSheet } from '../marketplace/pieces'
 import { AnalyticsSheet } from './AnalyticsSheet'
+import { WorkspacesCard } from '../bots/workspaces'
 
 /** The chat window's Settings: pages in a rail, Maus's settings layout. */
 export type SettingsPage = 'general' | 'ai' | 'computers' | 'access' | 'voice' | 'usage' | 'updates'
@@ -116,6 +117,8 @@ function PageContent({ page }: { page: SettingsPage }) {
 /** Account, window and app preferences. */
 function GeneralSettings() {
   const account = useAccount()
+  const app = useApp()
+  const browseStore = app.local ?? [...app.stores.values()].find((s) => s.connection.kind === 'online') ?? null
   const [textSize, setTextSize] = usePref(prefs.textSize)
   const [usageIconStyle, setUsageIconStyle] = usePref(prefs.usageIconStyle)
   const [compact, setCompact] = usePref(prefs.sidebarCompact)
@@ -170,6 +173,7 @@ function GeneralSettings() {
           Compact sidebar
         </Switch>
       </CardSection>
+      <WorkspacesCard store={browseStore} />
       <CardSection title="System">
         {window.codync.platform === 'darwin' ? <Switch on={showInDock} onChange={(on) => void window.codync.app.setShowInDock(on).then(setShowInDock)}>Show in Dock</Switch> : null}
         {window.codync.island.supported ? (

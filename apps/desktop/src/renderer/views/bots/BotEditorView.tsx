@@ -1,23 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fastModeRefusal, fastModeShown } from '@shared/fast-mode'
-import { draftOf, type BotDraft, type DirListing } from '@shared/models'
+import { draftOf, type BotDraft } from '@shared/models'
 import { CharacterAvatar } from '../../components/Avatar'
-import { CardSection, ChoicePicker, DropdownMenu, IconButton, Pill, SearchField, Spinner, ValueRow } from '../../components/Controls'
+import { CardSection, ChoicePicker, IconButton, SearchField, Spinner, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { ModalHeader, Sheet, useDismiss } from '../../components/Overlay'
+import { ModalHeader, useDismiss } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { AVATAR_COLORS, AVATAR_SHAPES } from '../../lib/theme'
 import { useStore } from '../../store/context'
 import { useAgentModels } from './agent-models'
 import { AgentModelPicker } from './AgentModelPicker'
 import { BOT_ROLES, botRole } from './bot-roles'
-import { errorText, fillDefaults, isValid, lastPathComponent, normalized, usePlugins, type Plugins } from './drafts'
+import { errorText, fillDefaults, isValid, normalized, usePlugins, type Plugins } from './drafts'
 import { FormSheet } from '../marketplace/pieces'
 import { SkillSheet, type SkillRef } from '../marketplace/SkillSheet'
 import { MemoryCard } from './MemoryView'
 import { Accordion } from './Accordion'
 import { RoutinesView } from '../routines/RoutinesView'
 import { AnchoredPanel, AutoTextArea, Field, SwitchRow } from './parts'
+import { WorkspacePicker } from './workspaces'
 import './bots.css'
 
 /** Picks a different value from the list (a shuffle that always visibly changes). */
@@ -124,7 +125,6 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
 }) {
   const store = useStore()
   const [pickingAvatar, setPickingAvatar] = useState(false)
-  const [pickingFolder, setPickingFolder] = useState(false)
   const [viewingSkill, setViewingSkill] = useState<SkillRef | null>(null)
   const avatarRef = useRef<HTMLButtonElement>(null)
   const set = <K extends keyof BotDraft>(key: K, value: BotDraft[K]) => onChange((d) => ({ ...d, [key]: value }))
@@ -306,18 +306,7 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
                 : 'This bot has its own space for files. It can work in other folders when you ask.'
             }
           >
-            <DropdownMenu
-              title={draft.cwd || 'A persistent workspace allocated for this bot'}
-              items={() => [
-                { title: 'Personal workspace', selected: !draft.cwd, action: () => set('cwd', '') },
-                { title: 'Choose project folder…', selected: !!draft.cwd, action: () => setPickingFolder(true) },
-              ]}
-            >
-              <Pill outlined style={{ gap: 6, color: 'var(--text)' }}>
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>{draft.cwd ? lastPathComponent(draft.cwd) : 'Personal'}</span>
-                <Icon name="chevron.down" size={10} weight="semibold" color="var(--secondary)" />
-              </Pill>
-            </DropdownMenu>
+            <WorkspacePicker value={draft.cwd} onChange={(path) => set('cwd', path)} />
           </ValueRow>
           <PluginToggles
             title="Connectors"
@@ -391,15 +380,6 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
       <FormSheet open={viewingSkill !== null} onClose={() => setViewingSkill(null)}>
         {viewingSkill ? <SkillSheet key={viewingSkill.name} skill={viewingSkill} /> : null}
       </FormSheet>
-      <Sheet open={pickingFolder} onClose={() => setPickingFolder(false)} width={460} height={520}>
-        <FolderPicker
-          start={draft.cwd || store.hello?.home || null}
-          onPick={(path) => {
-            set('cwd', path)
-            setPickingFolder(false)
-          }}
-        />
-      </Sheet>
     </div>
   )
 }
@@ -454,105 +434,6 @@ function AvatarPicker({ shape, color, onShape, onColor }: { shape: string; color
             <span style={{ width: 26, height: 26, borderRadius: '50%', background: c.hex, display: 'block' }} />
           </button>
         ))}
-      </div>
-    </div>
-  )
-}
-
-/** Browses folders on the host, drilling down in place. */
-function FolderPicker({ start, onPick }: { start: string | null; onPick: (path: string) => void }) {
-  // The folders opened so far; the last one is shown.
-  const [stack, setStack] = useState<(string | null)[]>([start])
-  const [forward, setForward] = useState(true)
-  const current = stack[stack.length - 1] ?? null
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
-        {stack.length > 1 ? (
-          <div className="fade-in" style={{ paddingLeft: 10, display: 'flex' }}>
-            <IconButton
-              title="Back"
-              icon="chevron.left"
-              onClick={() => {
-                setForward(false)
-                setStack((s) => s.slice(0, -1))
-              }}
-            />
-          </div>
-        ) : null}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <ModalHeader title={current ? lastPathComponent(current) : 'Folders'} />
-        </div>
-      </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <FolderLevel
-          key={stack.length}
-          path={current}
-          forward={forward}
-          onPick={onPick}
-          onOpen={(path) => {
-            setForward(true)
-            setStack((s) => [...s, path])
-          }}
-        />
-      </div>
-    </div>
-  )
-}
-
-/** One folder's subfolders. */
-function FolderLevel({ path, forward, onPick, onOpen }: { path: string | null; forward: boolean; onPick: (path: string) => void; onOpen: (path: string) => void }) {
-  const store = useStore()
-  const [listing, setListing] = useState<DirListing | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [filter, setFilter] = useState('')
-
-  useEffect(() => {
-    let live = true
-    store
-      .listDirs(path)
-      .then((l) => live && setListing(l))
-      .catch((e: unknown) => live && setError(errorText(e)))
-    return () => {
-      live = false
-    }
-  }, [store, path])
-
-  const dirs = listing?.dirs.filter((d) => !filter || d.name.toLowerCase().includes(filter.toLowerCase())) ?? []
-
-  return (
-    <div className={`bot-form level-slide ${forward ? 'from-trailing' : 'from-leading'}`}>
-      <div className="bot-form-content" style={{ gap: 14 }}>
-        <SearchField value={filter} onChange={setFilter} />
-        {listing ? (
-          <>
-            <CardSection footer={listing.path}>
-              <button className="press" style={{ display: 'flex', alignItems: 'center', gap: 8, ...font('headline'), color: 'var(--accent)' }} onClick={() => onPick(listing.path)}>
-                <Icon name="checkmark.circle.fill" size={13} />
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{`Use “${lastPathComponent(listing.path)}”`}</span>
-              </button>
-            </CardSection>
-            {dirs.length ? (
-              <CardSection>
-                {dirs.map((dir) => (
-                  <button key={dir.path} className="press" style={{ display: 'flex', alignItems: 'center', gap: 10 }} onClick={() => onOpen(dir.path)}>
-                    <span style={{ width: 20, display: 'flex', justifyContent: 'center' }}>
-                      <Icon name={dir.isGit ? 'arrow.triangle.branch' : 'folder'} size={12} color={dir.isGit ? 'var(--accent)' : 'var(--secondary)'} />
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{dir.name}</span>
-                    <Icon name="chevron.right" size={10} weight="semibold" color="var(--tertiary)" />
-                  </button>
-                ))}
-              </CardSection>
-            ) : null}
-          </>
-        ) : error ? (
-          <span style={{ color: 'var(--danger)' }}>{error}</span>
-        ) : (
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <Spinner size={20} />
-          </div>
-        )}
       </div>
     </div>
   )

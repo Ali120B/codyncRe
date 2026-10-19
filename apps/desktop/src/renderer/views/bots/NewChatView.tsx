@@ -6,6 +6,7 @@ import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
 import { createDefaultBot, errorText } from './drafts'
+import { GroupEditorView } from './GroupEditorView'
 import { AutoTextArea, BotChip } from './parts'
 import './bots.css'
 
@@ -22,6 +23,8 @@ export function NewChatView({ group, initialRecipient, onClose }: { group: boole
   const [draft, setDraft] = useState('')
   const [recipients, setRecipients] = useState<string[]>(initialRecipient ? [initialRecipient] : [])
   const [creating, setCreating] = useState(false)
+  // Two or more bots: set the group up (name, folder, rules) before it's created.
+  const [settingUp, setSettingUp] = useState(false)
   const toField = useRef<HTMLInputElement>(null)
   const chips = useRef<HTMLDivElement>(null)
 
@@ -66,17 +69,14 @@ export function NewChatView({ group, initialRecipient, onClose }: { group: boole
 
   const remove = (id: string) => setRecipients((list) => list.filter((r) => r !== id))
 
-  // One bot: its chat. Several: their group chat.
+  // One bot: its chat. Several: set up their group chat first.
   const start = () => {
     if (recipients.length === 0) return
     if (recipients.length === 1) {
       if (!group) open(recipients[0]!)
       return
     }
-    store
-      .createGroup(picked.map((b) => b.name).join(', '), '', recipients)
-      .then((g) => open(g.id))
-      .catch((e: unknown) => store.setError(errorText(e)))
+    setSettingUp(true)
   }
 
   const create = () => {
@@ -113,13 +113,15 @@ export function NewChatView({ group, initialRecipient, onClose }: { group: boole
   }
 
   // ⌘1 creates, ⌘2…⌘9 pick the matches; Escape closes.
-  const keys = useRef({ create, choose, matches, onClose })
-  keys.current = { create, choose, matches, onClose }
+  const keys = useRef({ create, choose, matches, onClose, settingUp, cancelSetup: () => setSettingUp(false) })
+  keys.current = { create, choose, matches, onClose, settingUp, cancelSetup: () => setSettingUp(false) }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        keys.current.onClose()
+        // Escape backs out of the group setup first, then the whole compose.
+        if (keys.current.settingUp) keys.current.cancelSetup()
+        else keys.current.onClose()
         return
       }
       if (!e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) return
@@ -135,6 +137,17 @@ export function NewChatView({ group, initialRecipient, onClose }: { group: boole
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  if (settingUp) {
+    return (
+      <GroupEditorView
+        group={null}
+        members={recipients}
+        onCancel={() => setSettingUp(false)}
+        onDone={(created) => open(created.id)}
+      />
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
