@@ -192,126 +192,6 @@
   background: var(--hover-fill);
 }
 
-/* Chats: every chat of a bot or group, open one to continue it on its own context. */
-.chats-card {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 10px;
-}
-
-.chats-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 2px 6px;
-}
-
-.chats-label {
-  color: var(--text);
-}
-
-.chats-new {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 8px;
-  font-size: calc(12px * var(--scale));
-  font-weight: 500;
-  color: var(--secondary);
-  background: var(--surface);
-  transition: background var(--hover), color var(--hover);
-}
-
-.chats-new:hover {
-  background: var(--hover-fill);
-  color: var(--text);
-}
-
-.chats-empty {
-  color: var(--tertiary);
-  padding: 2px 4px 6px;
-}
-
-.chat-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  text-align: left;
-  transition: background var(--hover);
-}
-
-.chat-row:hover {
-  background: var(--hover-fill);
-}
-
-.chat-row.active {
-  background: var(--bubble-agent);
-}
-
-.chat-row-title {
-  flex: 1;
-  min-width: 0;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-row-meta {
-  color: var(--tertiary);
-  white-space: nowrap;
-}
-
-/* The bar above the transcript: which chat you're in, or a pending new one. */
-.chat-mode-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 2px 14px 0;
-  padding: 5px 8px;
-  border-radius: 10px;
-  background: var(--surface);
-  position: relative;
-  z-index: 5;
-  flex: none;
-}
-
-.chat-mode-bar.pending {
-  border: 1px dashed var(--border);
-  background: transparent;
-}
-
-.chat-mode-back {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 7px;
-  font-size: calc(12px * var(--scale));
-  color: var(--secondary);
-  transition: background var(--hover), color var(--hover);
-}
-
-.chat-mode-back:hover {
-  background: var(--hover-fill);
-  color: var(--text);
-}
-
-.chat-mode-title {
-  font-size: calc(12px * var(--scale));
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* The Chats panel (side slot, like the Computer panel). */
 .chats-panel {
   display: flex;
@@ -320,56 +200,16 @@
   background: var(--background);
 }
 
-.chats-panel .chats-head {
+.chats-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   height: 54px;
   padding: 0 12px;
   flex: none;
 }
 
-.chats-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0 12px 12px;
-}
-
-/* Chat history rows: a quiet list that slides a touch and lifts on hover. */
-.chat-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 10px;
-  border-radius: 12px;
-  text-align: left;
-  transition: background var(--hover), transform var(--hover);
-}
-
-.chat-item:hover {
-  background: var(--hover-fill);
-  transform: translateX(2px);
-}
-
-.chat-item.active {
-  background: var(--bubble-agent);
-}
-
-.chat-item-icon {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background: var(--surface);
-  flex: none;
-  transition: background var(--hover);
-}
-
-.chat-item.active .chat-item-icon {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-.chat-item-text {
+.chats-heading {
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -377,38 +217,147 @@
   flex: 1;
 }
 
-.chat-item-title {
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-item-meta {
+.chats-heading-sub {
   color: var(--tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chat-item-go {
-  opacity: 0;
-  transform: translateX(-3px);
-  transition: opacity var(--hover), transform var(--hover);
+.chats-new-wrap {
+  padding: 0 10px 10px;
   flex: none;
 }
 
-.chat-item:hover .chat-item-go,
-.chat-item.active .chat-item-go {
-  opacity: 1;
-  transform: translateX(0);
+.chats-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* The one filled action above the history. */
+.chats-new {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 12px;
+  text-align: left;
+  transition: background var(--hover);
+}
+
+.chats-new:hover {
+  background: var(--hover-fill);
+}
+
+.chats-new-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  flex: none;
+}
+
+.chats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chats-section-label {
+  font-size: calc(10.5px * var(--scale));
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--tertiary);
+  padding: 0 8px 5px;
+}
+
+/* Chat rows are typographic: title, one-line last message, age. No tiles or chevrons. */
+.chat-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 12px;
+  text-align: left;
+  transition: background var(--hover);
+}
+
+.chat-item:hover {
+  background: var(--hover-fill);
+}
+
+.chat-item.active {
+  background: var(--roster-selected);
+}
+
+.chat-item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-item-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chat-item-title {
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-item-time {
+  color: var(--tertiary);
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-item-preview {
+  color: var(--secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chats-empty-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 36px 22px;
+  gap: 8px;
+  padding: 34px 24px;
   text-align: center;
+}
+
+.chats-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: var(--surface);
+  margin-bottom: 2px;
 }

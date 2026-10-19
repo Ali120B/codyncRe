@@ -7,6 +7,8 @@
   --bubble-agent: #f0f0f0;
   --bubble-user: #e2e2e2;
   --border: #e6e6e6;
+  /* The quiet fill under hovered rows and controls. */
+  --hover-fill: rgba(var(--text-rgb), 0.06);
   --text: #141414;
   --text-rgb: 20, 20, 20;
   --secondary: #6b6b6b;

@@ -510,7 +510,7 @@ mod tests {
         assert_eq!(result["models"][0]["description"], "Available here");
         assert_eq!(
             model_catalog(&json!({}), &Value::Null),
-            json!({"models": [], "currentModelId": null, "fastMode": false})
+            json!({"models": [], "currentModelId": null, "fastMode": false, "options": []})
         );
     }
 

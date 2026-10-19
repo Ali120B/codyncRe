@@ -5,18 +5,33 @@ use crate::agent::acp::{self, Incoming};
 use crate::hub::Hub;
 use anyhow::{Context, Result, anyhow};
 use serde_json::json;
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-const ASK: &str = "Name this conversation for a chat list. Reply with only the name: 2 to 5 plain words, no quotes, no period.";
+const ASK: &str =
+    "Name this conversation for a chat list. Reply with only the name: 2 to 5 plain words, no quotes, no period.";
 
 /// Names the chat in the background, once, if it has no name yet.
 pub(crate) fn spawn(hub: Arc<Hub>, bot: String, chat: String, seed: String) {
+    // A burst of messages must not start several naming calls for the same chat.
+    let key = format!("{bot}@{chat}");
+    if !in_flight().lock().is_ok_and(|mut keys| keys.insert(key.clone())) {
+        return;
+    }
     tokio::spawn(async move {
         if let Err(error) = generate(&hub, &bot, &chat, &seed).await {
             tracing::info!(bot, error = format!("{error:#}"), "couldn't name a chat");
         }
+        if let Ok(mut keys) = in_flight().lock() {
+            keys.remove(&key);
+        }
     });
+}
+
+fn in_flight() -> &'static Mutex<HashSet<String>> {
+    static KEYS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    KEYS.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
 async fn generate(hub: &Arc<Hub>, bot: &str, chat: &str, seed: &str) -> Result<()> {
@@ -30,7 +45,10 @@ async fn generate(hub: &Arc<Hub>, bot: &str, chat: &str, seed: &str) -> Result<(
     let result = tokio::time::timeout(Duration::from_secs(60), async {
         let session = acp.request("session/new", json!({"cwd": row.config.cwd, "mcpServers": []})).await?;
         let sid = session["sessionId"].as_str().ok_or_else(|| anyhow!("agent returned no sessionId"))?.to_owned();
-        let request = acp.request("session/prompt", json!({"sessionId": sid, "prompt": [{"type": "text", "text": ask}]}));
+        // The throwaway process starts on the agent's default model; use the bot's own.
+        crate::agent::bot::select_model(&acp, &session, &sid, &row.config).await?;
+        let request =
+            acp.request("session/prompt", json!({"sessionId": sid, "prompt": [{"type": "text", "text": ask}]}));
         tokio::pin!(request);
         let mut out = String::new();
         loop {
@@ -59,14 +77,24 @@ async fn generate(hub: &Arc<Hub>, bot: &str, chat: &str, seed: &str) -> Result<(
     acp.kill().await;
     let out = result.context("naming timed out")??;
     let Some(title) = tidy(&out) else { return Ok(()) };
+    tracing::debug!(bot, chat, title, "named a chat");
     hub.store.set_chat_title(bot, chat, &title)?;
+    let _ = hub.events.send(json!({"type": "chatTitle", "botId": bot, "chatId": chat, "title": title}));
     Ok(())
 }
 
-/// The first line, unquoted, no trailing period; 2–60 characters or nothing.
+/// The first line, unquoted, without a "Title:" label or trailing period; 2–60 characters or nothing.
 fn tidy(text: &str) -> Option<String> {
     let line = text.lines().map(str::trim).find(|line| !line.is_empty())?;
-    let clean = line.trim_matches(['"', '\'', '\u{201c}', '\u{201d}', '.', ' ']).trim_end_matches('.').trim();
+    let line = line.trim_start_matches(['#', '*', ' ']);
+    let line = ["title:", "chat title:", "name:"]
+        .iter()
+        .find_map(|label| {
+            line.get(..label.len()).filter(|head| head.eq_ignore_ascii_case(label)).map(|_| &line[label.len()..])
+        })
+        .unwrap_or(line)
+        .trim_start_matches(['*', ' ', ':']);
+    let clean = line.trim_matches(['"', '\'', '\u{201c}', '\u{201d}', '.', ' ']).trim_end_matches(['.', '*']).trim();
     if clean.chars().count() < 2 {
         return None;
     }

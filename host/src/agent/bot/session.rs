@@ -201,8 +201,12 @@ impl Actor {
         }
         let servers = self.mcp_servers()?;
         let claude = self.conn.as_ref().is_some_and(|c| c.claude);
+        // A chat root is its own fresh conversation, not a branch of the main one.
+        let chat_root =
+            root.as_deref().is_some_and(|root| self.hub.store.entry(root).is_some_and(|e| e.data["chat"] == true));
         let mut forked = false;
         if let Some(root) = root.as_deref()
+            && !chat_root
             && self.session_for(slot.as_deref()).is_none()
             && let Some(main) = self.session_id.clone()
             && self.conn.as_ref().is_some_and(|c| c.sessions.fork)
@@ -311,7 +315,7 @@ impl Actor {
         self.set_session(slot.as_deref(), Some(&sid));
         self.session_fresh = true;
         self.turn_session = Some(sid.clone());
-        if let Some(root) = root.as_deref() {
+        if let Some(root) = root.as_deref().filter(|_| !chat_root) {
             self.thread_intro = Some(self.thread_intro(root, false));
         }
         context::adopt(&self.hub.store, &self.cfg, &sid, system.clone())?;

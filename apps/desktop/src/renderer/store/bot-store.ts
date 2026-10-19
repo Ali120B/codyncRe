@@ -46,8 +46,25 @@ export class BotStore extends BotSync {
   /** Bots whose next message starts a new chat (it runs on a fresh session). */
   pendingNewChat = new Map<string, number>()
 
-  /** Generated chat names by bot (chat key → title), from the host's `chatTitles`. */
-  chatTitles = new Map<string, Record<string, string>>()
+  /** The chat root the host just created for a pending New chat, until the view opens it. */
+  newChatRoot = new Map<string, string>()
+
+  /** Deletes a chat on the host and drops it from the mirror right away. */
+  async deleteChat(botId: string, chatId: string): Promise<void> {
+    try {
+      await (await this.ready()).call('deleteChat', { botId, chatId })
+    } catch (error) {
+      this.setError(`Couldn't delete the chat: ${error instanceof Error ? error.message : String(error)}`)
+      return
+    }
+    this.entries.set(botId, this.allEntries(botId).filter((e) => e.id !== chatId && e.threadId !== chatId))
+    const titles = { ...(this.chatTitles.get(botId) ?? {}) }
+    delete titles[chatId]
+    this.chatTitles.set(botId, titles)
+    if (this.newChatRoot.get(botId) === chatId) this.newChatRoot.delete(botId)
+    this.changed()
+    this.scheduleSave()
+  }
 
   async loadChatTitles(botId: string): Promise<void> {
     try {
@@ -58,12 +75,15 @@ export class BotStore extends BotSync {
   }
 
   startNewChat(botId: string) {
+    this.newChatRoot.delete(botId)
     this.pendingNewChat.set(botId, Date.now())
     this.changed()
   }
 
   cancelNewChat(botId: string) {
-    if (this.pendingNewChat.delete(botId)) this.changed()
+    const pending = this.pendingNewChat.delete(botId)
+    const root = this.newChatRoot.delete(botId)
+    if (pending || root) this.changed()
   }
 
   /** Reads a bot's pinned thread models into the mirror. */
@@ -94,6 +114,8 @@ export class BotStore extends BotSync {
       turn: 0, data, createdAt: Date.now(), updatedAt: 0,
     })
     this.changed()
+    // A pending New chat: the host stores this message as a chat root and answers on a fresh session.
+    const newChat = this.pendingNewChat.has(botId)
     void (async () => {
       try {
         // Safe to repeat: the computer skips a nonce it already has.
@@ -109,10 +131,12 @@ export class BotStore extends BotSync {
               ids.push(id)
             }
           }
-          return client.send(botId, trimmed, nonce, thread, ids, this.pendingNewChat.delete(botId))
+          return client.send(botId, trimmed, nonce, thread, ids, newChat)
         }, true)
         this.outgoingFiles.delete(nonce)
         this.upsert(e)
+        // The view opens this chat and clears the pending request.
+        if (newChat && e.data.chat === true) this.newChatRoot.set(botId, e.id)
         this.changed()
       } catch (error) {
         if (this.outgoingFiles.has(nonce)) this.lastError = `Couldn't send the files: ${error instanceof Error ? error.message : error}`

@@ -4,11 +4,14 @@ import { AvatarWithStatus } from '../components/Avatar'
 import { Icon } from '../components/Icon'
 import { ThinkingOrb } from '../components/ThinkingOrb'
 import { font } from '../lib/fonts'
+import { useModel } from '../lib/observable'
 import { messagePreview } from '../lib/message-preview'
 import type { BotStore } from '../store/bot-store'
 
 /** A roster row: avatar with status, name, and the live activity or last message (Grok Bot's desktop sidebar). */
 export const BotRow = memo(function BotRow({ bot, store, compact, usingComputer, members }: { bot: Bot; store: BotStore; compact: boolean; usingComputer: boolean; members: Bot[] }) {
+  // The roster previews the open chat, so the row follows its messages too.
+  useModel(store)
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 0 : 10, padding: '9px 0', width: '100%', justifyContent: compact ? 'center' : 'flex-start' }}>
       <AvatarWithStatus bot={bot} members={members} size={30} />
@@ -66,5 +69,26 @@ function Preview({ bot, store }: { bot: Bot; store: BotStore }) {
     )
   }
   if (bot.status === 'error') return <span style={{ ...line, color: 'var(--danger)' }}>{messagePreview(bot.lastMessage ?? 'Something went wrong')}</span>
-  return <span style={{ ...line, color: 'var(--secondary)' }}>{messagePreview(bot.lastMessage ?? (isGroup(bot) ? `${bot.members.length} bots` : `${store.backendName(bot.backend)} · ${folderName(bot)}`))}</span>
+  const last = openChatPreview(bot, store) ?? bot.lastMessage
+  return <span style={{ ...line, color: 'var(--secondary)' }}>{messagePreview(last ?? (isGroup(bot) ? `${bot.members.length} bots` : `${store.backendName(bot.backend)} · ${folderName(bot)}`))}</span>
+}
+
+/** The last line of the chat this bot has open, if it isn't the first chat. */
+function openChatPreview(bot: Bot, store: BotStore): string | null {
+  const chat = localStorage.getItem(`chat.${bot.id}`)
+  if (!chat || chat === 'main') return null
+  const last = store
+    .allEntries(bot.id)
+    .filter((e) => e.id === chat || e.threadId === chat)
+    .filter((e) => e.kind === 'user' || (e.kind === 'agent' && e.data.final === true))
+    .sort((a, b) => a.seq - b.seq)
+    .at(-1)
+  if (!last) return null
+  const text = (last.data.text ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) {
+    const file = last.data.files?.[0] ?? last.data.attachments?.[0]
+    return file ? file.name : null
+  }
+  if (last.kind === 'user') return `You: ${text}`
+  return isGroup(bot) ? `${store.authorName(last.data.author)}: ${text}` : text
 }

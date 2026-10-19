@@ -1,6 +1,7 @@
 import { useRef } from 'react'
-import { isChat, type Entry } from '@shared/models'
-import { groupExchanges, type BotExchange, type ChatSlot } from './bot-exchange'
+import { isChat, type Entry } from '../../../shared/models.ts'
+import { messagePreview } from '../../lib/message-preview.ts'
+import { groupExchanges, type BotExchange, type ChatSlot } from './bot-exchange.ts'
 
 export type ChatItem =
   | { id: string; kind: 'separator'; date: number }
@@ -59,6 +60,25 @@ export function rowIn(item: ChatItem): string {
   return item.kind === 'entry' && item.entry.kind === 'user' ? 'row-in mine' : 'row-in'
 }
 
+/**
+ * A chat's last message in one line, as the chat list shows it: "You: …" for the user, and
+ * the author's name in a group. Empty chats fall back to their first request.
+ */
+export function lastMessagePreview(entries: Entry[], group: boolean, authorName: (id: string | null | undefined) => string): string {
+  const last = entries
+    .filter((e) => e.kind === 'user' || e.kind === 'agent')
+    .sort((a, b) => a.seq - b.seq)
+    .at(-1)
+  if (!last) return ''
+  const text = messagePreview(last.data.text ?? '')
+  if (text) {
+    if (last.kind === 'user') return `You: ${text}`
+    return group ? `${authorName(last.data.author)}: ${text}` : text
+  }
+  const file = last.data.files?.[0] ?? last.data.attachments?.[0]
+  return file ? file.name : ''
+}
+
 const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
 const monthDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'long' })
@@ -74,6 +94,15 @@ export const relativeTime = {
     const yesterday = new Date(now.getTime() - 86_400_000)
     const day = sameDay(date, now) ? 'Today' : sameDay(date, yesterday) ? 'Yesterday' : monthDay.format(date)
     return `${day} ${time.format(date)}`
+  },
+  /** Chat list section: Today · Yesterday · Previous 7 days · Older */
+  section(ms: number) {
+    const date = new Date(ms)
+    const now = new Date()
+    if (sameDay(date, now)) return 'Today'
+    if (sameDay(date, new Date(now.getTime() - 86_400_000))) return 'Yesterday'
+    if (now.getTime() - ms < 7 * 86_400_000) return 'Previous 7 days'
+    return 'Older'
   },
   /** Roster stamp: 3:45 AM · Yesterday · Wednesday · Sep 16 */
   day(ms: number) {

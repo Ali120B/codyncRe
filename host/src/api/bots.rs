@@ -201,14 +201,18 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
                 tracing::warn!(%error, bot, "couldn't mark bot read after send");
             }
             let turn_lane = if new_chat { Lane { chat: bot.to_owned(), thread: Some(e.id.clone()) } } else { lane };
+            let main_chat = turn_lane.thread.is_none();
             if row.config.is_group() {
                 crate::chat::group::start(hub, &row.config, turn_lane);
             } else {
                 hub.send_cmd(bot, Cmd::Send { lane: turn_lane, entry_id: e.id.clone(), text: prompt })?;
             }
-            // A chat names itself after its first message, on a throwaway agent call.
+            // A chat names itself after its first message, on a throwaway agent call. The
+            // original conversation gets one too, from its next message, if it has none yet.
             if new_chat {
                 crate::chat::title::spawn(hub.clone(), bot.to_owned(), e.id.clone(), text.to_owned());
+            } else if main_chat && !row.config.is_group() {
+                crate::chat::title::spawn(hub.clone(), bot.to_owned(), "main".to_owned(), text.to_owned());
             }
             json!({"entry": e})
         }
@@ -236,6 +240,25 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
                 Some(row) if row.config.is_group() => hub.groups.new_session(hub, bot),
                 _ => hub.send_cmd(bot, Cmd::NewSession { thread })?,
             }
+            json!({})
+        }
+        // Deleting a chat removes its root and replies (the client drops them locally too).
+        "deleteChat" => {
+            let bot = str_arg(&b, "botId")?;
+            let chat = str_arg(&b, "chatId")?;
+            hub.store.bot(bot)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("unknown bot"))?;
+            let is_chat = hub
+                .store
+                .entry(chat)
+                .is_some_and(|e| e.bot_id == bot && e.thread_id.is_none() && e.data["chat"] == true);
+            if !is_chat {
+                bail!("not a chat");
+            }
+            hub.store.delete_chat(bot, chat)?;
+            // Other devices drop the rows without waiting for a reload.
+            let _ = hub.events.send(json!({"type": "chatDeleted", "botId": bot, "chatId": chat}));
+            // Refresh the roster's last-message preview on every connected client.
+            hub.emit_bot(bot);
             json!({})
         }
         // Generated chat names (the agent names a chat after its first message).

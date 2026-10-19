@@ -96,6 +96,18 @@ impl Store {
         Ok(models)
     }
 
+    /// Deletes one chat: its root message and everything threaded under it.
+    pub fn delete_chat(&self, bot: &str, chat: &str) -> Result<()> {
+        // Release the connection before reading the title map: both lock the same mutex.
+        self.db
+            .locked()
+            .execute("DELETE FROM entries WHERE bot_id = ?1 AND (id = ?2 OR thread_id = ?2)", params![bot, chat])?;
+        let mut titles = self.chat_titles(bot);
+        titles.remove(chat);
+        self.kv_set(&chat_titles_key(bot), &serde_json::to_string(&titles)?)?;
+        Ok(())
+    }
+
     /// A chat's generated name (`None` until the agent has named it).
     pub fn chat_title(&self, bot: &str, chat: &str) -> Option<String> {
         self.chat_titles(bot).remove(chat)
@@ -103,9 +115,7 @@ impl Store {
 
     /// Every generated chat name for one bot (chat key → title).
     pub fn chat_titles(&self, bot: &str) -> HashMap<String, String> {
-        self.kv_get(&chat_titles_key(bot))
-            .and_then(|raw| serde_json::from_str(&raw).ok())
-            .unwrap_or_default()
+        self.kv_get(&chat_titles_key(bot)).and_then(|raw| serde_json::from_str(&raw).ok()).unwrap_or_default()
     }
 
     /// Stores a chat's generated name.
@@ -173,5 +183,25 @@ mod tests {
             auto_name: false,
             created_at: 0,
         }
+    }
+
+    #[test]
+    fn delete_chat_drops_its_root_replies_and_name() {
+        let s = temp_store();
+        let root = s
+            .insert_entry(&Lane::main("b"), EntryKind::User, 0, &serde_json::json!({"text": "first", "chat": true}))
+            .unwrap();
+        let reply = s
+            .insert_entry(&Lane::in_thread("b", &root.id), EntryKind::Agent, 0, &serde_json::json!({"text": "reply"}))
+            .unwrap();
+        let kept = s.insert_entry(&Lane::main("b"), EntryKind::User, 0, &serde_json::json!({"text": "kept"})).unwrap();
+        s.set_chat_title("b", &root.id, "First chat").unwrap();
+
+        s.delete_chat("b", &root.id).unwrap();
+
+        assert!(s.entry(&root.id).is_none(), "the chat root goes");
+        assert!(s.entry(&reply.id).is_none(), "its replies go");
+        assert!(s.entry(&kept.id).is_some(), "other chats stay");
+        assert!(s.chat_title("b", &root.id).is_none(), "its generated name goes");
     }
 }

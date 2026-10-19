@@ -35,6 +35,8 @@ export class BotSync extends BotMirror {
   private requestedSince = 0
   private floors = new Map<string, number>()
   private readingViews = new Map<string, { botId: string; thread: string | null }>()
+  /** Generated chat names by bot (chat key → title), from `chatTitles` and `chatTitle` events. */
+  chatTitles = new Map<string, Record<string, string>>()
 
   // MARK: lifecycle
 
@@ -228,6 +230,13 @@ export class BotSync extends BotMirror {
       case 'cloud':
         this.cloud = event.cloud
         break
+      case 'chatDeleted':
+        this.entries.set(event.botId, this.allEntries(event.botId).filter((e) => e.id !== event.chatId && e.threadId !== event.chatId))
+        this.dropChatTitle(event.botId, event.chatId)
+        break
+      case 'chatTitle':
+        this.chatTitles.set(event.botId, { ...(this.chatTitles.get(event.botId) ?? {}), [event.chatId]: event.title })
+        break
       case 'resync':
         this.restartEvents()
         break
@@ -361,6 +370,12 @@ export class BotSync extends BotMirror {
     } else {
       this.readingViews.delete(token)
     }
+  }
+
+  private dropChatTitle(botId: string, chatId: string) {
+    const titles = { ...(this.chatTitles.get(botId) ?? {}) }
+    delete titles[chatId]
+    this.chatTitles.set(botId, titles)
   }
 
   private acknowledgeVisible(botId: string, entry?: Entry) {

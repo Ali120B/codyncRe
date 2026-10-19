@@ -139,6 +139,39 @@
   flex: none;
 }
 
+/* A pending New chat: an empty stage until its first message starts it. */
+.pending-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 24px;
+  text-align: center;
+}
+.pending-chat-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: var(--surface);
+  margin-bottom: 2px;
+}
+.pending-chat-cancel {
+  margin-top: 4px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--secondary);
+  transition: background var(--hover), color var(--hover);
+}
+.pending-chat-cancel:hover {
+  background: var(--hover-fill);
+  color: var(--text);
+}
+
 /* Messages */
 .message {
   display: flex;

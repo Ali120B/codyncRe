@@ -4,10 +4,10 @@
 pub mod context;
 pub mod files;
 pub mod group;
-pub(crate) mod title;
 pub mod memory;
 pub mod naming;
 pub mod outbox;
 pub mod prompt;
 pub mod team;
+pub(crate) mod title;
 pub mod uploads;

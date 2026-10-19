@@ -9,7 +9,7 @@ import { useFocusMessage } from '../../lib/focus-message'
 import { prefs, usePref } from '../../lib/prefs'
 import { useApp, useStore } from '../../store/context'
 import { UpdateNeededCard } from '../UpdateNeededCard'
-import { buildChat, rowIn, useArrivals, type ChatItem } from './chat-items'
+import { buildChat, lastMessagePreview, rowIn, useArrivals, type ChatItem } from './chat-items'
 import { BotConversationView, BotMessageRow } from './BotConversation'
 import { ChatFindBar } from './ChatFindBar'
 import { ChatHeaderMenu } from './ChatHeaderMenu'
@@ -69,7 +69,8 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const root = useRef<HTMLDivElement>(null)
   const dock = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(800)
-  useReading(store, botId, null)
+  // Read receipts follow the open chat: a reply that lands there clears its badge at once.
+  useReading(store, botId, activeChat === 'main' ? null : activeChat)
 
   // A search hit: open its thread (or the main chat), page its message in, then flash its row.
   const focus = app.focus?.ref.botId === botId && app.focus.ref.computerId === store.computer.id ? app.focus : null
@@ -86,59 +87,80 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   // Every chat: the first one is the conversation so far; the rest are marked roots.
   const entries = store.allEntries(botId)
   const chats: ChatSummary[] = (() => {
+    const group = !!bot && isGroup(bot)
+    const titleOf = (key: string, first: Entry | undefined) => {
+      const raw = (first?.data.text ?? '').replace(/\s+/g, ' ').trim()
+      return store.chatTitles.get(botId)?.[key] ?? (raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat')
+    }
     const main = entries.filter((e) => (e.threadId ?? null) === null && e.data.chat !== true)
     const mainAsk = main.find((e) => e.kind === 'user')
     const list: ChatSummary[] = []
     if (mainAsk) {
-      const raw = (mainAsk.data.text ?? '').replace(/\s+/g, ' ').trim()
       list.push({
         id: 'main',
-        title: store.chatTitles.get(botId)?.['main'] ?? (raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat'),
+        title: titleOf('main', mainAsk),
         at: Math.max(...main.map((e) => e.createdAt), 0),
-        replies: main.filter((e) => e.kind === 'agent').length,
+        preview: lastMessagePreview(main, group, store.authorName),
       })
     }
     for (const root of entries.filter((e) => (e.threadId ?? null) === null && e.data.chat === true)) {
       const replies = entries.filter((e) => e.threadId === root.id)
-      const raw = (root.data.text ?? '').replace(/\s+/g, ' ').trim()
       list.push({
         id: root.id,
-        title: store.chatTitles.get(botId)?.[root.id] ?? (raw.length > 64 ? `${raw.slice(0, 64)}…` : raw || 'Chat'),
+        title: titleOf(root.id, root),
         at: Math.max(root.createdAt, ...replies.map((e) => e.createdAt), 0),
-        replies: replies.filter((e) => e.kind === 'agent').length,
+        preview: lastMessagePreview([root, ...replies], group, store.authorName),
       })
     }
     return list.sort((a, b) => b.at - a.at)
   })()
 
-  // A pending "New chat" is anchored by the first message sent after it was asked for.
-  const pendingChatAt = store.pendingNewChat.get(botId)
-  const newestUserRoot = entries
-    .filter((e) => e.kind === 'user' && (e.threadId ?? null) === null && !e.id.startsWith('local-'))
-    .sort((a, b) => b.createdAt - a.createdAt)[0]
+  // A remembered chat that was deleted elsewhere falls back to the first one.
+  const activeChatMissing = activeChat !== 'main' && chats.length > 0 && !chats.some((chat) => chat.id === activeChat)
   useEffect(() => {
-    if (pendingChatAt === undefined || !newestUserRoot) return
-    if (newestUserRoot.createdAt < pendingChatAt - 5_000) return
-    setActiveChat(newestUserRoot.id)
+    if (activeChatMissing) setActiveChat('main')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChatMissing])
+
+  // The host answers a pending New chat with its new root: open it, then clear the request.
+  const newChatRoot = store.newChatRoot.get(botId)
+  useEffect(() => {
+    if (!newChatRoot) return
+    setActiveChat(newChatRoot)
     store.cancelNewChat(botId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingChatAt, newestUserRoot?.id])
+  }, [newChatRoot])
 
-  // The agent names a chat right after its first message; pull names in on open and
-  // once more a moment later, since naming runs in the background.
+  // The agent names a chat in the background; while the panel is open, keep pulling names
+  // in until every chat has one (or two minutes pass).
+  const unnamedChats = chats.some((chat) => chat.id !== 'main' && !store.chatTitles.get(botId)?.[chat.id])
   useEffect(() => {
     void store.loadChatTitles(botId)
-    const timer = setTimeout(() => void store.loadChatTitles(botId), 9_000)
-    return () => clearTimeout(timer)
+    if (!showChats || !unnamedChats) return
+    let polls = 0
+    const timer = setInterval(() => {
+      void store.loadChatTitles(botId)
+      if (++polls >= 30) clearInterval(timer)
+    }, 4_000)
+    return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, botId, chats.length, showChats])
+  }, [store, botId, showChats, unnamedChats])
 
   const openChat = (id: string) => {
+    // Opening a chat leaves a pending New chat: its next message must not start another one.
+    store.cancelNewChat(botId)
     setActiveChat(id)
-    store.markAllRead(botId)
+    // Only this chat is read; the roster's Mark as Read still covers everything.
+    store.markRead(botId, id === 'main' ? null : id)
   }
   const startNewChat = () => {
     store.startNewChat(botId)
+  }
+  const deleteChat = (id: string) => {
+    // A running turn would write replies into the chat after its root is gone.
+    if (bot && id !== 'main' && isWorkingIn(bot, botId, id)) store.stop(botId)
+    void store.deleteChat(botId, id)
+    if (activeChat === id) setActiveChat('main')
   }
 
   // The roster's Edit Profile: land straight in the settings, not the small details.
@@ -290,13 +312,27 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
         </div>
         {findOpen && !calling ? <ChatFindBar botId={botId} store={store} close={() => setFindOpen(false)} /> : null}
         {store.pendingNewChat.has(botId) ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-            <span style={{ ...font('footnote'), color: 'var(--tertiary)', textAlign: 'center', maxWidth: 320 }}>
-              New chat — send a message to start it; it runs on a fresh context.
+          <div className="pending-chat">
+            <span className="pending-chat-icon"><Icon name="plus" size={18} color="var(--secondary)" /></span>
+            <span style={{ ...font(15, 'semibold'), color: 'var(--text)' }}>New chat</span>
+            <span style={{ ...font('footnote'), color: 'var(--tertiary)', maxWidth: 280, lineHeight: 1.5, textAlign: 'center' }}>
+              Send a message to start it. It runs on a fresh context, while your other chats keep theirs.
             </span>
+            <button className="pending-chat-cancel press" style={font('caption', 'medium')} onClick={() => store.cancelNewChat(botId)}>
+              Cancel
+            </button>
           </div>
         ) : (
-        <Transcript botId={botId} chatRoot={activeChat === 'main' ? null : activeChat} openTrace={openTrace} openThread={openThreadOn} openRoutine={presentRoutine} openBotChat={setBotChat} focusEntryId={focus && !focus.threadId ? focus.entryId : null} />
+        <Transcript
+          key={activeChat}
+          botId={botId}
+          chatRoot={activeChat === 'main' ? null : activeChat}
+          openTrace={openTrace}
+          openThread={openThreadOn}
+          openRoutine={presentRoutine}
+          openBotChat={setBotChat}
+          focusEntryId={focus && !focus.threadId ? focus.entryId : null}
+        />
         )}
         <div className="composer-dock" ref={dock}>
           <div className="composer-fade" />
@@ -307,7 +343,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           ) : (
             <Composer
               botId={botId}
-              thread={activeChat === 'main' ? null : activeChat}
+              thread={activeChat === 'main' || store.pendingNewChat.has(botId) ? null : activeChat}
               onCall={!calling && bot ? () => setCalling(true) : null}
               onInterrupt={callSpeaking ? () => interruptCall.current?.() : null}
             />
@@ -332,6 +368,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             activeChat={activeChat}
             onOpen={(id) => openChat(id)}
             onNew={() => startNewChat()}
+            onDelete={deleteChat}
             close={() => setShowChats(false)}
           />
         ) : showComputer && bot && !isGroup(bot) ? (
@@ -363,6 +400,10 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             }}
             onNew={() => {
               startNewChat()
+              setShowChats(false)
+            }}
+            onDelete={(id) => {
+              deleteChat(id)
               setShowChats(false)
             }}
             close={() => setShowChats(false)}
@@ -444,7 +485,7 @@ function Transcript({ botId, chatRoot = null, openTrace, openThread, openRoutine
   const store = useStore()
   const bot = store.bots.get(botId) ?? null
   const thread = chatRoot ? chatEntries(store, botId, chatRoot) : store.chat(botId).filter((e) => e.data.chat !== true)
-  const live = !!bot && isWorkingIn(bot, botId, null) && !store.isOffline
+  const live = !!bot && isWorkingIn(bot, botId, chatRoot) && !store.isOffline
   const all = buildChat(thread, true)
   // The newest 40 items first; older pages come in near the top.
   const [firstShown, setFirstShown] = useState<string | null>(null)
@@ -556,7 +597,7 @@ function Transcript({ botId, chatRoot = null, openTrace, openThread, openRoutine
           ))}
           {bot && live ? (
             <div className={arrivals.has('working') ? 'row-in' : undefined} style={{ paddingTop: 6 }}>
-              <WorkingIndicator bot={bot} thinking={store.currentThinking(botId, null)} />
+              <WorkingIndicator bot={bot} thinking={store.currentThinking(botId, chatRoot)} />
             </div>
           ) : null}
           <div style={{ height: 8 }} />

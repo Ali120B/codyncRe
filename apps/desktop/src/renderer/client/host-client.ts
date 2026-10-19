@@ -69,6 +69,8 @@ export type HostEvent =
   | { type: 'screen'; screen: ScreenState }
   | { type: 'accessRequests'; requests: AccessRequest[] }
   | { type: 'cloud'; cloud: CloudStatus }
+  | { type: 'chatDeleted'; botId: string; chatId: string }
+  | { type: 'chatTitle'; botId: string; chatId: string; title: string }
   | { type: 'resync' }
   /** An event this app version couldn't read (host newer/older than the app). */
   | { type: 'undecodable'; kind: string }
@@ -111,6 +113,14 @@ export function parseEvent(line: string): HostEvent | null {
       return { type, requests: (raw.requests as AccessRequest[]) ?? [] }
     case 'cloud':
       return raw.cloud ? { type, cloud: raw.cloud as CloudStatus } : null
+    case 'chatDeleted':
+      return typeof raw.botId === 'string' && typeof raw.chatId === 'string'
+        ? { type, botId: raw.botId, chatId: raw.chatId }
+        : null
+    case 'chatTitle':
+      return typeof raw.botId === 'string' && typeof raw.chatId === 'string' && typeof raw.title === 'string'
+        ? { type, botId: raw.botId, chatId: raw.chatId, title: raw.title }
+        : null
     case 'resync':
       return { type }
     default:
