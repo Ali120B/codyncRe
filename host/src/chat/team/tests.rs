@@ -21,6 +21,26 @@ fn wait_graph_rejects_self_duplicates_and_indirect_cycles() {
     assert!(requests.begin("ca", "c", "a").is_ok());
 }
 
+#[tokio::test]
+async fn a_room_turn_can_only_reach_its_members() {
+    let f = Fixture::new();
+    let group = f
+        .hub
+        .create_bot(
+            serde_json::from_value(json!({"id": "", "kind": "group", "name": "Room", "members": ["a", "b"]})).unwrap(),
+        )
+        .unwrap();
+    let group = group["id"].as_str().unwrap().to_owned();
+    f.hub.set_runtime("a", |r| r.lane = Some(crate::store::Lane::main(&group)));
+    assert!(call(&f.hub, "a", "message_bot", &json!({"botId": "c", "message": "hi"})).await.is_err());
+    assert!(call(&f.hub, "a", "ask_bot", &json!({"botId": "c", "message": "hi"})).await.is_err());
+    let listed = call(&f.hub, "a", "list_bots", &json!({})).await.unwrap();
+    let ids: Vec<&str> = listed["bots"].as_array().unwrap().iter().filter_map(|b| b["id"].as_str()).collect();
+    assert_eq!(ids, ["b"], "a room only sees its own members");
+    assert!(call(&f.hub, "a", "message_bot", &json!({"botId": "b", "message": "hi"})).await.is_ok());
+    f.shutdown().await;
+}
+
 struct Fixture {
     hub: Arc<Hub>,
     dir: PathBuf,

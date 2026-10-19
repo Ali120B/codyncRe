@@ -258,18 +258,24 @@ fn member_prompt(hub: &Hub, group: &BotConfig, members: &[BotConfig], me: &BotCo
         );
     }
     if !peers.is_empty() {
-        out.push("Other participants in the room:".into());
+        out.push("Other participants in the room (these are the only people here):".into());
         for p in &peers {
             let about =
                 if p.description.trim().is_empty() { String::new() } else { format!(" ({})", p.description.trim()) };
             out.push(format!("- {}{about}", p.name));
         }
     }
+    out.push(
+        "Never @-mention anyone who isn't in this room — bots from other groups or chats can't see it, \
+         and pinging them only confuses the room."
+            .into(),
+    );
     out.push(format!(
-        "You have your full toolkit here. Do the work first, then answer: your final reply of this turn is \
-         the one message the room sees. Keep it short and conversational. @-mention another participant only \
-         when you need them to act. If you have nothing new worth adding, reply exactly \"{PASS}\". Never \
-         reveal private one-on-one context."
+        "You have your full toolkit here, but the only bots you can reach are this room's participants. \
+         Do the work first, then answer: your final reply of this turn is the one message the room sees. \
+         Keep it short and conversational. @-mention one of those participants only when you need them to \
+         act. If you have nothing new worth adding, reply exactly \"{PASS}\". Never reveal private \
+         one-on-one context."
     ));
     out.push(String::new());
 
@@ -318,6 +324,41 @@ fn line(hub: &Hub, group: &BotConfig, e: &Entry, me: &BotConfig) -> String {
     if author == me.id { format!("{} (you): {text}", me.name) } else { format!("{}: {text}", hub.bot_name(author)) }
 }
 
+/// Bot replies can only ping the room's own members. An `@someone` from another group is
+/// left as a plain name, so nothing outside the room is invoked and readers aren't misled.
+pub fn sanitize_mentions(text: &str, members: &[BotConfig]) -> String {
+    let allowed: Vec<String> = members.iter().flat_map(|m| handles(&m.name)).collect();
+    let mut out = String::with_capacity(text.len());
+    let mut at = 0;
+    while let Some(pos) = text[at..].find('@') {
+        let start = at + pos;
+        out.push_str(&text[at..start]);
+        // An @ inside a word (an email address) isn't a mention.
+        if text[..start].chars().next_back().is_some_and(|c| c.is_ascii_alphanumeric() || c == '_') {
+            out.push('@');
+            at = start + 1;
+            continue;
+        }
+        let rest = &text[start + 1..];
+        let end = rest
+            .char_indices()
+            .take_while(|(_, c)| c.is_ascii_alphanumeric() || *c == '_')
+            .map(|(i, c)| i + c.len_utf8())
+            .last()
+            .unwrap_or(0);
+        let word = &rest[..end];
+        let lower = word.to_lowercase();
+        let known = !word.is_empty() && (lower == "all" || lower == "everyone" || allowed.contains(&lower));
+        if known {
+            out.push('@');
+        }
+        out.push_str(word);
+        at = start + 1 + end;
+    }
+    out.push_str(&text[at..]);
+    out
+}
+
 /// A member's final text is a pass (the room doesn't see it).
 pub fn is_pass(text: &str) -> bool {
     let t = text.trim().trim_matches(|c: char| c == '"' || c == '.' || c == '*').to_lowercase();
@@ -360,6 +401,20 @@ mod tests {
         assert_eq!(ids(&members, "@尼采課幫我整理"), ["c"], "CJK names can run into the message");
         assert_eq!(ids(&members, "@bobby?"), ["a", "b", "c"], "a longer word isn't a mention");
         assert_eq!(ids(&members, "@all go"), ["a", "b", "c"]);
+    }
+
+    #[test]
+    fn only_room_members_keep_their_mention() {
+        let members = [bot("a", "Kashmiri"), bot("b", "Rusty Nust")];
+        assert_eq!(
+            sanitize_mentions("ask @Rusty Nust to check, and @special too", &members),
+            "ask @Rusty Nust to check, and special too"
+        );
+        assert_eq!(
+            sanitize_mentions("@everyone @kashmiri look, @bob too", &members),
+            "@everyone @kashmiri look, bob too"
+        );
+        assert_eq!(sanitize_mentions("email me at a@b.com", &members), "email me at a@b.com", "plain emails stay");
     }
 
     use crate::api::devices::Caller;

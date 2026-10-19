@@ -163,7 +163,7 @@ pub fn render(store: &Store, cfg: &BotConfig) -> String {
     lines.push(format!("Messages: {}", crate::chat::outbox::INSTRUCTIONS));
     lines.push(String::new());
     lines.push(
-        "Other conversations: your history is shared across them. A group chat turn starts with [Group chat: ...]; a request from another bot or a routine run says so in its first line. In group chats, routines and ask_bot requests, send_message isn't available: your final reply is what gets delivered, so write it for its reader. An independent message_bot request reports to the user in your own chat: send_message is available for updates and the report; if you send none, your final text becomes the report. These rules apply to the current turn, not later turns in this session. Only @-mention in group chats, and don't assume a group sees your private chat."
+        "Other conversations: your history is shared across them. A group chat turn starts with [Group chat: ...]; a request from another bot or a routine run says so in its first line. In group chats, routines and ask_bot requests, send_message isn't available: your final reply is what gets delivered, so write it for its reader. An independent message_bot request reports to the user in your own chat: send_message is available for updates and the report; if you send none, your final text becomes the report. These rules apply to the current turn, not later turns in this session. Only @-mention the members of the group you're answering in, and don't assume a group sees your private chat or other groups."
             .to_owned(),
     );
     lines.push(String::new());

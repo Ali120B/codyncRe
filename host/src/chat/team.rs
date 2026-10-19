@@ -223,8 +223,25 @@ fn visible_bot(hub: &Hub, id: &str) -> Result<BotConfig> {
         .ok_or_else(|| anyhow!("unknown or hidden bot"))
 }
 
+/// The group chat a bot is answering in right now, when its live turn is a room turn.
+fn active_room(hub: &Hub, id: &str) -> Option<BotConfig> {
+    let lane = hub.runtime(id).lane?;
+    hub.store.bot(&lane.chat).ok().flatten().map(|r| r.config).filter(BotConfig::is_group)
+}
+
+/// From a room, only its members can be reached.
+fn reachable(room: Option<&BotConfig>, to: &str) -> Result<()> {
+    if let Some(room) = room
+        && !room.members.iter().any(|m| m == to)
+    {
+        bail!("this group chat can only reach its own members");
+    }
+    Ok(())
+}
+
 pub async fn call(hub: &Arc<Hub>, from: &str, name: &str, args: &Value) -> Result<Value> {
     let source = visible_bot(hub, from)?;
+    let room = active_room(hub, from);
     match name {
         "list_bots" => {
             let bots: Vec<Value> = hub
@@ -232,6 +249,7 @@ pub async fn call(hub: &Arc<Hub>, from: &str, name: &str, args: &Value) -> Resul
                 .bots()?
                 .into_iter()
                 .filter(|b| !b.deleted && !b.config.hidden && !b.config.is_group() && b.config.id != from)
+                .filter(|b| room.as_ref().is_none_or(|g| g.members.contains(&b.config.id)))
                 .map(|b| {
                     json!({
                         "id": b.config.id, "name": b.config.name, "description": b.config.description,
@@ -244,11 +262,13 @@ pub async fn call(hub: &Arc<Hub>, from: &str, name: &str, args: &Value) -> Resul
         }
         "ask_bot" => {
             let to = args["botId"].as_str().ok_or_else(|| anyhow!("botId is required"))?;
+            reachable(room.as_ref(), to)?;
             let message = args["message"].as_str().unwrap_or_default().trim();
             ask(hub, &source, to, message, ASK_TIMEOUT).await
         }
         "message_bot" => {
             let to = args["botId"].as_str().ok_or_else(|| anyhow!("botId is required"))?;
+            reachable(room.as_ref(), to)?;
             let message = args["message"].as_str().unwrap_or_default().trim();
             message_bot(hub, &source, to, message)
         }

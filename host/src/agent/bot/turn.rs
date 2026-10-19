@@ -223,9 +223,19 @@ impl Actor {
         if let Some(id) = self.last_text.take().filter(|_| !stopped)
             && let Some(mut e) = self.hub.store.entry(&id)
         {
-            let text = e.data["text"].as_str().map(str::to_owned);
+            let mut text = e.data["text"].as_str().map(str::to_owned);
             // A pass in a room stays in the trace; the room doesn't see it.
             if !(grouped && text.as_deref().is_none_or(crate::chat::group::is_pass)) {
+                // In a room, only its members can be pinged: another group's bot is just a name.
+                if let Some(members) = self.room_members()
+                    && let Some(raw) = text.as_deref()
+                {
+                    let clean = crate::chat::group::sanitize_mentions(raw, &members);
+                    if clean != raw {
+                        e.data["text"] = clean.clone().into();
+                        text = Some(clean);
+                    }
+                }
                 // An ask's answer belongs to its requesting bot and exchange notice.
                 // Independent messages still report to the user in this chat.
                 if !delegated {
@@ -341,6 +351,21 @@ impl Actor {
 }
 
 impl Actor {
+    /// The room's members when this turn is answering in a group chat.
+    fn room_members(&self) -> Option<Vec<crate::store::BotConfig>> {
+        let group = self.active_group.as_ref()?;
+        let row = self.hub.store.bot(&group.lane.chat).ok().flatten()?;
+        Some(
+            row.config
+                .members
+                .iter()
+                .filter_map(|id| self.hub.store.bot(id).ok().flatten())
+                .filter(|r| !r.deleted)
+                .map(|r| r.config)
+                .collect(),
+        )
+    }
+
     /// `turn_finished`, while the turn's start time is still in the runtime.
     pub(super) fn report_turn(&self, stopped: bool, failure: Option<&anyhow::Error>, stop_reason: &str) {
         let outcome = if stopped {
