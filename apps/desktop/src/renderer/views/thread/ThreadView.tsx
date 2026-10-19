@@ -102,7 +102,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
         id: 'main',
         title: titleOf('main', mainAsk),
         at: Math.max(...main.map((e) => e.createdAt), 0),
-        preview: lastMessagePreview(main, group, store.authorName),
+        preview: lastMessagePreview(main, group, (id) => store.authorName(id)),
       })
     }
     for (const root of entries.filter((e) => (e.threadId ?? null) === null && e.data.chat === true)) {
@@ -111,7 +111,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
         id: root.id,
         title: titleOf(root.id, root),
         at: Math.max(root.createdAt, ...replies.map((e) => e.createdAt), 0),
-        preview: lastMessagePreview([root, ...replies], group, store.authorName),
+        preview: lastMessagePreview([root, ...replies], group, (id) => store.authorName(id)),
       })
     }
     return list.sort((a, b) => b.at - a.at)

@@ -145,9 +145,7 @@ export class BotMirror extends Observable {
     this.changed()
   }
 
-  authorName(id: string | null | undefined) {
-    return (id && this.bots.get(id)?.name) || 'A deleted bot'
-  }
+  authorName = (id: string | null | undefined) => (id && this.bots.get(id)?.name) || 'A deleted bot'
 
   /** The latest thinking of the turn running in a chat (`thread` null) or thread. */
   currentThinking(botId: string, thread: string | null) {
