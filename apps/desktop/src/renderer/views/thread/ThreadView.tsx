@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { draftOf, isGroup, isWorkingIn, type Bot, type BotDraft, type Entry } from '@shared/models'
-import { BotAvatar, GroupAvatar } from '../../components/Avatar'
+import { BotAvatar, GroupAvatar, useWake } from '../../components/Avatar'
 import { Spinner } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Overlay'
@@ -44,6 +44,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const app = useApp()
   const bot = store.bots.get(botId) ?? null
   const [showTrace, setShowTrace] = useState(false)
+  const wake = useWake(1400)
   const [findOpen, setFindOpen] = useState(false)
   const [threadModelsSignal, setThreadModelsSignal] = useState(0)
   const [showChats, setShowChats] = useState(false)
@@ -305,7 +306,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           {/* The call bar takes the pill's place; its frosted glass would show the name blurred. */}
           <button className={`title-pill ${calling ? 'hidden-by-call' : ''}`} inert={calling} onClick={toggleDetails} aria-label="View conversation details" title="View conversation details">
             <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              {bot ? isGroup(bot) ? <GroupAvatar members={store.members(bot)} size={22} /> : <BotAvatar bot={bot} size={22} /> : null}
+              {bot ? isGroup(bot) ? <GroupAvatar members={store.members(bot)} size={22} wake={wake} /> : <BotAvatar bot={bot} size={22} wake={wake} /> : null}
               <span style={{ ...font(13, 'medium'), color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{bot?.name ?? ''}</span>
             </span>
             {store.shownConnection.kind !== 'online' || store.mismatch ? <ConnectionSubtitle /> : null}
@@ -642,11 +643,12 @@ function Row({ item, chat, openTrace, openThread, openRoutine, openBotChat }: { 
 /** The start of an empty group chat: who's in it and how the room works. */
 function GroupIntroCard({ group }: { group: Bot }) {
   const store = useStore()
+  const wake = useWake(1600)
   const members = store.members(group)
   const names = members.map((m) => m.name)
   return (
     <div className="intro-card">
-      <GroupAvatar members={members} size={72} />
+      <GroupAvatar members={members} size={72} wake={wake} />
       <div style={{ ...font('title2', 'semibold'), color: 'var(--text)' }}>{group.name}</div>
       {group.name !== names.join(', ') ? <div style={{ ...font('subheadline'), color: 'var(--secondary)' }}>{names.join(' · ')}</div> : null}
       {group.description ? <div style={{ ...font('subheadline'), color: 'var(--secondary)' }}>{group.description}</div> : null}
@@ -657,9 +659,10 @@ function GroupIntroCard({ group }: { group: Bot }) {
 
 function IntroCard({ bot }: { bot: Bot }) {
   const store = useStore()
+  const wake = useWake(1600)
   return (
     <div className="intro-card">
-      <BotAvatar bot={bot} size={72} />
+      <BotAvatar bot={bot} size={72} wake={wake} />
       <div style={{ ...font('title2', 'semibold'), color: 'var(--text)' }}>{bot.name}</div>
       <div style={{ ...font('callout'), color: 'var(--secondary)', overflowWrap: 'anywhere' }}>
         {bot.managedWorkspace ? `${store.backendName(bot.backend)} · Personal workspace` : `${store.backendName(bot.backend)} in ${bot.cwd}`}

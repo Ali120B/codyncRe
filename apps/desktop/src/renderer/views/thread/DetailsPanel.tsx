@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { folderName, isGroup, isWorking, type Bot } from '@shared/models'
 import { AgentIcon } from '../../components/AgentIcon'
-import { BotAvatar } from '../../components/Avatar'
+import { BotAvatar, useWake } from '../../components/Avatar'
 import { CardSection, IconButton } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
@@ -115,6 +115,7 @@ function GroupMembersList({ group }: { group: Bot }) {
   const store = useStore()
   const [adding, setAdding] = useState(false)
   const [query, setQuery] = useState('')
+  const wake = useWake(1800)
   const members = store.members(group)
   const q = query.trim().toLowerCase()
   const candidates = store.roster.filter((b) => !isGroup(b) && !group.members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
@@ -135,17 +136,7 @@ function GroupMembersList({ group }: { group: Bot }) {
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '0 20px' }}>
       {members.map((bot) => (
-        <div key={bot.id} className="member-row removable">
-          <button className="member-open press" title={`Open ${bot.name}'s own chat`} onClick={() => store.setSelection(bot.id)}>
-            <BotAvatar bot={bot} size={32} />
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
-              <span className="member-name">{bot.name}</span>
-              {group.leader === bot.id ? <span className="member-name" style={{ ...font('compactSecondary'), color: 'var(--secondary)' }}>Leads the room</span> : null}
-              {isWorking(bot) ? <span className="member-name" style={{ ...font('compactSecondary'), color: 'var(--secondary)' }}>{bot.activity || 'Working…'}</span> : null}
-            </span>
-          </button>
-          {group.members.length > 1 ? <IconButton title={`Remove ${bot.name} from the group`} icon="xmark" onClick={() => store.removeMember(group, bot.id)} /> : null}
-        </div>
+        <MemberRow key={bot.id} bot={bot} group={group} wake={wake} />
       ))}
       {adding ? (
         <>
@@ -241,5 +232,28 @@ function AgentSummary({ bot }: { bot: Bot }) {
       </InfoRow>
       {bot.model ? <InfoRow label="Model">{bot.model}</InfoRow> : null}
     </CardSection>
+  )
+}
+
+/** One member of a room: opening it swaps to that bot's own chat; hovering wakes its face. */
+function MemberRow({ bot, group, wake }: { bot: Bot; group: Bot; wake: boolean }) {
+  const store = useStore()
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      className="member-row removable"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <button className="member-open press" title={`Open ${bot.name}'s own chat`} onClick={() => store.setSelection(bot.id)}>
+        <BotAvatar bot={bot} size={32} wake={wake || hover} />
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
+          <span className="member-name">{bot.name}</span>
+          {group.leader === bot.id ? <span className="member-name" style={{ ...font('compactSecondary'), color: 'var(--secondary)' }}>Leads the room</span> : null}
+          {isWorking(bot) ? <span className="member-name" style={{ ...font('compactSecondary'), color: 'var(--secondary)' }}>{bot.activity || 'Working…'}</span> : null}
+        </span>
+      </button>
+      {group.members.length > 1 ? <IconButton title={`Remove ${bot.name} from the group`} icon="xmark" onClick={() => store.removeMember(group, bot.id)} /> : null}
+    </div>
   )
 }

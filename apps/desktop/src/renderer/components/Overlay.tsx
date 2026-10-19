@@ -326,13 +326,13 @@ export function useContextMenu() {
 }
 
 /** A modal's title row: title, optional trailing actions, and a close button. */
-export function ModalHeader({ title, trailing }: { title: ReactNode; trailing?: ReactNode }) {
+export function ModalHeader({ title, trailing, onClose, close = true }: { title: ReactNode; trailing?: ReactNode; /** Replaces the sheet's dismiss action. */ onClose?: () => void; /** Hides the header's own X (the parent already has one). */ close?: boolean }) {
   const dismiss = useDismiss()
   return (
     <div className="modal-header">
       <div style={{ ...font('compactBody', 'semibold'), flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
       {trailing}
-      <IconButtonBase title="Close" icon="xmark" onClick={dismiss} />
+      {close ? <IconButtonBase title="Close" icon="xmark" onClick={onClose ?? dismiss} /> : null}
     </div>
   )
 }

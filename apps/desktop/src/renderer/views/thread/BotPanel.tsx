@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { draftOf, type Bot, type BotDraft } from '@shared/models'
-import { BotAvatar } from '../../components/Avatar'
+import { BotAvatar, useWake } from '../../components/Avatar'
 import { Switch } from '../../components/Controls'
 import { useStore } from '../../store/context'
 import { usePlugins } from '../bots/drafts'
@@ -32,10 +32,11 @@ export function BotPanel({ bot, routineId, details, openPlugins, onSettings }: {
   onSettings: (section: string) => void
 }) {
   const [tab, setTab] = useState<TabId>('details')
+  const wake = useWake(1600)
   return (
     <div className="bot-panel">
       <div className="bot-panel-head">
-        <BotAvatar bot={bot} size={56} />
+        <BotAvatar bot={bot} size={56} wake={wake} />
         <span className="bot-panel-name">{bot.name}</span>
         <div className="bot-panel-tabs" role="tablist">
           {TABS.map((t) => (

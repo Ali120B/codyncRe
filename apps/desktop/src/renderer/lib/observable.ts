@@ -41,6 +41,10 @@ const zero = () => 0
 export function useModels(models: Observable[]) {
   const key = useRef<{ models: Observable[]; version: number }>({ models, version: 0 })
   key.current.models = models
+  // Callers pass a fresh array each render: resubscribe only when its members change.
+  // (A `[models.length, ...models]` dep list changes shape and breaks the hook.)
+  const seen = useRef(models)
+  if (seen.current.length !== models.length || models.some((m, i) => m !== seen.current[i])) seen.current = models
   useSyncExternalStore(
     useCallback((cb: () => void) => {
       const offs = key.current.models.map((m) => m.subscribe(() => {
@@ -48,7 +52,7 @@ export function useModels(models: Observable[]) {
         cb()
       }))
       return () => offs.forEach((off) => off())
-    }, [models.length, ...models]),
+    }, [seen.current]),
     () => key.current.version,
   )
 }

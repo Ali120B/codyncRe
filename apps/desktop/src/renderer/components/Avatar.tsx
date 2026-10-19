@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, type CSSProperties } from 'react'
+import { memo, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { isGroup, isWorking, needsInput, type Bot } from '@shared/models'
 import { avatarColor, palette, useDark, useReduceMotion } from '../lib/theme'
 import { Icon } from './Icon'
@@ -105,6 +105,8 @@ interface CharacterProps {
   tint?: string
   size?: number
   mood?: Mood
+  /** Wakes an idle character for a moment (opening a view, hovering a row). */
+  wake?: boolean
   /** Draws for a dark ground whatever the system appearance (the notch island is always black). */
   dark?: boolean
   style?: CSSProperties
@@ -114,7 +116,7 @@ interface CharacterProps {
  * Grok-Bot-style character drawn like the app icon: an even grid of dots shaded as if the
  * silhouette were a ball, with hollow eyes that glance while it works and blink now and then.
  */
-export const CharacterAvatar = memo(function CharacterAvatar({ shape, color, tint, size = 40, mood = 'idle', dark: forceDark, style }: CharacterProps) {
+export const CharacterAvatar = memo(function CharacterAvatar({ shape, color, tint, size = 40, mood = 'idle', wake = false, dark: forceDark, style }: CharacterProps) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const dark = useDark() || forceDark === true
   const reduce = useReduceMotion()
@@ -127,7 +129,7 @@ export const CharacterAvatar = memo(function CharacterAvatar({ shape, color, tin
     el.width = Math.round(size * ratio)
     el.height = Math.round(size * ratio)
     const ctx = el.getContext('2d')!
-    const still = mood === 'idle' || reduce
+    const still = (mood === 'idle' && !wake) || reduce
     let frame = 0
     const draw = (time: number) => {
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
@@ -137,7 +139,7 @@ export const CharacterAvatar = memo(function CharacterAvatar({ shape, color, tin
     }
     draw(performance.now())
     return () => cancelAnimationFrame(frame)
-  }, [shape, fill, size, mood, dark, reduce])
+  }, [shape, fill, size, mood, wake, dark, reduce])
 
   return <canvas ref={canvas} aria-hidden style={{ width: size, height: size, display: 'block', flex: 'none', ...style }} />
 })
@@ -156,12 +158,15 @@ export function drawCharacter(
   const n = parseInt(fill.slice(1), 16)
   const [cr, cg, cb] = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
   // Glance: whole-cell steps left / center / right, like a small display.
-  const glance = mood === 'working' ? Math.round(Math.sin((t * 2 * Math.PI) / 3.2) * 1.4) : 0
+  // Working looks around widely; an idle wake/hover glances gently instead of freezing.
+  const glance = mood === 'working'
+    ? Math.round(Math.sin((t * 2 * Math.PI) / 3.2) * 1.4)
+    : still ? 0 : Math.round(Math.sin((t * 2 * Math.PI) / 4.2))
   const blinking = !still && (t / 4.7) % 1 < 0.035
   const eyeRows = blinking ? eyeRowsAll.slice(-1) : eyeRowsAll
   const eyeCols = eyeColumns.map((c) => c + glance)
   const half = size / 2
-  const yaw = mood === 'working' ? t * 1.4 : -0.7
+  const yaw = mood === 'working' ? t * 1.4 : still ? -0.7 : Math.sin(t * 0.9) * 0.6 - 0.2
   const lx = Math.sin(yaw) * 0.8
   const ly = 0.55
   const lz = Math.cos(yaw) * 0.5 + 0.6 // never fully behind
@@ -195,18 +200,28 @@ export function moodOf(bot: Bot, animated = true): Mood {
   return needsInput(bot) ? 'needsInput' : isWorking(bot) ? 'working' : 'idle'
 }
 
-export function BotAvatar({ bot, size = 40, animated = true }: { bot: Bot; size?: number; animated?: boolean }) {
-  return <CharacterAvatar shape={bot.avatarShape} color={bot.avatarColor} size={size} mood={moodOf(bot, animated)} />
+export function BotAvatar({ bot, size = 40, animated = true, wake = false }: { bot: Bot; size?: number; animated?: boolean; wake?: boolean }) {
+  return <CharacterAvatar shape={bot.avatarShape} color={bot.avatarColor} size={size} mood={moodOf(bot, animated)} wake={wake} />
+}
+
+/** True for a moment after mount: a character wakes up when its view opens. */
+export function useWake(ms = 1400) {
+  const [awake, setAwake] = useState(true)
+  useEffect(() => {
+    const timer = setTimeout(() => setAwake(false), ms)
+    return () => clearTimeout(timer)
+  }, [ms])
+  return awake
 }
 
 /**
  * A group chat's face, clustered like iMessage: two bots tucked diagonally, three in a
  * triangle, four in a 2×2 grid; past four the last cell counts the rest.
  */
-export function GroupAvatar({ members, size = 40, animated = true }: { members: Bot[]; size?: number; animated?: boolean }) {
+export function GroupAvatar({ members, size = 40, animated = true, wake = false }: { members: Bot[]; size?: number; animated?: boolean; wake?: boolean }) {
   const place = (bot: Bot, side: number, corner: CSSProperties) => (
     <div key={bot.id} style={{ position: 'absolute', ...corner }}>
-      <BotAvatar bot={bot} size={side} animated={animated} />
+      <BotAvatar bot={bot} size={side} animated={animated} wake={wake} />
     </div>
   )
   let content
@@ -219,7 +234,7 @@ export function GroupAvatar({ members, size = 40, animated = true }: { members: 
       )
       break
     case 1:
-      content = <BotAvatar bot={members[0]!} size={size} animated={animated} />
+      content = <BotAvatar bot={members[0]!} size={size} animated={animated} wake={wake} />
       break
     case 2:
       content = [place(members[1]!, size * 0.66, { top: 0, right: 0 }), place(members[0]!, size * 0.66, { bottom: 0, left: 0 })]
@@ -255,10 +270,10 @@ export function GroupAvatar({ members, size = 40, animated = true }: { members: 
 }
 
 /** Avatar with the roster status dot: filled = unread, amber = needs you. A group shows its members. */
-export function AvatarWithStatus({ bot, members = [], size = 44 }: { bot: Bot; members?: Bot[]; size?: number }) {
+export function AvatarWithStatus({ bot, members = [], size = 44, wake = false }: { bot: Bot; members?: Bot[]; size?: number; wake?: boolean }) {
   return (
     <div style={{ position: 'relative', width: size, height: size, flex: 'none' }}>
-      {isGroup(bot) ? <GroupAvatar members={members} size={size} /> : <BotAvatar bot={bot} size={size} />}
+      {isGroup(bot) ? <GroupAvatar members={members} size={size} wake={wake} /> : <BotAvatar bot={bot} size={size} wake={wake} />}
       {needsInput(bot) ? (
         <div
           style={{

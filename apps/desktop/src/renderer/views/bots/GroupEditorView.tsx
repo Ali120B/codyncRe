@@ -8,6 +8,7 @@ import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
 import { errorText } from './drafts'
 import { AutoTextArea, SwitchRow } from './parts'
+import { useWake } from '../../components/Avatar'
 import { WorkspacePicker } from './workspaces'
 import './bots.css'
 
@@ -35,6 +36,9 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
   const [leader, setLeader] = useState(group?.leader ?? '')
   const [instructions, setInstructions] = useState(group?.instructions ?? '')
   const [shared, setShared] = useState(group?.workspace ?? '')
+  // "One shared folder" is its own switch: an empty path must still select it.
+  const [sharedFolder, setSharedFolder] = useState(!!group?.workspace)
+  const wake = useWake(1400)
   const [pinned, setPinned] = useState(group?.pinned ?? false)
   const [notify, setNotify] = useState(group?.notify ?? true)
   const [query, setQuery] = useState('')
@@ -48,7 +52,7 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
   // Bots that can still join, filtered by the search.
   const q = query.trim().toLowerCase()
   const candidates = store.roster.filter((b) => !isGroup(b) && !members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
-  const canSave = members.length > 0 && !saving
+  const canSave = members.length > 0 && (!sharedFolder || shared.trim() !== '') && !saving
   // "Alice, Bob" when no name is typed.
   const defaultName = picked.length ? picked.map((b) => b.name).join(', ') : 'Name'
   const current = groupId ? store.bots.get(groupId) : undefined
@@ -68,7 +72,7 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
     setError(null)
     const typed = name.trim()
     const finalName = typed || defaultName
-    const extra: Partial<GroupDraft> = { leader, instructions, workspace: shared.trim(), pinned, notify }
+    const extra: Partial<GroupDraft> = { leader, instructions, workspace: sharedFolder ? shared.trim() : '', pinned, notify }
     void (async () => {
       try {
         if (groupId) {
@@ -91,17 +95,14 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
       <ModalHeader
         title={isNew ? 'New group chat' : 'Group chat'}
-        trailing={
-          <>
-            {saving ? <Spinner /> : <IconButton title={isNew ? 'Create' : 'Save'} icon="checkmark" disabled={!canSave} onClick={save} />}
-            {onCancel ? <IconButton title="Cancel" icon="xmark" onClick={onCancel} /> : null}
-          </>
-        }
+        trailing={saving ? <Spinner /> : <IconButton title={isNew ? 'Create' : 'Save'} icon="checkmark" disabled={!canSave} onClick={save} />}
+        close={!!onCancel}
+        onClose={onCancel}
       />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <div className="group-form">
           <div className="group-identity">
-            <GroupAvatar members={picked} size={76} />
+            <GroupAvatar members={picked} size={76} wake={wake} />
             <input className="group-name" value={name} placeholder={defaultName} aria-label="Name" onChange={(e) => setName(e.target.value)} />
             <AutoTextArea className="group-about" value={about} placeholder="What this group works on" minRows={1} maxRows={3} onChange={setAbout} />
           </div>
@@ -159,15 +160,21 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
           </CardSection>
 
           <CardSection title="Workspace">
-            <ValueRow label="Where they work" detail={shared ? 'Every member works in this project folder.' : 'Every member keeps its own folder (set per bot).'}>
+            <ValueRow
+              label="Where they work"
+              detail={sharedFolder ? 'Every member works in this project folder.' : 'Every member keeps its own folder (set per bot).'}
+            >
               <ChoicePicker
-                selection={shared ? 'shared' : 'own'}
+                selection={sharedFolder ? 'shared' : 'own'}
                 options={[{ id: 'own', label: 'Own folders' }, { id: 'shared', label: 'One shared folder' }]}
-                onChange={(id) => setShared(id === 'shared' ? shared : '')}
+                onChange={(id) => setSharedFolder(id === 'shared')}
               />
             </ValueRow>
-            {shared ? (
-              <ValueRow label="Shared folder" detail={shared}>
+            {sharedFolder ? (
+              <ValueRow
+                label="Shared folder"
+                detail={shared || 'Pick one of your saved workspaces or browse for a folder.'}
+              >
                 <WorkspacePicker value={shared} personal={false} onChange={setShared} />
               </ValueRow>
             ) : null}

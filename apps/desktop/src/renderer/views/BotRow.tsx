@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { folderName, isGroup, isWorking, needsInput, type Bot } from '@shared/models'
 import { AvatarWithStatus } from '../components/Avatar'
 import { Icon } from '../components/Icon'
@@ -12,9 +12,14 @@ import type { BotStore } from '../store/bot-store'
 export const BotRow = memo(function BotRow({ bot, store, compact, usingComputer, members }: { bot: Bot; store: BotStore; compact: boolean; usingComputer: boolean; members: Bot[] }) {
   // The roster previews the open chat, so the row follows its messages too.
   useModel(store)
+  const [hover, setHover] = useState(false)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 0 : 10, padding: '9px 0', width: '100%', justifyContent: compact ? 'center' : 'flex-start' }}>
-      <AvatarWithStatus bot={bot} members={members} size={30} />
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: compact ? 0 : 10, padding: '9px 0', width: '100%', justifyContent: compact ? 'center' : 'flex-start' }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <AvatarWithStatus bot={bot} members={members} size={30} wake={hover} />
       <div
         aria-hidden={compact}
         style={{
