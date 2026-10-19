@@ -20,6 +20,7 @@ import { UpdateBadge } from './UpdateButton'
 import { ComputerFilterHeader, computerSelection } from './ComputerFilterHeader'
 import { ThreadView } from './thread/ThreadView'
 import { NewChatView } from './bots/NewChatView'
+import { GroupEditorView } from './bots/GroupEditorView'
 import { newDraft } from './bots/drafts'
 import { BotEditorView } from './bots/BotEditorView'
 import { MarketplaceView } from './marketplace/MarketplaceView'
@@ -334,14 +335,27 @@ function ChatSplitView() {
           <ComputerPicker stores={onlineStores} value={composeStore.computer.id} onChange={setComposeComputer} />
         ) : null}
         <StoreContext.Provider value={composeStore}>
-          <NewChatView
-            group={composingGroup}
-            initialRecipient={composeBot ?? undefined}
-            onClose={() => {
-              setComposing(false)
-              if (!app.selection) app.select(previousSelection.current)
-            }}
-          />
+          {composingGroup ? (
+            <GroupEditorView
+              group={null}
+              onCancel={() => {
+                setComposing(false)
+                if (!app.selection) app.select(previousSelection.current)
+              }}
+              onDone={(group) => {
+                composeStore.setSelection(group.id)
+                setComposing(false)
+              }}
+            />
+          ) : (
+            <NewChatView
+              initialRecipient={composeBot ?? undefined}
+              onClose={() => {
+                setComposing(false)
+                if (!app.selection) app.select(previousSelection.current)
+              }}
+            />
+          )}
         </StoreContext.Provider>
       </div>
     )

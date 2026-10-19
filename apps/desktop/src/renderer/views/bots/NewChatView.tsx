@@ -13,11 +13,10 @@ import './bots.css'
 /**
  * Desktop "new message" page (Grok Bot's compose): a To: field that searches your
  * bots or creates a new one, with ⌘1…⌘9 shortcuts, and the message box underneath.
- * Picked bots become chips in the To: field; one opens its chat, several start a
- * group chat with them (or open the one they already share). Whatever you typed is sent.
- * `group` is "New group chat": the same page, but it only gathers bots and needs two.
+ * Picked bots become chips in the To: field; one opens its chat, several open the
+ * group setup screen with them. Whatever you typed is sent to what opens.
  */
-export function NewChatView({ group, initialRecipient, onClose }: { group: boolean; initialRecipient?: string; onClose: () => void }) {
+export function NewChatView({ initialRecipient, onClose }: { initialRecipient?: string; onClose: () => void }) {
   const store = useStore()
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState('')
@@ -30,17 +29,11 @@ export function NewChatView({ group, initialRecipient, onClose }: { group: boole
 
   // Bots not picked yet; a group can only be opened on its own, so groups go once someone's picked.
   const q = query.trim().toLowerCase()
-  const matches = store.roster.filter((b) => !recipients.includes(b.id) && !(isGroup(b) && (group || recipients.length > 0)) && (!q || b.name.toLowerCase().includes(q)))
+  const matches = store.roster.filter((b) => !recipients.includes(b.id) && !(isGroup(b) && recipients.length > 0) && (!q || b.name.toLowerCase().includes(q)))
   const picked = recipients.map((id) => store.bots.get(id)).filter((b): b is Bot => !!b)
 
-  const toPrompt = group ? (recipients.length < 2 ? 'Add bots to the group' : 'Add another bot') : recipients.length ? 'Add another bot' : 'Search or create bots'
-  const placeholder = group
-    ? picked.length < 2
-      ? 'Pick at least two bots'
-      : 'Message the group'
-    : picked.length === 0
-      ? 'Message Bot'
-      : `Message ${picked.map((b) => b.name).join(', ')}`
+  const toPrompt = recipients.length ? 'Add another bot' : 'Search or create bots'
+  const placeholder = picked.length === 0 ? 'Message Bot' : `Message ${picked.map((b) => b.name).join(', ')}`
 
   useEffect(() => {
     toField.current?.focus()
@@ -73,7 +66,7 @@ export function NewChatView({ group, initialRecipient, onClose }: { group: boole
   const start = () => {
     if (recipients.length === 0) return
     if (recipients.length === 1) {
-      if (!group) open(recipients[0]!)
+      open(recipients[0]!)
       return
     }
     setSettingUp(true)
@@ -83,7 +76,7 @@ export function NewChatView({ group, initialRecipient, onClose }: { group: boole
     if (creating) return
     setCreating(true)
     const name = query.trim()
-    const alone = recipients.length === 0 && !group
+    const alone = recipients.length === 0
     void (async () => {
       try {
         let bot = await createDefaultBot(store)
