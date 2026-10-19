@@ -39,7 +39,21 @@ async fn generate(hub: &Arc<Hub>, bot: &str, chat: &str, seed: &str) -> Result<(
     if seed.is_empty() || hub.store.chat_title(bot, chat).is_some() {
         return Ok(());
     }
-    let Some(row) = hub.store.bot(bot)?.filter(|r| !r.deleted) else { return Ok(()) };
+    let Some(owner) = hub.store.bot(bot)?.filter(|r| !r.deleted) else { return Ok(()) };
+    // A group has no agent of its own: its first member with one names the chat.
+    let row = if owner.config.is_group() {
+        let Some(member) = owner
+            .config
+            .members
+            .iter()
+            .find_map(|id| hub.store.bot(id).ok().flatten().filter(|r| !r.deleted && !r.config.backend.is_empty()))
+        else {
+            return Ok(());
+        };
+        member
+    } else {
+        owner
+    };
     let (acp, mut inbox, _, _) = crate::agent::auth::start(&hub.store, &row.config.backend).await?;
     let ask = format!("{ASK}\n\nIt starts with: {}", seed.chars().take(600).collect::<String>());
     let result = tokio::time::timeout(Duration::from_secs(60), async {

@@ -75,7 +75,7 @@ function Preview({ bot, store }: { bot: Bot; store: BotStore }) {
 
 /** The last line of the chat this bot has open, if it isn't the first chat. */
 function openChatPreview(bot: Bot, store: BotStore): string | null {
-  const chat = localStorage.getItem(`chat.${bot.id}`)
+  const chat = store.openChats.get(bot.id) ?? localStorage.getItem(`chat.${bot.id}`)
   if (!chat || chat === 'main') return null
   const last = store
     .allEntries(bot.id)

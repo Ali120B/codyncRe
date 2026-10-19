@@ -71,6 +71,8 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const [width, setWidth] = useState(800)
   // Read receipts follow the open chat: a reply that lands there clears its badge at once.
   useReading(store, botId, activeChat === 'main' ? null : activeChat)
+  // The roster previews this chat's last line.
+  useEffect(() => store.setOpenChat(botId, activeChat), [store, botId, activeChat])
 
   // A search hit: open its thread (or the main chat), page its message in, then flash its row.
   const focus = app.focus?.ref.botId === botId && app.focus.ref.computerId === store.computer.id ? app.focus : null

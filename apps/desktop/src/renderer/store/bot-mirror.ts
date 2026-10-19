@@ -47,6 +47,8 @@ export class BotMirror extends Observable {
   selection: string | null = null
   /** Permission cards whose answer is on its way, with the chosen option. */
   answering = new Map<string, string>()
+  /** The chat each bot or group has open in its thread view (this window's UI state). */
+  openChats = new Map<string, string>()
 
   onRosterChanged: (() => void) | null = null
   onComputerChanged: ((c: Computer) => void) | null = null
@@ -134,6 +136,13 @@ export class BotMirror extends Observable {
 
   members(group: Bot) {
     return group.members.map((id) => this.bots.get(id)).filter((b): b is Bot => !!b)
+  }
+
+  /** Remembers which chat a view has open, so the roster can preview it. */
+  setOpenChat(botId: string, chatId: string) {
+    if (this.openChats.get(botId) === chatId) return
+    this.openChats.set(botId, chatId)
+    this.changed()
   }
 
   authorName(id: string | null | undefined) {
