@@ -135,15 +135,15 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
 
   // The agent names a chat in the background; while the panel is open, keep pulling names
   // in until every chat has one (or two minutes pass).
-  const unnamedChats = chats.some((chat) => chat.id !== 'main' && !store.chatTitles.get(botId)?.[chat.id])
+  const unnamedChats = chats.some((chat) => !store.chatTitles.get(botId)?.[chat.id])
   useEffect(() => {
     void store.loadChatTitles(botId)
     if (!showChats || !unnamedChats) return
     let polls = 0
     const timer = setInterval(() => {
       void store.loadChatTitles(botId)
-      if (++polls >= 30) clearInterval(timer)
-    }, 4_000)
+      if (++polls >= 15) clearInterval(timer)
+    }, 8_000)
     return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, botId, showChats, unnamedChats])

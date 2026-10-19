@@ -263,7 +263,13 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
         }
         // Generated chat names (the agent names a chat after its first message).
         "chatTitles" => {
-            let titles = hub.store.chat_titles(str_arg(&b, "botId")?);
+            let bot = str_arg(&b, "botId")?;
+            let titles = hub.store.chat_titles(bot);
+            // Chats from before naming existed get one too; the panel keeps polling while any
+            // chat lacks a name, so they're filled in one at a time.
+            if let Some((chat, seed)) = hub.store.untitled_chat(bot, &titles) {
+                crate::chat::title::spawn(hub.clone(), bot.to_owned(), chat, seed);
+            }
             json!({"titles": titles})
         }
         // Thread models: a thread can pin its own; without one it follows the bot's.

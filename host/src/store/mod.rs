@@ -118,6 +118,39 @@ impl Store {
         self.kv_get(&chat_titles_key(bot)).and_then(|raw| serde_json::from_str(&raw).ok()).unwrap_or_default()
     }
 
+    /// An untitled chat to name next: the oldest marked chat or the first conversation,
+    /// with the first thing the user said as the seed.
+    pub fn untitled_chat(&self, bot: &str, titles: &HashMap<String, String>) -> Option<(String, String)> {
+        let c = self.db.locked();
+        let mut st = c
+            .prepare(
+                "SELECT id, json_extract(data, '$.chat'), data FROM entries
+                 WHERE bot_id = ?1 AND thread_id IS NULL AND kind = 'user'
+                 ORDER BY seq ASC",
+            )
+            .ok()?;
+        let rows = st
+            .query_map([bot], |r| {
+                let id: String = r.get(0)?;
+                let chat: Option<i64> = r.get(1)?;
+                let data: String = r.get(2)?;
+                Ok((id, chat == Some(1), data))
+            })
+            .ok()?;
+        for (id, chat, data) in rows.flatten() {
+            let key = if chat { id } else { "main".to_owned() };
+            if titles.contains_key(&key) {
+                continue;
+            }
+            let value: serde_json::Value = serde_json::from_str(&data).unwrap_or_default();
+            let text = value["text"].as_str().unwrap_or_default().trim();
+            if !text.is_empty() {
+                return Some((key, text.to_owned()));
+            }
+        }
+        None
+    }
+
     /// Stores a chat's generated name.
     pub fn set_chat_title(&self, bot: &str, chat: &str, title: &str) -> Result<()> {
         let mut titles = self.chat_titles(bot);
@@ -183,6 +216,22 @@ mod tests {
             auto_name: false,
             created_at: 0,
         }
+    }
+
+    #[test]
+    fn untitled_chat_picks_the_oldest_unnamed_chat() {
+        let s = temp_store();
+        s.insert_entry(&Lane::main("b"), EntryKind::User, 0, &serde_json::json!({"text": "first"})).unwrap();
+        let root = s
+            .insert_entry(&Lane::main("b"), EntryKind::User, 1, &serde_json::json!({"text": "second", "chat": true}))
+            .unwrap();
+        let titles = s.chat_titles("b");
+        assert_eq!(s.untitled_chat("b", &titles), Some(("main".into(), "first".into())));
+        let mut titles = titles;
+        titles.insert("main".into(), "Named".into());
+        assert_eq!(s.untitled_chat("b", &titles), Some((root.id.clone(), "second".into())));
+        titles.insert(root.id.clone(), "Named too".into());
+        assert!(s.untitled_chat("b", &titles).is_none());
     }
 
     #[test]
