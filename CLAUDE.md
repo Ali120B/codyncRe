@@ -1,103 +1,13 @@
-# Codync
+# Claude notes
 
-Bot-based remote for coding agents: persistent named bots on your computer, messaged from the iPhone (UI patterns from Grok Bot).
+`AGENTS.md` is the source of truth for this fork. Read it first.
 
-## Language & Syntax
+Quick reminders:
 
-- **Swift 6** strict concurrency mode — use latest Swift 6 syntax throughout
-- Prefer SwiftUI lifecycle and modern APIs (`@Observable`, `@State`, `@Environment`)
-- Use structured concurrency (`async/await`, `TaskGroup`) over Combine
-- Use `sending`, `nonisolated`, `@MainActor` correctly per Swift 6 rules
-- Avoid `@unchecked Sendable` — prefer proper `Sendable` conformance
-- Desktop app (`apps/desktop/`) is Electron + React + strict TypeScript: state in `Observable` models (`src/renderer/store/`), host calls through the `window.codync` bridge (`src/shared/ipc.ts`), main-process code in `src/main/`; CI runs `npm run typecheck` and `npm test`
-- Host is Rust 2024 edition and follows the `rust-skills` rules (`~/.agents/skills/rust-skills`). Lints live in `host/Cargo.toml` (`[lints]`: default groups + pedantic, `unwrap_used`); CI runs `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings`
-- Host conventions: no `unwrap()` outside tests (`expect("why this can't fail")` for true invariants); lock std mutexes with `LockExt::locked()` (poison-tolerant); enums, not strings, for states and modes (`BotStatus`, `Permission`, `EntryKind`, `AlertKind`); `tracing` with structured fields (`error = format!("{e:#}")` keeps the context chain); blocking fs/process work goes through `spawn_blocking`; registry JSON is untrusted (paths are validated)
-
-## Clean code
-
-- Keep code modular and clean on every change: reuse before writing, one responsibility per file/type, no new code appended to files past ~500 lines (split first), views/components hold no I/O or logic, short single-purpose functions, enums over flags, no dead code, no swallowed errors. Full rules: [docs/guides/clean-code.md](docs/guides/clean-code.md).
-
-## Architecture
-
-- Clients: iOS app (SwiftUI), desktop app for macOS, Linux and Windows (`apps/desktop/`, Electron: menu bar/tray + chat window; why and how: [docs/architecture/desktop-app.md](docs/architecture/desktop-app.md)), terminal UI (`codync-host tui`, `host/src/tui/`, ratatui; layout and state vocabulary modeled on herdr).
-- **Host owns the logic**: bot management, sessions, agent processes, MCP servers/connectors, routing, routines, memory, validation and anything heavy or needed by more than one client run in the Rust host. iOS, desktop and TUI render host state and send intents through the host API; they keep only UI state and device-only work (mic/speech, Keychain, push decryption; desktop main process: host service, SSH, updates). A client that needs something the host lacks gets a new host method, never its own copy: [ownership rules](docs/architecture/overview.md#host-owns-the-logic).
-- iPhone Swift package (`apps/ios/Kit/`, iOS only): `CodyncKit` (models, client, theme, avatars; also used by the widgets and the notification extension) + `CodyncUI` (`BotStore` + screens).
-- UI principle: buttons an icon can express are icon-only (with tooltip / accessibility label); text only where an icon would be ambiguous (approval choices).
-- UI controls default to the shared custom components. Explicit exception: iOS BotListView and ThreadView use native navigation/toolbar items and automatic back navigation, and the iPhone root uses the system `TabView`, for system Liquid Glass; BotListView is a `List` with its styling removed, for system drag-to-reorder; as specified in `docs/design/ui-conventions.md`. **iOS menus are always the system ones**: tap menus through `DropdownMenu`/`ChoicePicker` (native `Menu`), long-press through `.contextActions` (native `contextMenu`). Never hand-build a dropdown on iOS: a custom overlay lands in the wrong place (sheets, scroll views, the composer's + menu). The desktop app's menu bar/tray menu is the system menu. Keep system authentication and widget containers native. On iOS `.codyncSheet` presents the system sheet (grabber, swipe down). Outside these exceptions, avoid: no `Menu`/`Picker`, `.switch` toggles, `Form`/`List` styling, `confirmationDialog`/`alert`, `ProgressView`, `.sheet`/`.popover`/`.fullScreenCover`, `.toolbar`/navigation bars, `ContentUnavailableView`. Use `apps/ios/Kit/Sources/CodyncUI/Controls.swift` + `Chrome.swift` (`.codyncSheet`, `ModalHeader`, `ScreenHeader`, `.codyncDialog`, `ToggleStyle.codync`); on the desktop, `apps/desktop/src/renderer/components/` (`Sheet`, `Dialog`, `AnchoredMenu`, `ModalHeader`, `Controls.tsx`, `Icon` for SF Symbols). Every tap that shows/hides something animates (`Motion`). Anything with a background fill gets no border line.
-- `host/` — **codync-host** (Rust, macOS + Linux + Windows; platform differences in `service/` and `shell.rs`). Detects installed harnesses (`agent/backends.rs`: login-shell PATH + known dirs) and the ACP registry (`agent/registry.rs`, cached in `~/.codync/registry.json`, binaries under `~/.codync/agents`). Drives agents over **ACP** (JSON-RPC on stdio, hand-rolled in `agent/acp.rs`, updates kept as `serde_json::Value` so new adapter variants never break parsing). One actor per bot (`agent/bot/`) owns the agent process + session and maps `session/update` onto transcript entries.
-- Chat/session ownership, groups, collaboration, Engram memory and visible-message rules: [conversation runtime](docs/architecture/conversation-runtime.md).
-- **Sync**: every mutation stamps a global `rev`. Clients call `GET /events?since=<rev>` (catch-up in rev order, then live). Emission happens under `Hub::emit_lock` so events leave in rev order. Clients upsert by id; never skip undecodable events (the iOS app rewinds to rev 0).
-- API: `POST /api/<method>` + SSE with the bearer token (`~/.codync/token`) is **loopback only** (desktop app, SSH tunnel, local helpers). Phones and other remote clients use the E2E channel (`/channel` direct, or the Cloudflare relay). Default port **19222**.
-- Remote access (Cloudflare relay primary, direct LAN/Tailscale alternative, accounts, SSH, public routine webhooks queued in the relay §7.8): [docs/reference/remote-relay.md](docs/reference/remote-relay.md).
-- Remote screen (`host/src/screen/` is the reference): phones view/control the computer over WebRTC (hardware H.264, non-trickle SDP relayed by `screenOffer`, input on data channels `input` / `input-fast`); bots get the built-in `computer` MCP server (`codync-host mcp computer`, `host/src/mcp.rs`) when their `computer` flag is on; its tools run on the bundled cua-driver, which Codync Screen starts on macOS so its grants apply ([computer use](docs/features/computer-use.md)). Capture/input live in a helper on `~/.codync/screen.sock`: `apps/screen-macos` (macOS, launchd agent the desktop app registers via `SMAppService`, owns the TCC grants) or `apps/screen-linux` (`codync-screen`: portals + GStreamer, started by the host). On by default (Linux: only with a graphical session); `setScreenEnabled` is accepted only from loopback. An interactive phone takes over (bots may only look).
-- Multiple computers per account are future work, not a current priority: the product targets one computer. The multi-computer structure (`AccountStore`, `BotReference`) stays because relay/accounts/SSH build on it; don't extend or polish multi-computer features unless asked.
-- Environments: `iOS Dev` / desktop `dist:*:dev` use the isolated Codync Dev app; `iOS` / `dist:*:main` retain production identities. Stop only the variant being rebuilt. Resource map, signing and diagnostics: [Dev app isolation](docs/guides/dev-app.md).
-- Push: iOS registers its APNs token with `relay/` → gets an AES-GCM ticket → gives it (plus its X25519 push key) to the host; the host seals title/body to that key and a Notification Service Extension opens it, so `relay/` sees only generic text. Alert kinds: *needs you*, *done*, and *failed*, suppressed while the iOS app is connected. Delivery and lifecycle: [notification design](docs/design/push-and-live-activity.md).
-- Voice call (iPhone, desktop): on-device speech (macOS desktop: the `codync-speech` helper), or OpenAI / Gemini realtime on the user's own key (kept in the host's vault, which mints per-call credentials; audio goes device ↔ provider); the host sees plain messages. Grok-style call bar: [docs/features/voice-call.md](docs/features/voice-call.md).
-- Analytics: PostHog, on by default (off in each device's Settings), feature use only (never content); host events come from `api::dispatch`: [docs/features/analytics.md](docs/features/analytics.md).
-- Usage: local only — `claude -p /usage --no-session-persistence`, the Claude status line (`codync-host statusline`, wrapping any existing one), Claude ACP `usage_update` rate-limit meta, Codex rollout files. Never call provider APIs with agent credentials.
-- The desktop app is thin: the Mac build bundles `codync-host` in `Contents/Resources` (Linux uses the installed host) and installs it as a launchd/systemd agent via `codync-host install`; the menu bar/tray shows status/pairing/usage and opens the chat window. Not sandboxed, not Mac App Store (the host must spawn CLIs).
-
-## Cross-platform UI changes
-
-- Any UI change in any client must include the corresponding updates to the other clients in the same change: iOS (`apps/ios/`, `apps/ios/Kit/Sources/CodyncUI/`), desktop (`apps/desktop/src/renderer/`, macOS, Linux and Windows), and terminal UI (`host/src/tui/`). This applies in every direction.
-- Keep shared features, actions, terminology, displayed information, and loading, empty, error, and permission states consistent. Adapt layout, controls, and input to each platform, including terminal keyboard interaction, while preserving the same user-facing behavior.
-- Inspect every client's corresponding implementation before finishing a UI task. Implement applicable changes together; do not silently defer another client. For a platform-only change or an unsupported capability, document which clients are unaffected and the concrete reason in the change summary.
-- Validate each affected client with its relevant build/tests and UI checks. Report any checks that could not run and why.
-- The desktop app is one codebase for macOS, Linux and Windows: platform differences go through `window.codync.platform` checks or the main process, never a fork of a view.
-
-## Codync 1.x does not exist for us
-
-- Ignore everything from Codync 1.x (the Claude Code hooks + CloudKit session monitor): no migration, no compatibility shims, no cleanup of its files or hooks, no keeping old workers or App Store copy alive for it. Don't mention 1.x in code, docs or release notes.
-- Build only the current design; don't reintroduce hooks or CloudKit.
-- Don't carry legacy along. Old names, settings, schemes, files or code paths left from earlier designs get renamed or deleted outright when you meet them, not kept "for compatibility". Put full effort into the new design.
-
-## Installing a new build: kill the old one first
-
-Always stop the old desktop app, host and iPhone process before running a new build (old host = old protocol, old app = old UI); commands in [development: desktop app](docs/guides/development.md#desktop-app) and [iOS app](docs/guides/development.md#ios-app).
-
-Keep only the latest build: in this checkout, Apple builds go to `build/dd` only (no other `-derivedDataPath`, no copies in scratchpads, `/tmp` or Xcode's DerivedData); delete any older Codync build right away, so macOS never launches a stale copy. A git worktree may keep its own single build inside that worktree.
-
-## End-to-end test every change
-
-After every change, test it end to end on the real apps, not just builds and unit tests: install the new build (old one stopped first) and walk through the changed flow. Drive the desktop app with Computer Use, and the iPhone app on an iOS Simulator through Device Hub (Xcode's `DeviceHub.app`). Report any check that could not run and why.
-- **Minimal e2e** (default): only the platform of the computer you test on (on the Mac: macOS).
-- **Full e2e** (large changes: platform code, packaging, the desktop main process; or when asked): macOS, Linux (Lima `codync-linux`) and Windows (UTM, [Windows testing](docs/guides/windows-testing.md)). A platform whose VM isn't installed is skipped and reported, not set up.
-- **Desktop build to use**: develop and e2e with `npm run dev` in `apps/desktop` (renderer reloads on save, restart it after `src/main` or preload changes; nothing packaged or signed). After a host change run `node tools/native-host.mjs dev` there first: `npm run dev` prefers that build over `host/target/debug`. Package `npm run dist:mac:dev` (about 45 s) only for what an unpackaged run lacks: the bundled host install, Codync Screen / computer use, system permissions. `dist:*:main` (universal, timestamped, minutes) only to check the production app.
-
-## Project generation
-
-- `apps/project.yml` + `xcodegen generate --spec apps/project.yml` produce `apps/Codync.xcodeproj`. Edit `project.yml`, not the pbxproj.
-
-## App Store Upload
-
-- Xcode Cloud archives the `iOS` scheme on every `v*` tag and uploads it to App Store Connect with its own build number, then the `Submit iOS` workflow submits it to App Review for the App Store; don't upload from the local machine or edit `CURRENT_PROJECT_VERSION` for it. Details: [development guide](docs/guides/development.md#ios-releases-xcode-cloud).
-
-## Versioning
-
-- Phone ↔ host compatibility: each side names the oldest version of the other it works with (`minApp` in the host's `hello`, `minHost` in each client). Additive changes need nothing; a rename/removal raises `minApp` in the same release, and hosts hold that release until the App Store has the iPhone app: [docs/reference/compatibility.md](docs/reference/compatibility.md)
-- **Every source change ships as a release.** A version bump on `main` is the only release trigger (Auto Tag → desktop app for macOS, Linux and Windows, host, Homebrew, in-app update), so any change to shipped code (`apps/`, `host/`, `packaging/`) bumps the version before it reaches `main`, without being asked. Docs, `web/`, `cloud/`, `relay/` and CI-only changes don't bump.
-- Pick the bump yourself: patch for fixes and small tweaks, minor for new features or protocol additions. Never bump major (stay on 2.x). One bump per merge into `main`: if `MARKETING_VERSION` is already ahead of the latest `v*` tag, leave it.
-- How: set `MARKETING_VERSION` in `apps/project.yml` and `version` in `host/Cargo.toml` (+ its `Cargo.lock` entry) and `apps/desktop/package.json` (+ `package-lock.json`) to the same value, run `xcodegen generate --spec apps/project.yml`, commit as `build: bump version to X.Y.Z`. Never touch `CURRENT_PROJECT_VERSION` (Xcode Cloud sets the iOS build number). When the iOS app changes, also write that version's section in `apps/ios/WhatsNew.md` (zh-Hant + en-US, what iPhone users notice); it becomes the App Store "What's New".
-
-## Layout & naming
-
-Build targets, folder layout, file naming and shared terms: [docs/architecture/file-structure.md](docs/architecture/file-structure.md). Follow it when adding or moving files.
-
-## Several agents share `dev`
-
-- Several agents often work in this checkout on `dev` at once. When you start a task, name your session after its area (`/rename kit-markdown`, `host-voice`, …; ask the user if you can't rename yourself) so others can find you in `ListAgents`.
-- Before starting any task, sync with origin: `git pull --rebase --autostash origin dev`, then push any finished local commits that aren't on `origin/dev` yet (`git push origin dev`). The pull is tree-wide, so the next rule applies; if the autostash conflicts, keep both sides' intent and never drop another agent's hunk.
-- Before touching files with someone else's uncommitted changes, or anything tree-wide (renames, `xcodegen`, version bump, `git stash`/`reset`/`checkout`), `SendMessage` the agents involved with what you'll change and wait for or answer their replies. Never discard, revert or reformat hunks that aren't yours.
-- External contributors open PRs against `dev`, never `main`. Retarget a contributor PR aimed at `main` to `dev` before reviewing or merging it.
-- An external PR is merged only after its author has verified it end to end locally (real host + the clients it touches, not just builds/tests) and says so in the PR's *Validation*; ask for it in the review if missing.
-
-## Commit messages
-
-Follow the Conventional Commit and PR rules in [AGENTS.md](AGENTS.md#commit--pull-request-guidelines); stage only your own changes. The pre-commit hook (`git config core.hooksPath .githooks`) runs CI's checks for the parts a commit touches ([pre-commit checks](docs/guides/development.md#pre-commit-checks)); fix what it reports instead of `--no-verify`.
-
-## Keeping this file short
-
-- CLAUDE.md and AGENTS.md hold only rules an agent needs on every task. Reference material (file structure, naming tables, API details, audits, how-tos) goes in `docs/` as its own file, with a one-line pointer here.
-- Whenever you edit either file, check its length: past ~100 lines, or a section past a few lines of reference detail, refactor that detail into `docs/` and leave the pointer, without being asked.
-- Keep `docs/` current: update the doc in the same change that makes it stale.
+- Dev profile: `~/.codync-dev`, host on 19223, app via `cd apps/desktop && npm run dev`.
+  Stable profile: `~/.codync`, host on 19222. Never mix them.
+- The user tests the UI. Run typecheck/targeted builds, not UI or full E2E suites, unless
+  asked.
+- Shipped code gets a 2.x version bump; docs and README do not.
+- Keep releases and the updater on `Ali120B/codyncRe`.
+- Prefer direct edits over throwaway scripts, and keep changes scoped.
