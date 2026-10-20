@@ -9,7 +9,7 @@ Your coding agents, as teammates you can message.
 
 > **Fork note** — this is [Ali120B](https://github.com/Ali120B)'s fork of [Codync](https://github.com/leepokai/Codync).
 > Builds, releases and app updates come from [Ali120B/codyncRe](https://github.com/Ali120B/codyncRe/releases);
-> the iPhone app and the wired-in cloud relay are upstream's for now.
+> the iPhone app, optional account sign-in and the wired-in cloud relay are upstream's for now.
 
 [Website](https://www.codync.dev) · [Compare](https://www.codync.dev/compare) · [Launch film](https://youtu.be/QAhyZWpV70U)
 
@@ -51,12 +51,14 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 
 - **Free and open source.** No subscription, no paid tier, Apache 2.0 licensed. It runs on your computer with the agents and accounts you already have.
 - **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.
-- **Many bots, one team.** Run as many bots as you like side by side, each with its own agent, project folder and approvals, all working at once. Put several in a **group chat** and they answer in turn, like a team channel; `@name` picks who replies. Start a **thread** on any message to branch off without cluttering the main chat.
+- **Many bots, one team.** Run as many bots as you like side by side, each with its own agent, project folder and approvals, all working at once. Put 2–50 in a **group room** and they answer in turn, like a team channel; `@name` picks who replies. Each member can get its own Browser or Computer access inside the room without changing its own setup, group Files show who wrote what, and group routines run with the room's context. Start a **thread** on any message to branch off without cluttering the main chat.
+- **Routines that fit the work.** Run a bot once, every few minutes, hourly, daily, on weekdays or a chosen day each week or month — or from a webhook. Set the time with a real time picker, choose the time zone, and see the next run before saving.
+- **Apps and skills when you need them.** Connect Gmail, Slack, GitHub, Notion and 1,000+ apps through Composio, or give bots reusable skills; the Marketplace leads with popular apps and expands only when you ask.
 - **Built in Rust.** `codync-host` is one small, fast Rust binary for macOS, Windows and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
 - **One app per kind of device.** Native SwiftUI on the iPhone, one desktop app for Mac, Windows and Linux (Electron), and a terminal UI for SSH.
 - **A Grok Bot, Muse and Dots alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
 - **Reach your computer from anywhere, free.** The hosted Cloudflare relay is included at no cost: no Tailscale, no VPN, no port forwarding. Traffic is end-to-end encrypted between your phone and your computer, so the relay only forwards ciphertext. Same Wi-Fi or Tailscale? The phone connects directly instead.
-- **Every computer, one app.** Sign in and your iPhone lists every computer on your account (Mac, Windows PC, Linux desktop, server or cloud VM); tap **Connect**, confirm a 6-digit code on that computer, and its bots show up next to the others. A new bot can live on any of them, and the Mac app reaches your SSH machines too. Each computer approves each device itself, so an account alone never unlocks a computer.
+- **Every computer, one app.** Your iPhone lists every computer you've paired — or signed in to, where account support is configured. Tap **Connect**, confirm a 6-digit code on that computer, and its bots show up next to the others. A new bot can live on any of them, and the Mac app reaches your SSH machines too. Each computer approves each device itself, so an account alone never unlocks a computer.
 - **Remote screen.** See and control your computer from the iPhone over WebRTC (hardware H.264), and let bots use the screen themselves through the built-in `computer` tool.
 - **Voice calls.** Talk to a bot hands-free from the iPhone and hear its replies read aloud.
 - **Private push.** Notification text is sealed to your phone's key, so the push relay never sees what your bots said.
@@ -87,7 +89,7 @@ Host notifications → APNs worker (relay/) → iPhone
 ```
 
 - **Bots** have a name, a character avatar, standing instructions, an agent backend, a project folder and a permission policy. Each bot has **a persistent main chat and optional reply threads**; the agent sessions underneath are an implementation detail (resumed with `session/load`, restarted with *New session*).
-- **Group chats** hold several bots and you. Each message starts a short room turn: the bots you @-mention (or everyone) reply one at a time, each in its own session, and can react to each other, up to 3 rounds. See [group chats and threads](docs/features/groups-and-threads.md).
+- **Group rooms** hold 2–50 bots and you. Each message starts a short room turn: the bots you @-mention (or everyone) reply one at a time, each in its own session, and can react to each other, up to 3 rounds. Browser and Computer switches are scoped to the room and never rewrite a bot's own setup; group routines and attributed Files live alongside the chat. See [group chats and threads](docs/features/groups-and-threads.md).
 - **Bots can ask each other for help.** Tell one “ask Reviewer to check these changes.” The built-in `team` MCP server lets it discover your other visible bots and wait for a reply. Requests appear in both chats; each recipient keeps its own agent, folder and approvals. Native subagents stay under the coding agent's control. See [bot collaboration](docs/features/bot-collaboration.md).
 - **The chat only shows what matters**: your messages, each turn's final reply, approval cards and notices. Every tool call, diff, plan and thought is one tap away in *Full conversation*. While a bot works, its row shows what it's doing right now.
 - **Agents are detected automatically**: the host hydrates PATH from your login shell (plus Homebrew, ~/.local/bin, nvm, bun, volta, asdf, mise, pnpm…), finds every harness you have installed, and prefers its native ACP mode. Anything else in the official [ACP registry](https://agentclientprotocol.com/registry) can be picked too — Codync fetches it on first use (npx, uvx or a checksummed binary).
@@ -171,7 +173,7 @@ Data lives in `~/.codync`. The local bearer token authorizes loopback helpers an
 
 **Where does my data go?** Bots, chats and memory stay on your computer. The phone reaches it directly on the same network, or through an end-to-end encrypted relay that can't read your messages.
 
-**Do I need an account?** No. Pair your phone by scanning a QR code. Signing in with Apple or Google is optional.
+**Do I need an account?** No. Pair your phone by scanning a QR code. Signing in with Apple or Google is optional; that path uses upstream's Codync Cloud, while local pairing never needs it.
 
 **Which computers can run it?** A Mac, a Windows PC, or a Linux desktop or headless server. The iPhone app and the terminal UI over SSH talk to the same host.
 
@@ -205,6 +207,14 @@ cd relay && npm test             # relay tickets
 ```
 
 ## Changelog
+
+### 2.19 — group rooms
+
+Group chats became rooms you can run work from. Every member can get its own Browser or
+Computer access without changing its own settings; the shared Computer panel adds Files,
+Skills, Vault and Routines; group Files keep attribution; and routines can run with the
+room's context. Marketplace apps, connectors and skills got a wider catalog, with
+Composio's app library and show-more browsing.
 
 ### 2.7.0 — one desktop app for Mac and Linux
 
