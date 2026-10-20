@@ -13,7 +13,9 @@ use std::{path::Path, sync::Arc, time::Duration};
 
 #[derive(Deserialize, Serialize)]
 struct Config {
-    /// On unless the owner turned it off; only a host that can update itself does.
+    /// Off unless the owner turned it on: this fork's releases carry no signed host
+    /// update manifest, so an upstream updater must never take it over. Only a host
+    /// that can update itself checks.
     #[serde(default = "on")]
     automatic: bool,
 }
@@ -25,7 +27,7 @@ impl Default for Config {
 }
 
 const fn on() -> bool {
-    true
+    false
 }
 
 /// A release build of a standalone binary that the installed service runs: the hosts that

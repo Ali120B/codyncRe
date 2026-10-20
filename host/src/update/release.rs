@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{fmt::Write as _, io::Read, path::Path, time::Duration};
 
-pub const RELEASES: &str = "https://github.com/leepokai/Codync/releases";
+// This fork ships its own builds; never follow upstream releases (their signed host
+// updates would replace this host with a different codebase).
+pub const RELEASES: &str = "https://github.com/Ali120B/codyncRe/releases";
 pub const MAX_ARCHIVE: usize = 128 * 1024 * 1024;
 const MAX_UNPACKED: u64 = 256 * 1024 * 1024;
 const PUBLIC_KEY: &str = include_str!("../../../packaging/updates/host-public-key.txt");
@@ -109,7 +111,7 @@ pub async fn latest() -> Result<Release> {
     // Resolve latest once. Fetching manifest and signature through separate
     // latest redirects could straddle two releases.
     let response = crate::http()
-        .get("https://api.github.com/repos/leepokai/Codync/releases/latest")
+        .get("https://api.github.com/repos/Ali120B/codyncRe/releases/latest")
         .header(reqwest::header::USER_AGENT, "codync-host")
         .timeout(Duration::from_secs(20))
         .send()
