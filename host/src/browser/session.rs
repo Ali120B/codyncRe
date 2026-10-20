@@ -40,8 +40,8 @@ impl BotBrowser {
     /// Starts the bot's browser (its profile is `~/.codync/browser/<bot>/<engine>`).
     pub async fn start(hub: &Arc<Hub>, bot: &str) -> Result<Self> {
         let row = hub.store.bot(bot)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("unknown bot"))?;
-        if !row.config.browser {
-            bail!("Turn on “Use a browser” for this bot first.");
+        if !row.config.browser && !hub.store.room_tools(bot)?.0 {
+            bail!("Turn on “Use a browser” for this bot first, in its settings or in a group it's in.");
         }
         let engine_name = super::engine_for(&row.config.browser_engine)?;
         let profile = profile_dir(bot);

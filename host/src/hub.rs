@@ -243,6 +243,7 @@ impl Hub {
         }
         if cfg.is_group() {
             cfg.members = crate::chat::group::valid_members(&self.store, &cfg.id, &cfg.members)?;
+            cfg.member_settings.retain(|id, _| cfg.members.contains(id));
         }
         validate(&cfg)?;
         crate::agent::workspace::prepare(&mut cfg)?;
@@ -252,6 +253,16 @@ impl Hub {
         }
         if !cfg.is_group() {
             self.send_cmd(&id, Cmd::Reconfigure(Box::new(cfg)))?;
+        } else if cfg.members != row.config.members || cfg.member_settings != row.config.member_settings {
+            // A room's tool list is per member: only a member or tools change costs
+            // the room its sessions (a rename or a new folder doesn't).
+            let group = cfg.id.clone();
+            let mut told = std::collections::HashSet::new();
+            for member in row.config.members.iter().chain(cfg.members.iter()) {
+                if told.insert(member.clone()) {
+                    let _ = self.send_cmd(member, Cmd::GroupToolsChanged { group: group.clone() });
+                }
+            }
         }
         self.emit_bot(&id);
         Ok(self.bot_value(&id).unwrap_or(Value::Null))

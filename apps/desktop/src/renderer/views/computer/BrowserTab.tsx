@@ -19,7 +19,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
  * user takes over (the host hands control back to the bot after 50 s without input).
  * Nothing starts it on its own: an explicit Start, or the bot working in this chat.
  */
-export function BrowserTab({ bot, store }: { bot: Bot; store: BotStore }) {
+export function BrowserTab({ bot, store, working }: { bot: Bot; store: BotStore; working?: boolean }) {
   const [state, setState] = useState<BrowserState | null>(null)
   const [frame, setFrame] = useState<BrowserFrame | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -36,7 +36,7 @@ export function BrowserTab({ bot, store }: { bot: Bot; store: BotStore }) {
   // The config decides before the first state arrives; the host is the truth after.
   const enabled = state?.enabled ?? bot.browser
   const running = state?.running ?? false
-  const botWorking = isWorkingIn(bot, bot.id, null)
+  const botWorking = working ?? isWorkingIn(bot, bot.id, null)
   const live = enabled && (watch || botWorking)
   const user = state?.control === 'user'
   const engine = state?.engine ?? null

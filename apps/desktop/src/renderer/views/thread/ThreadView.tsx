@@ -286,14 +286,13 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           <div className="top-chrome-row">
             <span style={{ flex: 1 }} />
             {bot && !isGroup(bot) && !calling ? <ModelChip bot={bot} /> : null}
-            {bot && !isGroup(bot) && !calling ? (
+            {bot && !calling ? (
               <MacChatButton title="Computer" icon="display" direction={[0, 0]} className={showComputer ? 'active' : undefined} onClick={toggleComputer} />
             ) : null}
             {bot && !calling ? (
               <ChatHeaderMenu
                 bot={bot}
                 showComputer={showComputer}
-                withComputer={!isGroup(bot)}
                 onFind={() => setFindOpen(true)}
                 onChats={toggleChats}
                 onFull={openTrace}
@@ -374,7 +373,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             onDelete={deleteChat}
             close={() => setShowChats(false)}
           />
-        ) : showComputer && bot && !isGroup(bot) ? (
+        ) : showComputer && bot ? (
           <ComputerPanel
             bot={bot}
             store={store}
@@ -413,8 +412,8 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           />
         ) : null}
       </Sheet>
-      <Sheet open={showComputer && !wide && !!bot && !isGroup(bot)} onClose={() => setShowComputer(false)} width={panelWidth} height={Math.min(720, window.innerHeight - 60)}>
-        {bot && !isGroup(bot) ? (
+      <Sheet open={showComputer && !wide && !!bot} onClose={() => setShowComputer(false)} width={panelWidth} height={Math.min(720, window.innerHeight - 60)}>
+        {bot ? (
           <ComputerPanel
             bot={bot}
             store={store}

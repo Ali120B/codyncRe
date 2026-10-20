@@ -10,6 +10,32 @@ use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+#[cfg(test)]
+mod tool_tests {
+    use super::effective_tools;
+    use crate::store::MemberSettings;
+
+    #[test]
+    fn a_room_uses_its_switches_otherwise_the_bot_settings() {
+        assert_eq!(effective_tools(None, true, false), (true, false));
+        assert_eq!(effective_tools(Some(MemberSettings::default()), true, true), (false, false));
+        assert_eq!(
+            effective_tools(Some(MemberSettings { browser: true, computer: false }), false, false),
+            (false, true)
+        );
+    }
+}
+
+/// The tools a turn may use: a room's per-member switches when answering in a group,
+/// otherwise the bot's own settings.
+pub(crate) fn effective_tools(
+    member: Option<crate::store::MemberSettings>,
+    computer: bool,
+    browser: bool,
+) -> (bool, bool) {
+    member.map_or((computer, browser), |m| (m.computer, m.browser))
+}
+
 impl Actor {
     /// The storage key of the session a lane's turns use; `None` is the bot's own chat.
     /// A thread of the bot's chat and every group lane (main room or thread) get their own.
@@ -109,6 +135,14 @@ impl Actor {
         )
     }
 
+    /// The group row when this lane is a room (a group's chat), not one of the bot's own.
+    fn active_room_row(&self) -> Option<crate::store::BotRow> {
+        if self.lane.chat == self.cfg.id {
+            return None;
+        }
+        self.hub.store.bot(&self.lane.chat).ok().flatten().filter(|r| !r.deleted && r.config.is_group())
+    }
+
     /// ACP connectors, team collaboration, and optional computer control.
     pub(super) fn mcp_servers(&self) -> Result<Value> {
         let Ok(exe) = std::env::current_exe() else {
@@ -123,14 +157,19 @@ impl Actor {
                 .filter_map(|c| c.acp(&exe, port))
                 .collect();
         let composio = crate::market::composio::enabled_for(&self.hub.store, &self.cfg.connectors)?;
+        // In a room, browser and computer control are the group's per-member switches
+        // (off by default); a bot's own chats keep its own settings.
+        let member =
+            self.active_room_row().map(|row| row.config.member_settings.get(&self.cfg.id).copied().unwrap_or_default());
+        let (computer, browser) = effective_tools(member, self.cfg.computer, self.cfg.browser);
         let builtin = [
             Some("connectors"),
             Some("chat"),
             Some("team"),
             Some("memory"),
             Some("routines"),
-            self.cfg.computer.then_some("computer"),
-            self.cfg.browser.then_some("browser"),
+            computer.then_some("computer"),
+            browser.then_some("browser"),
             composio.then_some("composio"),
         ];
         for name in builtin.into_iter().flatten() {

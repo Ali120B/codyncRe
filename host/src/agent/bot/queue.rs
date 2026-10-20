@@ -131,6 +131,13 @@ impl Actor {
                     self.sync_thread_model(&sid, Some(root.as_str())).await;
                 }
             }
+            Cmd::GroupToolsChanged { group } => {
+                // The next turn in this room creates a session with the new tools.
+                if self.active_group.as_ref().is_some_and(|g| g.lane.chat == group) {
+                    self.stop().await;
+                }
+                self.forget_group_sessions(&group);
+            }
             Cmd::GroupNewSession { group } => {
                 // Its room turn (if any) and every session it had for this group go away.
                 if self.active_group.as_ref().is_some_and(|g| g.lane.chat == group) {

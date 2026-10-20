@@ -202,11 +202,7 @@ impl Routines {
     }
 
     pub fn save(&self, hub: &Hub, bot: &str, body: &Value) -> Result<Value> {
-        let row = hub
-            .store
-            .bot(bot)?
-            .filter(|b| !b.deleted && !b.config.is_group())
-            .context("routine requires an existing agent bot")?;
+        let row = hub.store.bot(bot)?.filter(|b| !b.deleted).context("routine requires an existing bot")?;
         let name = required(body, "name")?.trim();
         let instruction = required(body, "instruction")?.trim();
         if name.is_empty() || name.len() > 200 || instruction.is_empty() || instruction.len() > 32_000 {

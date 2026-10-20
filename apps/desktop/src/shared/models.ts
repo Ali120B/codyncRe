@@ -40,6 +40,8 @@ export interface Bot {
   leader: string
   instructions: string
   workspace: string
+  /** What each member may use in this group's room (browser, PC control). Off unless switched on. */
+  memberSettings?: Record<string, { browser: boolean; computer: boolean }>
   /** The bot can see and operate the computer's desktop. */
   computer: boolean
   /** The bot gets its own headless browser (private Chrome/Firefox profile). */
@@ -482,6 +484,7 @@ export interface GroupDraft {
   leader?: string
   instructions?: string
   workspace?: string
+  memberSettings?: Record<string, { browser: boolean; computer: boolean }>
   pinned?: boolean
   hidden?: boolean
   notify?: boolean | null

@@ -13,6 +13,12 @@ pub struct Prepared {
     pub timeout: Duration,
 }
 
+/// A group routine's claim: its instruction is posted into the room, not an agent lane.
+pub struct PreparedGroup {
+    pub routine_id: String,
+    pub prompt: String,
+}
+
 impl Routines {
     /// An enabled clock schedule keeps the local daemon's machine awake between
     /// runs. Explicit system sleep or a closed laptop lid still suspends execution.
@@ -80,6 +86,32 @@ impl Routines {
             &json!({"text":format!("Routine · {name}"),"routineId":routine_id,"runId":id,"style":"info"}),
         )?;
         Ok(Some(prepared))
+    }
+
+    /// Claims a group routine's run: the instruction goes into the room and the members
+    /// answer there. Unlike a bot's run there is no session of the routine's own.
+    pub fn begin_group(&self, store: &Store, bot: &str, id: &str) -> Result<Option<PreparedGroup>> {
+        if self.stopping() {
+            return Ok(None);
+        }
+        let prepared = self.change(store, |s| {
+            let Some(run) = s.runs.iter_mut().find(|r| r.id == id && r.bot_id == bot && r.status == Status::Pending) else { return Ok(None); };
+            let Some(routine) = s.routines.iter().find(|r| r.id == run.routine_id && !r.deleted) else { cancel_run(run); return Ok(None); };
+            if !routine.enabled && run.event["source"] != "test" { cancel_run(run); return Ok(None); }
+            run.status = Status::Running;
+            run.started_at = Some(now_ms());
+            Ok(Some(PreparedGroup {
+                routine_id: routine.id.clone(),
+                prompt: format!(
+                    "Scheduled routine: {}\n\n{}\n\nThis is an autonomous routine the user scheduled for this room. Work on it together and answer here.",
+                    routine.name, routine.instruction
+                ),
+            }))
+        })?;
+        if prepared.is_none() {
+            self.release(bot);
+        }
+        Ok(prepared)
     }
 
     /// Called immediately before sending session/prompt, after session setup.
@@ -264,11 +296,27 @@ fn tick(hub: &Arc<Hub>) -> Result<()> {
         if hub.routines.stopping() {
             break;
         }
-        if hub.store.bot(&run.bot_id)?.is_none_or(|r| r.deleted) {
+        let Some(row) = hub.store.bot(&run.bot_id)? else {
+            hub.routines.disable_bot(&hub.store, &run.bot_id)?;
+            continue;
+        };
+        if row.deleted {
             hub.routines.disable_bot(&hub.store, &run.bot_id)?;
             continue;
         }
         if !hub.routines.active.locked().insert(run.bot_id.clone()) {
+            continue;
+        }
+        if row.config.is_group() {
+            if let Err(error) = dispatch_group(hub, &run, &row.config) {
+                hub.routines.complete(
+                    hub,
+                    &run.id,
+                    Status::Failed,
+                    Some(format!("Could not start the room routine: {error:#}")),
+                    None,
+                )?;
+            }
             continue;
         }
         if let Err(error) = hub.send_cmd(&run.bot_id, crate::agent::bot::Cmd::Routine(run.id.clone())) {
@@ -284,9 +332,73 @@ fn tick(hub: &Arc<Hub>) -> Result<()> {
     Ok(())
 }
 
+/// A routine on a group: its instruction arrives in the room like the user's message and
+/// the members answer it. The run finishes with the room turn.
+fn dispatch_group(hub: &Arc<Hub>, run: &Run, group: &crate::store::BotConfig) -> Result<()> {
+    let Some(prepared) = hub.routines.begin_group(&hub.store, &run.bot_id, &run.id)? else {
+        return Ok(());
+    };
+    let lane = Lane::main(&run.bot_id);
+    let turn = hub.store.max_turn(&run.bot_id) + 1;
+    let posted = hub.add_entry(
+        &lane,
+        EntryKind::User,
+        turn,
+        &json!({
+            "text": prepared.prompt,
+            "status": "sent",
+            "routineId": prepared.routine_id,
+            "runId": run.id,
+        }),
+    );
+    if posted.is_none() {
+        bail!("couldn't post the routine into the group");
+    }
+    // The room's answer lands unread, like any message the user sends.
+    if let Err(error) = hub.mark_read(&run.bot_id, crate::store::ReadScope::Chat) {
+        tracing::warn!(%error, room = %run.bot_id, "couldn't mark the room read after a routine");
+    }
+    let (done, finished) = tokio::sync::oneshot::channel();
+    crate::chat::group::start_with(hub, group, lane, Some(done));
+    let hub = hub.clone();
+    let run_id = run.id.clone();
+    tokio::spawn(async move {
+        let ok = finished.await.unwrap_or(false);
+        let detail = (!ok).then(|| "The room turn ended before the routine finished".to_owned());
+        let status = if ok { Status::Succeeded } else { Status::Failed };
+        if let Err(error) = hub.routines.complete(&hub, &run_id, status, detail, None) {
+            tracing::warn!(%error, routine = %run_id, "couldn't finish a group routine run");
+        }
+    });
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_group_run_claims_without_a_thread() {
+        let store = Store::open(std::path::Path::new(":memory:")).unwrap();
+        let routines = Routines::default();
+        let mut routine = super::super::tests::routine();
+        routine.bot_id = "group-1".into();
+        let mut run_id = String::new();
+        routines
+            .change(&store, |s| {
+                s.routines.push(routine.clone());
+                let run = new_run(&routine, Value::Null, None);
+                run_id = run.id.clone();
+                s.runs.push(run);
+                Ok(())
+            })
+            .unwrap();
+        let prepared = routines.begin_group(&store, "group-1", &run_id).unwrap().expect("claimed");
+        assert!(prepared.prompt.contains("Scheduled routine"), "the room gets the routine's instruction");
+        let run = routines.state.locked().runs.iter().find(|r| r.id == run_id).cloned().unwrap();
+        assert!(matches!(run.status, Status::Running));
+        assert!(run.root_id.is_none(), "a group run has no thread of its own");
+    }
 
     #[test]
     fn busy_run_keeps_one_pending_wake_and_interval_cadence() {

@@ -503,3 +503,118 @@
 .browser-overlay-panel .browser-toolbar {
   padding-top: 10px;
 }
+
+/* Group panel: one member at a time (browser, skills, apps). */
+.computer-members {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px 10px;
+  flex: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.computer-members::-webkit-scrollbar {
+  display: none;
+}
+
+.computer-member {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px 0 6px;
+  border-radius: 7px;
+  flex: none;
+  font-size: 12px;
+  color: var(--secondary);
+  background: var(--surface);
+  transition: background var(--hover), color var(--hover);
+}
+
+.computer-member:hover {
+  color: var(--text);
+}
+
+.computer-member.active {
+  background: var(--roster-selected);
+  color: var(--text);
+}
+
+/* Group Files: edited files signed by member, the shared folder behind a click. */
+.group-files {
+  gap: 2px;
+}
+
+.group-files-label {
+  color: var(--tertiary);
+  padding: 10px 2px 4px;
+}
+
+.group-files-row {
+  gap: 8px;
+}
+
+.group-files-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.group-files-path {
+  color: var(--tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-files-author {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--secondary);
+  flex: none;
+}
+
+.group-files-delta {
+  color: var(--tertiary);
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.group-files-shared {
+  background: var(--surface);
+}
+
+.group-files-browse {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.group-files-browse .files-tab {
+  flex: 1;
+  min-height: 0;
+}
+
+.computer-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  margin: 6px 10px 0;
+  padding: 0 8px;
+  align-self: flex-start;
+  flex: none;
+  border-radius: 7px;
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.computer-link:hover {
+  background: var(--roster-selected);
+  color: var(--text);
+}

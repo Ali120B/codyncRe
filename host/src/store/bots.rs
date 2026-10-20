@@ -41,6 +41,23 @@ impl Store {
         Ok(row.and_then(parse_bot))
     }
 
+    /// Whether any group switched on this bot's room browser or PC control. The bot's own
+    /// chats stay governed by its own settings; the room tools only unlock work in a group.
+    pub fn room_tools(&self, id: &str) -> Result<(bool, bool)> {
+        let mut browser = false;
+        let mut computer = false;
+        for row in self.bots()? {
+            if row.deleted || !row.config.is_group() {
+                continue;
+            }
+            if let Some(s) = row.config.member_settings.get(id) {
+                browser |= s.browser;
+                computer |= s.computer;
+            }
+        }
+        Ok((browser, computer))
+    }
+
     pub fn save_bot(&self, cfg: &BotConfig) -> Result<i64> {
         let c = self.db.locked();
         let rev = next_rev(&c)?;
@@ -221,6 +238,7 @@ mod tests {
             leader: String::new(),
             instructions: String::new(),
             workspace: String::new(),
+            member_settings: std::collections::BTreeMap::new(),
             name: "Rev".into(),
             description: String::new(),
             avatar_color: "blue".into(),

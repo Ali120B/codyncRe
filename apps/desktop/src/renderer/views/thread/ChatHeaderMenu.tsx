@@ -8,11 +8,9 @@ import { MacChatButton } from './MacChatButton'
  * The chat header's ⋯ menu: find in chat, the full conversation, copying the
  * transcript, the Computer panel and the bot's settings.
  */
-export function ChatHeaderMenu({ bot, showComputer, withComputer, onFind, onChats, onFull, onComputer, onThreadModels, onSettings }: {
+export function ChatHeaderMenu({ bot, showComputer, onFind, onChats, onFull, onComputer, onThreadModels, onSettings }: {
   bot: Bot
   showComputer: boolean
-  /** The Computer panel exists for bots only, not groups. */
-  withComputer: boolean
   onFind: () => void
   onChats: () => void
   onFull: () => void
@@ -41,9 +39,9 @@ export function ChatHeaderMenu({ bot, showComputer, withComputer, onFind, onChat
     { title: 'Chats', icon: 'bubble.left', action: onChats },
     { title: 'Full conversation', icon: 'list.bullet.rectangle', action: onFull },
     { title: 'Copy conversation', icon: 'doc.on.doc', action: copyConversation },
-    ...(withComputer ? [{ title: 'Computer', icon: 'display', selected: showComputer, divider: true, action: onComputer } as MenuItem] : []),
-    ...(withComputer ? [{ title: 'Thread models', icon: 'arrow.triangle.branch', action: onThreadModels } as MenuItem] : []),
-    { title: isGroup(bot) ? 'Group settings' : 'Bot settings', icon: 'gearshape', action: onSettings, divider: !withComputer },
+    { title: 'Computer', icon: 'display', selected: showComputer, divider: true, action: onComputer },
+    ...(!isGroup(bot) ? [{ title: 'Thread models', icon: 'arrow.triangle.branch', action: onThreadModels } as MenuItem] : []),
+    { title: isGroup(bot) ? 'Group settings' : 'Bot settings', icon: 'gearshape', action: onSettings },
   ]
 
   return (

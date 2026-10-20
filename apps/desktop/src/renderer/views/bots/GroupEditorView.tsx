@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { isGroup, type Bot, type GroupDraft } from '@shared/models'
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
-import { CardSection, ChoicePicker, IconButton, Spinner, ValueRow } from '../../components/Controls'
+import { CardSection, ChoicePicker, IconButton, Spinner, Switch, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { Dialog, ModalHeader, useDismiss } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
@@ -38,6 +38,8 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
   const [shared, setShared] = useState(group?.workspace ?? '')
   // "One shared folder" is its own switch: an empty path must still select it.
   const [sharedFolder, setSharedFolder] = useState(!!group?.workspace)
+  // Room-only tools: off until switched on here, independent of each bot's own settings.
+  const [tools, setTools] = useState<Record<string, { browser: boolean; computer: boolean }>>(() => ({ ...(group?.memberSettings ?? {}) }))
   const wake = useWake(1400)
   const [pinned, setPinned] = useState(group?.pinned ?? false)
   const [notify, setNotify] = useState(group?.notify ?? true)
@@ -49,6 +51,9 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
   const [confirmDelete, setConfirmDelete] = useState<Bot | null>(null)
 
   const picked = members.map((id) => store.bots.get(id)).filter((b): b is Bot => !!b)
+  const toolOf = (id: string) => tools[id] ?? { browser: false, computer: false }
+  const setTool = (id: string, key: 'browser' | 'computer', on: boolean) =>
+    setTools((all) => ({ ...all, [id]: { ...(all[id] ?? { browser: false, computer: false }), [key]: on } }))
   // Bots that can still join, filtered by the search.
   const q = query.trim().toLowerCase()
   const candidates = store.roster.filter((b) => !isGroup(b) && !members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
@@ -72,7 +77,15 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
     setError(null)
     const typed = name.trim()
     const finalName = typed || defaultName
-    const extra: Partial<GroupDraft> = { leader, instructions, workspace: sharedFolder ? shared.trim() : '', pinned, notify }
+    const memberSettings = Object.fromEntries(members.map((id) => [id, toolOf(id)]))
+    const extra: Partial<GroupDraft> = {
+      leader,
+      instructions,
+      workspace: sharedFolder ? shared.trim() : '',
+      memberSettings,
+      pinned,
+      notify,
+    }
     void (async () => {
       try {
         if (groupId) {
@@ -113,6 +126,18 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
                 <BotAvatar bot={bot} size={32} animated={false} />
                 <span className="member-name">{bot.name}</span>
                 {leader === bot.id ? <span className="key-cap">Leader</span> : null}
+                <span className="member-tools">
+                  <span title="Browser in this room">
+                    <Switch label="Browser in this room" on={toolOf(bot.id).browser} onChange={(on) => setTool(bot.id, 'browser', on)}>
+                      <Icon name="safari" size={12} color="var(--secondary)" />
+                    </Switch>
+                  </span>
+                  <span title="PC control in this room">
+                    <Switch label="PC control in this room" on={toolOf(bot.id).computer} onChange={(on) => setTool(bot.id, 'computer', on)}>
+                      <Icon name="display" size={12} color="var(--secondary)" />
+                    </Switch>
+                  </span>
+                </span>
                 <IconButton title={`Remove ${bot.name}`} icon="xmark" onClick={() => toggle(bot.id)} />
               </div>
             ))}
@@ -145,7 +170,9 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
               </button>
             ) : null}
           </CardSection>
-          <span style={{ ...font('caption'), color: 'var(--tertiary)' }}>Everyone answers in turn unless you @mention someone.</span>
+          <span style={{ ...font('caption'), color: 'var(--tertiary)' }}>
+            Everyone answers in turn unless you @mention someone. The globe and display switches give a member its browser and PC control in this room only — both start off and never change the bot's own settings.
+          </span>
 
           <CardSection title="Room">
             <ValueRow label="Leader" detail="Speaks first each round and hands work to the others.">

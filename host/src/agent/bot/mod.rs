@@ -98,6 +98,10 @@ pub enum Cmd {
     GroupNewSession {
         group: String,
     },
+    /// The group's members or per-member tools changed: its room sessions are stale.
+    GroupToolsChanged {
+        group: String,
+    },
     Shutdown,
 }
 

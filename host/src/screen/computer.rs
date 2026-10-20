@@ -75,8 +75,8 @@ pub async fn computer_tools(hub: &Arc<Hub>) -> Value {
 /// Runs one `computer` tool for `bot`: `{content, isError?}` for the agent.
 pub async fn computer(hub: &Arc<Hub>, bot: &str, name: &str, args: Value) -> Result<Value> {
     let row = hub.store.bot(bot)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("unknown bot"))?;
-    if !row.config.computer {
-        bail!("Computer use is turned off for this bot.");
+    if !row.config.computer && !hub.store.room_tools(bot)?.1 {
+        bail!("Computer use is turned off for this bot, in its settings and in every group it's in.");
     }
     let screen = &hub.screen;
     if !screen.computer_use() {

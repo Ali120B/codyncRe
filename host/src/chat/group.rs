@@ -127,11 +127,20 @@ pub fn with_members(store: &Store, members: &[String]) -> Result<Option<String>>
 
 /// The user wrote in a group lane: start a room turn there (ending one still running).
 pub fn start(hub: &Arc<Hub>, group: &BotConfig, lane: Lane) {
+    start_with(hub, group, lane, None);
+}
+
+/// [`start`], reporting whether the turn ran to the end: a group routine waits for it.
+pub fn start_with(hub: &Arc<Hub>, group: &BotConfig, lane: Lane, done: Option<oneshot::Sender<bool>>) {
     let epoch = hub.groups.next(&lane);
     let (hub, group_id) = (hub.clone(), group.id.clone());
     tokio::spawn(async move {
-        if let Err(error) = run(&hub, &group_id, &lane, epoch).await {
+        let outcome = run(&hub, &group_id, &lane, epoch).await;
+        if let Err(error) = &outcome {
             tracing::warn!(group = group_id, error = format!("{error:#}"), "room turn failed");
+        }
+        if let Some(done) = done {
+            let _ = done.send(outcome.is_ok());
         }
     });
 }

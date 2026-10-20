@@ -43,6 +43,16 @@ impl EntryKind {
     }
 }
 
+/// What one member may use inside a group. Both off until the group switches them on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberSettings {
+    #[serde(default)]
+    pub browser: bool,
+    #[serde(default)]
+    pub computer: bool,
+}
+
 /// A roster row is an agent bot or a group chat of bots (wire values `agent` / `group`).
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -72,6 +82,10 @@ pub struct BotConfig {
     /// A group's shared folder. Empty = every member keeps its own workspace.
     #[serde(default)]
     pub workspace: String,
+    /// What each member may use inside this room (browser, computer control). The
+    /// bot's own chats keep the bot's own settings; these only gate room turns.
+    #[serde(default)]
+    pub member_settings: BTreeMap<String, MemberSettings>,
     pub name: String,
     #[serde(default)]
     pub description: String,
@@ -134,6 +148,17 @@ pub struct BotConfig {
     pub auto_name: bool,
     #[serde(default)]
     pub created_at: i64,
+}
+
+#[cfg(test)]
+mod member_tests {
+    use super::MemberSettings;
+
+    #[test]
+    fn group_member_tools_start_off() {
+        let settings: MemberSettings = serde_json::from_value(serde_json::json!({})).expect("defaults");
+        assert!(!settings.browser && !settings.computer, "a new room member gets no browser or computer");
+    }
 }
 
 impl BotConfig {

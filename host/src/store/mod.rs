@@ -12,7 +12,7 @@ mod model;
 mod schema;
 
 pub use devices::{Device, DeviceSource, Scope};
-pub use model::{BotConfig, BotKind, BotRow, Entry, EntryKind, Lane, Permission, ReadScope, lane_key};
+pub use model::{BotConfig, BotKind, BotRow, Entry, EntryKind, Lane, MemberSettings, Permission, ReadScope, lane_key};
 
 use crate::LockExt;
 use anyhow::Result;
@@ -192,6 +192,7 @@ mod tests {
             leader: String::new(),
             instructions: String::new(),
             workspace: String::new(),
+            member_settings: std::collections::BTreeMap::new(),
             name: name.into(),
             description: String::new(),
             avatar_color: "blue".into(),

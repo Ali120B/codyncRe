@@ -217,6 +217,21 @@ textarea.field-box {
   color: var(--secondary);
   padding-bottom: 4px;
 }
+.member-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.member-tools .switch {
+  gap: 5px;
+}
+
+.member-tools .switch-label {
+  display: flex;
+}
+
 .member-row {
   display: flex;
   align-items: center;

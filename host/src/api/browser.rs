@@ -21,15 +21,17 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
                 Ok(name) => (Some(name), None),
                 Err(e) => (None, Some(e.to_string())),
             };
+            // A bot can browse in a room whose group switch is on even when its own is off.
+            let enabled = row.config.browser || hub.store.room_tools(bot)?.0;
             let mut state = json!({
-                "enabled": row.config.browser,
+                "enabled": enabled,
                 "engine": engine,
                 "engineError": engine_error,
                 "running": false,
                 "tabs": [],
                 "activeTab": null,
             });
-            if row.config.browser
+            if enabled
                 && engine.is_some()
                 && let Some(session) = hub.browser.running(bot)
             {
