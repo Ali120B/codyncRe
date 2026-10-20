@@ -20,6 +20,109 @@ textarea.routine-input {
   max-height: calc(8lh + 24px);
 }
 
+/* The schedule editor: a real time control instead of a cron string for the time. */
+.routine-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.routine-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.routine-time-select {
+  height: 38px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--bubble-user);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  color-scheme: light dark;
+}
+
+.routine-time-select:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.routine-time-wide {
+  width: 100%;
+}
+
+.routine-time-colon {
+  color: var(--secondary);
+  font-weight: 600;
+}
+
+.routine-meridiem {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--bubble-user);
+}
+
+.routine-meridiem button {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: calc(12px * var(--scale));
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.routine-meridiem button[aria-pressed='true'] {
+  background: var(--bubble-agent);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.routine-days {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.routine-day {
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: calc(12px * var(--scale));
+  font-weight: 500;
+  color: var(--secondary);
+  background: var(--bubble-user);
+}
+
+.routine-day[aria-pressed='true'] {
+  background: var(--bubble-agent);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.routine-date {
+  color-scheme: light dark;
+}
+
+.routine-interval {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.routine-interval .routine-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.routine-interval .routine-time-select {
+  flex: none;
+}
+
 .routine-form {
   border: none;
   margin: 0;

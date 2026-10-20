@@ -6,6 +6,7 @@ import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
 import { emptyDraft, errorText, sameDraft, type Routine, type RoutineScheduleDraft, type RoutineSchedulePreview } from './routine'
 import { Field, RoutineWebhookPanel } from './RoutineWebhookPanel'
+import { REPEATS, TIME_ZONES, TimeField, WEEKDAYS, dateValue, pad } from './RoutineTimeField'
 import './routines.css'
 
 const caption = { ...font('caption'), paddingLeft: 4, lineHeight: 1.4 } as const
@@ -33,11 +34,17 @@ export function RoutineEditorView({ botId, routine, saved }: {
   const latest = useRef(schedule)
   latest.current = schedule
 
-  // Anything the bot set up (a one-off time, an interval, events, several triggers) stays as it is until replaced.
-  const keepsOriginal = routine ? (routine.triggers.length === 1 ? !['cron', 'webhook'].includes(routine.triggers[0]!.type) : routine.triggers.length > 0) : false
+  // Events and several triggers stay as they are until replaced; times and repeats are editable.
+  const keepsOriginal = routine
+    ? routine.triggers.length === 1
+      ? !['cron', 'webhook', 'once', 'interval'].includes(routine.triggers[0]!.type)
+      : routine.triggers.length > 0
+    : false
   const options = [
     ...(routine && keepsOriginal ? [{ id: 'keep', label: routine.triggerDescriptions.join(' · ') }] : []),
     { id: 'cron', label: 'Schedule' },
+    { id: 'once', label: 'Once' },
+    { id: 'interval', label: 'Repeat' },
     { id: 'webhook', label: 'Webhook' },
   ]
   const canSave = !!name.trim() && !!instruction.trim() && !store.isOffline && !busy && loaded && sameDraft(checkedSchedule, schedule) && previewError === null
@@ -49,8 +56,9 @@ export function RoutineEditorView({ botId, routine, saved }: {
         triggers: routine?.triggers ?? [],
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       })
-      const draft = { ...result.draft, calendarStyle: 'custom' }
-      if (!['cron', 'webhook'].includes(draft.kind)) draft.kind = 'keep'
+      // The host recognises daily/weekly/monthly cron too; keep that friendly style.
+      const draft = result.draft
+      if (!['cron', 'interval', 'once', 'webhook'].includes(draft.kind)) draft.kind = 'keep'
       setSchedule(draft)
       setPreview(result)
       setCheckedSchedule(result.draft)
@@ -129,46 +137,195 @@ export function RoutineEditorView({ botId, routine, saved }: {
   const update = (change: Partial<RoutineScheduleDraft>) => setSchedule((s) => ({ ...s, ...change }))
   const shownPreview = sameDraft(checkedSchedule, schedule) ? preview : null
 
+  const previewBlock = () => (
+    <div style={{ paddingLeft: 4 }}>
+      {previewError ? (
+        <span style={{ ...font('caption'), color: 'var(--danger)', lineHeight: 1.4 }}>{previewError}</span>
+      ) : shownPreview ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={font('caption', 'medium')}>{shownPreview.summary}</span>
+          {shownPreview.nextRunAt ? (
+            <span style={{ ...font('caption'), color: 'var(--secondary)' }}>
+              Next {new Date(shownPreview.nextRunAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+            </span>
+          ) : null}
+          {shownPreview.warning ? <span style={{ ...font('caption'), color: 'var(--secondary)' }}>{shownPreview.warning}</span> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+
+  const cronFields = () => {
+    const style = schedule.calendarStyle
+    const withTime = ['daily', 'weekdays', 'weekly', 'monthly', 'days'].includes(style)
+    return (
+      <div className="routine-schedule">
+        <Field label="Repeat">
+          <ChoicePicker selection={style} options={REPEATS} onChange={(id) => update({ calendarStyle: id })} fits />
+        </Field>
+        {style === 'minutes' ? (
+          <Field label="Every">
+            <select className="routine-time-select routine-time-wide" value={schedule.minuteStep} onChange={(e) => update({ minuteStep: Number(e.target.value) })}>
+              {[1, 5, 10, 15, 20, 30].map((n) => (
+                <option key={n} value={n}>{n} minutes</option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        {style === 'hourly' ? (
+          <Field label="At minute">
+            <select className="routine-time-select routine-time-wide" value={schedule.minute} onChange={(e) => update({ minute: Number(e.target.value) })}>
+              {Array.from({ length: 60 }, (_, i) => i).map((m) => (
+                <option key={m} value={m}>:{pad(m)}</option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        {withTime ? (
+          <Field label="Time">
+            <TimeField hour={schedule.hour} minute={schedule.minute} onChange={(hour, minute) => update({ hour, minute })} />
+          </Field>
+        ) : null}
+        {style === 'weekly' ? (
+          <Field label="Day">
+            <select className="routine-time-select routine-time-wide" value={schedule.weekday} onChange={(e) => update({ weekday: Number(e.target.value) })}>
+              {WEEKDAYS.map((label, value) => (
+                <option key={label} value={value}>{label}</option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        {style === 'monthly' ? (
+          <Field label="Day of month">
+            <select className="routine-time-select routine-time-wide" value={schedule.monthDay} onChange={(e) => update({ monthDay: Number(e.target.value) })}>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                <option key={day} value={day}>{day}</option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        {style === 'days' ? (
+          <Field label="Days">
+            <div className="routine-days">
+              {WEEKDAYS.map((label, day) => {
+                const on = schedule.selectedDays.includes(day)
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    className="routine-day"
+                    aria-pressed={on}
+                    onClick={() =>
+                      update({ selectedDays: on ? schedule.selectedDays.filter((d) => d !== day) : [...schedule.selectedDays, day].sort() })
+                    }
+                  >
+                    {label.slice(0, 3)}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+        ) : null}
+        {style === 'custom' ? (
+          <Field label="Cron">
+            <input
+              className="routine-input"
+              style={font('body', undefined, 'monospaced')}
+              value={schedule.expression}
+              placeholder="0 9 * * 1-5"
+              spellCheck={false}
+              autoCorrect="off"
+              onChange={(e) => update({ expression: e.target.value })}
+            />
+          </Field>
+        ) : null}
+        <Field label="Time zone">
+          <input
+            className="routine-input"
+            list="routine-time-zones"
+            value={schedule.zone}
+            placeholder="Asia/Taipei"
+            spellCheck={false}
+            autoCorrect="off"
+            onChange={(e) => update({ zone: e.target.value })}
+          />
+          <datalist id="routine-time-zones">
+            {TIME_ZONES.map((zone) => (
+              <option key={zone} value={zone} />
+            ))}
+          </datalist>
+        </Field>
+        {previewBlock()}
+      </div>
+    )
+  }
+
+  const onceFields = () => {
+    const at = schedule.at || Date.now() + 3_600_000
+    const date = new Date(at)
+    return (
+      <div className="routine-schedule">
+        <Field label="Date">
+          <input
+            className="routine-input routine-date"
+            type="date"
+            value={dateValue(at)}
+            onChange={(e) => {
+              const [year, month, day] = e.target.value.split('-').map(Number)
+              if (!year || !month || !day) return
+              const next = new Date(schedule.at || Date.now())
+              next.setFullYear(year, month - 1, day)
+              update({ at: next.getTime() })
+            }}
+          />
+        </Field>
+        <Field label="Time">
+          <TimeField
+            hour={date.getHours()}
+            minute={date.getMinutes()}
+            onChange={(hour, minute) => {
+              const next = new Date(schedule.at || Date.now())
+              next.setHours(hour, minute, 0, 0)
+              update({ at: next.getTime() })
+            }}
+          />
+        </Field>
+        {previewBlock()}
+      </div>
+    )
+  }
+
+  const intervalFields = () => (
+    <div className="routine-schedule">
+      <Field label="Every">
+        <div className="routine-interval">
+          <input
+            className="routine-input"
+            inputMode="numeric"
+            value={schedule.amount}
+            aria-label="Interval amount"
+            onChange={(e) => update({ amount: e.target.value.replace(/[^0-9]/g, '') })}
+          />
+          <select className="routine-time-select" value={schedule.unit} onChange={(e) => update({ unit: Number(e.target.value) })} aria-label="Interval unit">
+            <option value={1}>seconds</option>
+            <option value={60}>minutes</option>
+            <option value={3600}>hours</option>
+            <option value={86400}>days</option>
+          </select>
+        </div>
+      </Field>
+      {previewBlock()}
+    </div>
+  )
+
   const triggerFields = () => {
     switch (schedule.kind) {
       case 'cron':
-        return (
-          <div className="routine-cron" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div className="routine-cron-fields">
-              <Field label="Cron">
-                <input
-                  className="routine-input"
-                  style={font('body', undefined, 'monospaced')}
-                  value={schedule.expression}
-                  placeholder="0 9 * * 1-5"
-                  spellCheck={false}
-                  autoCorrect="off"
-                  onChange={(e) => update({ expression: e.target.value })}
-                />
-              </Field>
-              <Field label="Time zone">
-                <input className="routine-input" value={schedule.zone} placeholder="Asia/Taipei" spellCheck={false} autoCorrect="off" onChange={(e) => update({ zone: e.target.value })} />
-              </Field>
-            </div>
-            <div style={{ paddingLeft: 4 }}>
-              {previewError ? (
-                <span style={{ ...font('caption'), color: 'var(--danger)', lineHeight: 1.4 }}>{previewError}</span>
-              ) : shownPreview ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span style={font('caption', 'medium')}>{shownPreview.summary}</span>
-                  {shownPreview.nextRunAt ? (
-                    <span style={{ ...font('caption'), color: 'var(--secondary)' }}>
-                      Next {new Date(shownPreview.nextRunAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                    </span>
-                  ) : null}
-                  {shownPreview.warning ? <span style={{ ...font('caption'), color: 'var(--secondary)' }}>{shownPreview.warning}</span> : null}
-                </div>
-              ) : (
-                <span style={{ ...font('caption', undefined, 'monospaced'), color: 'var(--tertiary)', whiteSpace: 'pre' }}>minute  hour  day  month  weekday</span>
-              )}
-            </div>
-          </div>
-        )
+        return cronFields()
+      case 'once':
+        return onceFields()
+      case 'interval':
+        return intervalFields()
       case 'webhook':
         return routine && routine.triggers.some((t) => t.type === 'webhook' || t.type === 'event') ? (
           <RoutineWebhookPanel botId={botId} routineId={routine.id} />
@@ -176,7 +333,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
           <span style={{ ...caption, color: 'var(--secondary)' }}>Runs each time something is posted to its URL. Save to get the URL and key.</span>
         )
       default:
-        return <span style={{ ...caption, color: 'var(--secondary)' }}>Set up by the bot. Pick Schedule or Webhook to replace it.</span>
+        return <span style={{ ...caption, color: 'var(--secondary)' }}>Set up by the bot. Pick a schedule, Once, Repeat or Webhook to replace it.</span>
     }
   }
 
@@ -196,7 +353,12 @@ export function RoutineEditorView({ botId, routine, saved }: {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Field label="When to run">
-              <ChoicePicker selection={schedule.kind} options={options} onChange={(kind) => update({ kind })} fits />
+              <ChoicePicker
+                selection={schedule.kind}
+                options={options}
+                onChange={(kind) => update(kind === 'once' && !schedule.at ? { kind, at: Date.now() + 3_600_000 } : { kind })}
+                fits
+              />
             </Field>
             {loaded ? (
               triggerFields()
@@ -244,7 +406,9 @@ export function RoutineEditorView({ botId, routine, saved }: {
             Retry loading schedule
           </button>
         ) : null}
-        {schedule.kind !== 'cron' && previewError ? <span style={{ ...font('caption'), color: 'var(--danger)' }}>{previewError}</span> : null}
+        {!['cron', 'once', 'interval'].includes(schedule.kind) && previewError ? (
+          <span style={{ ...font('caption'), color: 'var(--danger)' }}>{previewError}</span>
+        ) : null}
         {error ? (
           <span style={{ display: 'flex', gap: 6, alignItems: 'flex-start', ...font('callout'), color: 'var(--danger)', userSelect: 'text' }}>
             <Icon name="exclamationmark.circle" size={12} style={{ marginTop: 1 }} />
