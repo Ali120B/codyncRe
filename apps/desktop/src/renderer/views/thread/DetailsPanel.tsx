@@ -123,7 +123,8 @@ function GroupDetails({ group, onSettings }: { group: Bot; onSettings: () => voi
   const members = store.members(group)
   const full = group.members.length >= 50
   const q = query.trim().toLowerCase()
-  const candidates = store.roster.filter((b) => !isGroup(b) && !group.members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
+  // Hidden bots can still join a room: the roster alone would hide them from this list.
+  const candidates = [...store.bots.values()].filter((b) => !isGroup(b) && !group.members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
   const add = (id: string) => {
     if (full) return
     void store.updateGroup({
@@ -178,8 +179,13 @@ function GroupDetails({ group, onSettings }: { group: Bot; onSettings: () => voi
               <Icon name="plus.circle" size={18} color="var(--secondary)" />
             </button>
           ))}
+          {candidates.length === 0 ? (
+            <span style={{ ...font('caption'), color: 'var(--tertiary)', padding: '4px 0' }}>
+              {q ? `No bots match “${query}”.` : 'Every bot is already in this group.'}
+            </span>
+          ) : null}
         </>
-      ) : candidates.length && !full ? (
+      ) : !full ? (
         <button className="member-row press" onClick={() => setAdding(true)}>
           <span style={{ width: 32, display: 'grid', placeItems: 'center' }}>
             <Icon name="plus" size={16} color="var(--secondary)" />

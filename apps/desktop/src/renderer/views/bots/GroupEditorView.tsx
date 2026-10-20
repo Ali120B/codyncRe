@@ -59,7 +59,8 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
     setTools((all) => ({ ...all, [id]: { ...(all[id] ?? { browser: false, computer: false }), [key]: on } }))
   // Bots that can still join, filtered by the search.
   const q = query.trim().toLowerCase()
-  const candidates = store.roster.filter((b) => !isGroup(b) && !members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
+  // Include hidden bots: they can join a room even though the roster hides them.
+  const candidates = [...store.bots.values()].filter((b) => !isGroup(b) && !members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
   const roomFull = members.length >= 50
   const canSave = members.length >= 2 && (!sharedFolder || shared.trim() !== '') && !saving
   // "Alice, Bob" when no name is typed.
@@ -169,7 +170,12 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
                   <Icon name="plus.circle" size={18} color="var(--secondary)" />
                 </button>
               )),
-            ] : candidates.length && !roomFull ? (
+              candidates.length === 0 ? (
+                <span key="none" style={{ ...font('caption'), color: 'var(--tertiary)', padding: '4px 0' }}>
+                  {q ? `No bots match “${query}”.` : 'Every bot is already in this group.'}
+                </span>
+              ) : null,
+            ] : !roomFull ? (
               <button className="member-row press" onClick={() => setAdding(true)}>
                 <span style={{ width: 32, display: 'grid', placeItems: 'center' }}>
                   <Icon name="plus" size={16} color="var(--secondary)" />
