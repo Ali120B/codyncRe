@@ -33,7 +33,7 @@ export function FolderPicker({ start, onPick }: { start: string | null; onPick: 
           <ModalHeader title={current ? lastPathComponent(current) : 'Folders'} />
         </div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <FolderLevel
           key={stack.length}
           path={current}

@@ -295,6 +295,11 @@ impl Hub {
             let mut group = row.config;
             if !row.deleted && group.is_group() && group.members.iter().any(|m| m == id) {
                 group.members.retain(|m| m != id);
+                if group.members.len() < 2 {
+                    // A room that lost its second-to-last bot is no longer a group.
+                    self.delete_bot(&group.id)?;
+                    continue;
+                }
                 {
                     let _g = self.emit_lock.locked();
                     self.store.save_bot(&group)?;

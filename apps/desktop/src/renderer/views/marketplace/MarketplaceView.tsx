@@ -53,6 +53,7 @@ export function MarketplaceView({ computers, computer, onComputer }: { computers
   const [addingConnector, setAddingConnector] = useState(false)
   const [writingSkill, setWritingSkill] = useState(false)
   const [viewingSkill, setViewingSkill] = useState<SkillRef | null>(null)
+  const [skillsExpanded, setSkillsExpanded] = useState(false)
   const [showInstalled, setShowInstalled] = useState(false)
   const [showCredentials, setShowCredentials] = useState(false)
   const [showMcp, setShowMcp] = useState(false)
@@ -131,6 +132,7 @@ export function MarketplaceView({ computers, computer, onComputer }: { computers
 
   const submit = (q: string) => {
     setSearchToken((t) => t + 1)
+    setSkillsExpanded(false)
     void loadConnectors(q)
   }
 
@@ -146,7 +148,7 @@ export function MarketplaceView({ computers, computer, onComputer }: { computers
 
   const all = kind === 'all'
   const connectorRows = all ? visible(connectors).slice(0, SECTION_ROWS) : visible(connectors)
-  const skillRows = all ? shownSkills.slice(0, SECTION_ROWS) : shownSkills
+  const skillRows = all && !skillsExpanded ? shownSkills.slice(0, SECTION_ROWS * 2) : shownSkills
 
   const header = (
     <div className="market-heading">
@@ -265,6 +267,13 @@ export function MarketplaceView({ computers, computer, onComputer }: { computers
                       />
                     ))}
                   </ItemGrid>
+                  {all && (hasHiddenItems(connectors) || connectorCursor || visible(connectors).length > connectorRows.length)
+                    ? centered(
+                        <Button kind="secondary" disabled={loadingMore} onClick={() => void loadMoreConnectors()}>
+                          {loadingMore ? 'Loading…' : 'Show more connectors'}
+                        </Button>,
+                      )
+                    : null}
                   {!all && (hasHiddenItems(connectors) || connectorCursor)
                     ? centered(
                         <Button kind="secondary" disabled={loadingMore} onClick={() => void loadMoreConnectors()}>
@@ -299,6 +308,9 @@ export function MarketplaceView({ computers, computer, onComputer }: { computers
                   ))}
                 </ItemGrid>
               )}
+              {all && !skillsExpanded && shownSkills.length > skillRows.length ? (
+                centered(<Button kind="secondary" onClick={() => setSkillsExpanded(true)}>Show more skills</Button>)
+              ) : null}
             </MarketSection>
           ) : null}
           <div style={{ display: 'flex' }}>

@@ -30,8 +30,11 @@
 
 .computer-tabs {
   display: flex;
-  gap: 4px;
-  padding: 0 12px 10px;
+  gap: 2px;
+  margin: 0 12px 10px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--surface);
   flex: none;
   overflow-x: auto;
   scrollbar-width: none;
@@ -44,14 +47,15 @@
 .computer-tab {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 10px;
+  gap: 5px;
+  height: auto;
+  padding: 5px 9px;
   flex: none;
-  border-radius: 8px;
-  font-size: 12.5px;
+  border-radius: 9px;
+  font-size: calc(12px * var(--scale));
   font-weight: 500;
   color: var(--secondary);
+  white-space: nowrap;
   transition: background var(--hover), color var(--hover);
 }
 
@@ -60,13 +64,23 @@
 }
 
 .computer-tab.active {
-  background: var(--roster-selected);
+  background: var(--bubble-agent);
   color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .computer-body {
   flex: 1;
   min-height: 0;
+  padding: 0 12px 12px;
+  overflow: hidden;
+}
+
+/* The panel reads like a bot's Details: one grey surface holds the tab's content. */
+.computer-card {
+  height: 100%;
+  border-radius: 16px;
+  background: var(--surface);
   overflow-y: auto;
 }
 

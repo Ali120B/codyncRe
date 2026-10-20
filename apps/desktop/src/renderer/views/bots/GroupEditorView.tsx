@@ -17,7 +17,7 @@ import './bots.css'
  * notifications) and the rules everyone follows. Used full-screen from New chat, and
  * in the details panel when a group's settings are opened.
  */
-export function GroupEditorView({ group, members: initialMembers = [], onCancel, onDone }: {
+export function GroupEditorView({ group, members: initialMembers = [], onCancel, onDone, onSaved }: {
   group: Bot | null
   /** Members picked before the editor opened (creating from New chat). */
   members?: string[]
@@ -25,6 +25,8 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
   onCancel?: () => void
   /** Handed the created group instead of dismissing (creating flow). */
   onDone?: (group: Bot) => void
+  /** Saved changes to an existing group (the details panel returns to the summary). */
+  onSaved?: () => void
 }) {
   const store = useStore()
   const dismiss = useDismiss()
@@ -49,6 +51,7 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Bot | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<Bot | null>(null)
 
   const picked = members.map((id) => store.bots.get(id)).filter((b): b is Bot => !!b)
   const toolOf = (id: string) => tools[id] ?? { browser: false, computer: false }
@@ -57,12 +60,17 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
   // Bots that can still join, filtered by the search.
   const q = query.trim().toLowerCase()
   const candidates = store.roster.filter((b) => !isGroup(b) && !members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
-  const canSave = members.length > 0 && (!sharedFolder || shared.trim() !== '') && !saving
+  const roomFull = members.length >= 50
+  const canSave = members.length >= 2 && (!sharedFolder || shared.trim() !== '') && !saving
   // "Alice, Bob" when no name is typed.
   const defaultName = picked.length ? picked.map((b) => b.name).join(', ') : 'Name'
   const current = groupId ? store.bots.get(groupId) : undefined
 
   const toggle = (id: string) => {
+    if (!members.includes(id) && roomFull) {
+      setError('A group can have at most 50 bots.')
+      return
+    }
     setMembers((list) => {
       const next = list.includes(id) ? list.filter((m) => m !== id) : [...list, id]
       if (!next.includes(leader)) setLeader('')
@@ -90,7 +98,8 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
       try {
         if (groupId) {
           await store.updateGroup({ id: groupId, kind: 'group', name: finalName, description: about.trim(), members, ...extra })
-          dismiss()
+          if (onSaved) onSaved()
+          else dismiss()
         } else {
           const created = await store.createGroup(finalName, about.trim(), members, extra)
           if (onDone) onDone(created)
@@ -138,7 +147,11 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
                     </Switch>
                   </span>
                 </span>
-                <IconButton title={`Remove ${bot.name}`} icon="xmark" onClick={() => toggle(bot.id)} />
+                <IconButton
+                  title={`Remove ${bot.name}`}
+                  icon="xmark"
+                  onClick={() => (groupId && members.length <= 2 ? setRemoveTarget(bot) : toggle(bot.id))}
+                />
               </div>
             ))}
             {adding ? [
@@ -161,7 +174,7 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
                   <Icon name="plus.circle" size={18} color="var(--secondary)" />
                 </button>
               )),
-            ] : candidates.length ? (
+            ] : candidates.length && !roomFull ? (
               <button className="member-row press" onClick={() => setAdding(true)}>
                 <span style={{ width: 32, display: 'grid', placeItems: 'center' }}>
                   <Icon name="plus" size={16} color="var(--secondary)" />
@@ -170,8 +183,8 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
               </button>
             ) : null}
           </CardSection>
-          <span style={{ ...font('caption'), color: 'var(--tertiary)' }}>
-            Everyone answers in turn unless you @mention someone. The globe and display switches give a member its browser and PC control in this room only — both start off and never change the bot's own settings.
+          <span style={{ ...font('caption'), color: roomFull ? 'var(--warning)' : 'var(--tertiary)' }}>
+            {roomFull ? '50 bots is the limit for one group. ' : ''}A group needs at least 2 bots and can have up to 50. Everyone answers in turn unless you @mention someone. The globe and display switches give a member its browser and PC control in this room only — both start off and never change the bot's own settings.
           </span>
 
           <CardSection title="Room">
@@ -227,6 +240,23 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
         </div>
       </div>
       <DeleteBotDialog bot={confirmDelete} onClose={() => setConfirmDelete(null)} onDeleted={dismiss} />
+      <Dialog
+        open={removeTarget !== null}
+        title="Delete this group?"
+        message={`${removeTarget?.name ?? 'That bot'} can't leave — a group needs at least 2 bots. Delete the group instead?`}
+        actions={[
+          {
+            title: 'Delete group',
+            destructive: true,
+            action: () => {
+              if (current) store.delete(current)
+              if (onSaved) onSaved()
+              else dismiss()
+            },
+          },
+        ]}
+        onClose={() => setRemoveTarget(null)}
+      />
     </div>
   )
 }

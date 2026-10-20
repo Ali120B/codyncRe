@@ -341,6 +341,8 @@ export class BotStore extends BotSync {
 
   /** Takes one bot out of a group; an automatic "Alice, Bob" name follows the new roster. */
   removeMember(group: Bot, memberId: string) {
+    // A group needs two bots: the UI asks to delete the group instead.
+    if (group.members.length <= 2) return
     const members = group.members.filter((m) => m !== memberId)
     const autoName = (ids: string[]) => ids.map((id) => this.bots.get(id)?.name).join(', ')
     const name = group.name === autoName(group.members) ? autoName(members) : group.name

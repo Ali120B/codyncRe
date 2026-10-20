@@ -8,7 +8,7 @@ import {
   appConnected, emptyPage, errorText, hasHiddenItems, market, replacePage, revealMore, sleep, visible,
   type ComposioApp, type ComposioConnect, type ComposioStatus,
 } from './market-models'
-import { AppLogo, ErrorText, Field, FormSheet, ItemGrid, MarketLink, MarketRow, MarketSection, SkeletonGrid, TileIcon, WebLink, filled, lineClamp } from './pieces'
+import { AppLogo, ErrorText, Field, FormSheet, ItemGrid, MarketLink, MarketRow, MarketSection, ServiceLogo, SkeletonGrid, TileIcon, WebLink, filled, lineClamp } from './pieces'
 import { pluginsFor } from './plugins'
 
 // Apps through Composio (host/src/market/composio.rs): set up a key once, connect
@@ -16,6 +16,18 @@ import { pluginsFor } from './plugins'
 // other connector.
 
 export { AppLogo }
+
+/** The apps people look for first: shown before Composio is set up, so the section isn't one card. */
+const POPULAR_APPS = [
+  ['Gmail', 'https://mail.google.com'],
+  ['Google Calendar', 'https://calendar.google.com'],
+  ['Slack', 'https://slack.com'],
+  ['Notion', 'https://notion.so'],
+  ['GitHub', 'https://github.com'],
+  ['Google Drive', 'https://drive.google.com'],
+  ['Discord', 'https://discord.com'],
+  ['Telegram', 'https://telegram.org'],
+] as const
 
 /** The Marketplace's "Apps" section. With a `limit`, shows that many and a "View all" link. */
 export function ComposioSection({ query, searchToken, limit, onViewAll }: {
@@ -32,6 +44,7 @@ export function ComposioSection({ query, searchToken, limit, onViewAll }: {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [settingUp, setSettingUp] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [connecting, setConnecting] = useState<ComposioApp | null>(null)
   const request = useRef(0)
   const queryRef = useRef(query)
@@ -58,13 +71,14 @@ export function ComposioSection({ query, searchToken, limit, onViewAll }: {
   }
 
   useEffect(() => {
+    setExpanded(false)
     void load()
     return () => void request.current++
   }, [searchToken])
 
   const configured = status?.configured === true
   const shown = visible(apps)
-  const rows = limit ? shown.slice(0, limit) : shown
+  const rows = limit && !expanded ? shown.slice(0, limit) : shown
   return (
     <MarketSection
       title="Apps"
@@ -72,17 +86,32 @@ export function ComposioSection({ query, searchToken, limit, onViewAll }: {
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {!configured ? (
-          <ItemGrid>
-            <MarketRow
-              title="Composio"
-              subtitle="Gmail, Slack, GitHub, Notion and 1,000 more apps"
-              added={false}
-              busy={status === null && loading}
-              addLabel="Set up"
-              icon={<TileIcon name="square.grid.3x3" />}
-              onAdd={() => setSettingUp(true)}
-            />
-          </ItemGrid>
+          <>
+            <ItemGrid>
+              <MarketRow
+                title="Composio"
+                subtitle="Connect Gmail, Slack, GitHub, Notion and 1,000 more apps"
+                added={false}
+                busy={status === null && loading}
+                addLabel="Set up"
+                icon={<TileIcon name="square.grid.3x3" />}
+                onAdd={() => setSettingUp(true)}
+              />
+            </ItemGrid>
+            <ItemGrid>
+              {POPULAR_APPS.map(([name, website]) => (
+                <MarketRow
+                  key={name}
+                  title={name}
+                  subtitle="Through Composio"
+                  added={false}
+                  addLabel="Set up"
+                  icon={<ServiceLogo website={website} name={name} size={36} />}
+                  onAdd={() => setSettingUp(true)}
+                />
+              ))}
+            </ItemGrid>
+          </>
         ) : loading ? (
           <SkeletonGrid />
         ) : apps.items.length === 0 ? (
@@ -102,7 +131,12 @@ export function ComposioSection({ query, searchToken, limit, onViewAll }: {
             ))}
           </ItemGrid>
         )}
-        {!loading && !limit && hasHiddenItems(apps) && configured ? (
+        {!loading && limit && !expanded && shown.length > rows.length ? (
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <Button kind="secondary" onClick={() => setExpanded(true)}>Show more apps</Button>
+          </div>
+        ) : null}
+        {!loading && (!limit || expanded) && hasHiddenItems(apps) && configured ? (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <Button kind="secondary" onClick={() => setApps(revealMore)}>Load more apps</Button>
           </div>

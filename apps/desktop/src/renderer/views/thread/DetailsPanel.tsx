@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { folderName, isGroup, isWorking, type Bot } from '@shared/models'
 import { AgentIcon } from '../../components/AgentIcon'
-import { BotAvatar, useWake } from '../../components/Avatar'
+import { BotAvatar, GroupAvatar, useWake } from '../../components/Avatar'
 import { CardSection, IconButton } from '../../components/Controls'
+import { Dialog } from '../../components/Overlay'
 import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
@@ -49,8 +50,9 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, share, ope
   } else if (bot && isGroup(bot)) {
     header = (
       <>
-        <PanelTitle>Members</PanelTitle>
-        <span style={{ ...font(13), color: 'var(--tertiary)', flex: 1 }}>{bot.members.length}</span>
+        <PanelTitle>Details</PanelTitle>
+        <span style={{ flex: 1 }} />
+        <RoundButton label="All group settings" symbol="gearshape" action={() => setEditing(true)} />
       </>
     )
   } else {
@@ -73,10 +75,10 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, share, ope
         {bot && isGroup(bot) ? (
           editing ? (
             <div className="panel-slide from-trailing" style={{ height: '100%', overflowY: 'auto' }}>
-              <GroupEditorView group={bot} />
+              <GroupEditorView group={bot} onSaved={() => setEditing(false)} />
             </div>
           ) : (
-            <GroupMembersList group={bot} />
+            <GroupDetails group={bot} onSettings={() => setEditing(true)} />
           )
         ) : editing ? (
           <div className="panel-slide from-trailing" style={{ height: '100%', overflowY: 'auto' }}>
@@ -110,16 +112,19 @@ function RoundButton({ label, symbol, action }: { label: string; symbol: string;
   return <MacChatButton title={label} icon={symbol} direction={symbol === 'chevron.right.2' ? [1, 0] : [0, 0]} onClick={action} />
 }
 
-/** A group's bots (Grok Bot's member list); clicking one opens its own chat. */
-function GroupMembersList({ group }: { group: Bot }) {
+/** The group at a glance, like a bot's Details: who's in it, its rules and all settings. */
+function GroupDetails({ group, onSettings }: { group: Bot; onSettings: () => void }) {
   const store = useStore()
   const [adding, setAdding] = useState(false)
   const [query, setQuery] = useState('')
+  const [removeTarget, setRemoveTarget] = useState<Bot | null>(null)
   const wake = useWake(1800)
   const members = store.members(group)
+  const full = group.members.length >= 50
   const q = query.trim().toLowerCase()
   const candidates = store.roster.filter((b) => !isGroup(b) && !group.members.includes(b.id) && (!q || b.name.toLowerCase().includes(q)))
   const add = (id: string) => {
+    if (full) return
     void store.updateGroup({
       kind: 'group',
       id: group.id,
@@ -129,15 +134,27 @@ function GroupMembersList({ group }: { group: Bot }) {
       leader: group.leader,
       instructions: group.instructions,
       workspace: group.workspace,
+      memberSettings: group.memberSettings,
       pinned: group.pinned,
     })
     setQuery('')
   }
+  const remove = (bot: Bot) => {
+    if (group.members.length <= 2) setRemoveTarget(bot)
+    else store.removeMember(group, bot.id)
+  }
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: '0 20px' }}>
-      {members.map((bot) => (
-        <MemberRow key={bot.id} bot={bot} group={group} wake={wake} />
-      ))}
+    <div className="bot-panel">
+      <div className="bot-panel-head group-details-head">
+        <GroupAvatar members={members} size={56} wake={wake} />
+        <span className="bot-panel-name">{group.name}</span>
+        {group.description.trim() ? <span className="group-details-about">{group.description}</span> : null}
+      </div>
+      <div className="bot-panel-body group-details-body">
+        <CardSection title="Members" accessory={<span style={{ ...font('caption'), color: 'var(--tertiary)' }}>{members.length}{full ? ' · 50 max' : ''}</span>}>
+          {members.map((bot) => (
+            <MemberRow key={bot.id} bot={bot} group={group} wake={wake} onRemove={() => remove(bot)} />
+          ))}
       {adding ? (
         <>
           <input
@@ -161,7 +178,7 @@ function GroupMembersList({ group }: { group: Bot }) {
             </button>
           ))}
         </>
-      ) : candidates.length ? (
+      ) : candidates.length && !full ? (
         <button className="member-row press" onClick={() => setAdding(true)}>
           <span style={{ width: 32, display: 'grid', placeItems: 'center' }}>
             <Icon name="plus" size={16} color="var(--secondary)" />
@@ -169,6 +186,31 @@ function GroupMembersList({ group }: { group: Bot }) {
           <span className="member-name" style={{ color: 'var(--secondary)' }}>Add bots</span>
         </button>
       ) : null}
+        </CardSection>
+        <CardSection title="Instructions">
+          <span className="group-details-instructions">{group.instructions.trim() || 'No room rules yet.'}</span>
+        </CardSection>
+        <CardSection>
+          <button className="group-settings-row press" onClick={onSettings}>
+            <Icon name="gearshape" size={14} color="var(--secondary)" />
+            <span style={{ flex: 1, textAlign: 'left' }}>All settings</span>
+            <Icon name="chevron.right" size={10} weight="semibold" color="var(--tertiary)" />
+          </button>
+        </CardSection>
+      </div>
+      <Dialog
+        open={removeTarget !== null}
+        title="Delete this group?"
+        message={`${removeTarget?.name ?? 'That bot'} can't leave — a group needs at least 2 bots. Delete the group instead?`}
+        actions={[
+          {
+            title: 'Delete group',
+            destructive: true,
+            action: () => store.delete(group),
+          },
+        ]}
+        onClose={() => setRemoveTarget(null)}
+      />
     </div>
   )
 }
@@ -236,7 +278,7 @@ function AgentSummary({ bot }: { bot: Bot }) {
 }
 
 /** One member of a room: opening it swaps to that bot's own chat; hovering wakes its face. */
-function MemberRow({ bot, group, wake }: { bot: Bot; group: Bot; wake: boolean }) {
+function MemberRow({ bot, group, wake, onRemove }: { bot: Bot; group: Bot; wake: boolean; onRemove: () => void }) {
   const store = useStore()
   const [hover, setHover] = useState(false)
   return (
@@ -253,7 +295,7 @@ function MemberRow({ bot, group, wake }: { bot: Bot; group: Bot; wake: boolean }
           {isWorking(bot) ? <span className="member-name" style={{ ...font('compactSecondary'), color: 'var(--secondary)' }}>{bot.activity || 'Working…'}</span> : null}
         </span>
       </button>
-      {group.members.length > 1 ? <IconButton title={`Remove ${bot.name} from the group`} icon="xmark" onClick={() => store.removeMember(group, bot.id)} /> : null}
+      <IconButton title={`Remove ${bot.name} from the group`} icon="xmark" onClick={onRemove} />
     </div>
   )
 }

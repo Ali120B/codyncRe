@@ -105,6 +105,7 @@ export function ComputerPanel({ bot, store, width, onWidth, settings, close }: {
         <MemberPicker members={members} value={member.id} onChange={setMemberId} />
       ) : null}
       <div className="computer-body">
+        <div className="computer-card">
         {group ? (
           <>
             {tab === 'browser' && member ? (
@@ -132,6 +133,7 @@ export function ComputerPanel({ bot, store, width, onWidth, settings, close }: {
             {tab === 'cloud' ? <CloudTab store={store} /> : null}
           </>
         )}
+        </div>
       </div>
     </div>
   )

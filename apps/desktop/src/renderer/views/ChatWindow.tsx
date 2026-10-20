@@ -174,6 +174,7 @@ function ChatSplitView() {
   const [railNewMenu, setRailNewMenu] = useState(false)
   const [contextBot, setContextBot] = useState<{ target: BotTarget; x: number; y: number } | null>(null)
   const [editing, setEditing] = useState<EditTarget | null>(null)
+  const [groupSettings, setGroupSettings] = useState<{ bot: Bot; store: BotStore } | null>(null)
   const [teamMap, setTeamMap] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<BotTarget | null>(null)
   const [newSessionBot, setNewSessionBot] = useState<BotTarget | null>(null)
@@ -284,7 +285,9 @@ function ChatSplitView() {
   const botActions = (bot: Bot, store: BotStore): MenuItem[] => [
     { title: bot.pinned ? 'Unpin' : 'Pin', icon: 'pin', action: () => store.setPinned(bot, !bot.pinned) },
     { title: 'Mark as Read', icon: 'bell.badge', action: () => store.markAllRead(bot.id) },
-    { title: 'Edit Profile…', icon: 'square.and.pencil', divider: true, action: () => app.openSettings({ computerId: store.computer.id, botId: bot.id }) },
+    ...(isGroup(bot)
+      ? [{ title: 'Group settings', icon: 'gearshape', divider: true, action: () => setGroupSettings({ bot, store }) } as MenuItem]
+      : [{ title: 'Edit Profile…', icon: 'square.and.pencil', divider: true, action: () => app.openSettings({ computerId: store.computer.id, botId: bot.id }) } as MenuItem]),
     { title: 'Copy conversation ID', icon: 'square.on.square', divider: true, action: () => window.codync.app.copy(bot.id) },
     ...(isGroup(bot) ? [] : [{ title: 'New session', icon: 'arrow.counterclockwise', action: () => setNewSessionBot({ bot, store }) } as MenuItem]),
     { title: 'Hide from sidebar', icon: 'eye.slash', divider: true, action: () => store.setHidden(bot, true) },
@@ -479,6 +482,17 @@ function ChatSplitView() {
       <Sheet open={teamMap} onClose={() => setTeamMap(false)} width={680} height={Math.min(640, window.innerHeight - 60)}>
         {selectedStore ? <TeamMapView store={selectedStore} close={() => setTeamMap(false)} /> : null}
       </Sheet>
+      <Sheet open={groupSettings !== null} onClose={() => setGroupSettings(null)} width={560} height={Math.min(760, sheetHeight)}>
+        {groupSettings ? (
+          <StoreContext.Provider value={groupSettings.store}>
+            <GroupEditorView
+              group={groupSettings.bot}
+              onCancel={() => setGroupSettings(null)}
+              onSaved={() => setGroupSettings(null)}
+            />
+          </StoreContext.Provider>
+        ) : null}
+      </Sheet>
       <Sheet open={editing !== null} onClose={() => setEditing(null)} width={520} height={Math.min(680, sheetHeight)}>
         {editing ? (
           <StoreContext.Provider value={editing.store}>
@@ -486,7 +500,7 @@ function ChatSplitView() {
           </StoreContext.Provider>
         ) : null}
       </Sheet>
-      <Sheet open={marketplace !== null} onClose={() => setMarketplace(null)} dismissOnDim width={Math.min(920, windowSize.width - 80)} height={sheetHeight}>
+      <Sheet open={marketplace !== null} onClose={() => setMarketplace(null)} dismissOnDim width={Math.min(920, windowSize.width - 80)} height={Math.min(820, sheetHeight)}>
         {marketplace && app.store(marketplace) ? (
           <StoreContext.Provider value={app.store(marketplace)!}>
             <MarketplaceView key={marketplace} computers={onlineStores.map((s) => ({ id: s.computer.id, name: s.hostName }))} computer={marketplace} onComputer={setMarketplace} />
@@ -506,8 +520,16 @@ function ChatSplitView() {
       <Dialog
         open={confirmDelete !== null}
         title={`Delete ${confirmDelete?.bot.name ?? 'bot'}?`}
-        message="Files it changed on your computer stay as they are."
-        actions={confirmDelete ? [{ title: 'Delete bot and its conversation', destructive: true, action: () => confirmDelete.store.delete(confirmDelete.bot) }] : []}
+        message={
+          confirmDelete && isGroup(confirmDelete.bot)
+            ? 'Its bots and their own chats stay.'
+            : `Files it changed on your computer stay as they are.${
+                confirmDelete && confirmDelete.store.roster.some((g) => isGroup(g) && g.members.length === 2 && g.members.includes(confirmDelete.bot.id))
+                  ? ' A group left with fewer than 2 bots is deleted too.'
+                  : ''
+              }`
+        }
+        actions={confirmDelete ? [{ title: confirmDelete && isGroup(confirmDelete.bot) ? 'Delete group chat' : 'Delete bot and its conversation', destructive: true, action: () => confirmDelete.store.delete(confirmDelete.bot) }] : []}
         onClose={() => setConfirmDelete(null)}
       />
       <Dialog open={errorMessage !== null} title="Something went wrong" message={errorMessage} actions={[]} cancel="OK" onClose={() => app.clearErrors()} />

@@ -108,8 +108,11 @@ pub fn valid_members(store: &Store, group_id: &str, ids: &[String]) -> Result<Ve
             _ => {}
         }
     }
-    if out.is_empty() {
-        bail!("a group needs at least one bot");
+    if out.len() < 2 {
+        bail!("a group needs at least 2 bots");
+    }
+    if out.len() > 50 {
+        bail!("a group can have at most 50 bots");
     }
     Ok(out)
 }
