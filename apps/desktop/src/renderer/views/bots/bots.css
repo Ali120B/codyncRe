@@ -351,3 +351,53 @@ button.member-row:hover {
   background: var(--accent-fill);
   color: var(--on-accent);
 }
+
+
+/* Create/edit sheets: Done and Cancel stay on screen while the form scrolls. */
+.editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 10px 14px 14px;
+  background: var(--background);
+}
+
+.editor-cancel {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: calc(13px * var(--scale));
+  font-weight: 500;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+  transition: background var(--hover), opacity var(--hover);
+}
+
+.editor-cancel:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+.editor-cancel:disabled {
+  opacity: 0.45;
+}
+
+.editor-done {
+  height: 34px;
+  min-width: 92px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: calc(13px * var(--scale));
+  font-weight: 600;
+  color: var(--background);
+  background: var(--text);
+  transition: opacity var(--hover), transform var(--press);
+}
+
+.editor-done:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.editor-done:disabled {
+  opacity: 0.32;
+}

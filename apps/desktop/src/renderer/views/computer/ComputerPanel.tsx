@@ -3,6 +3,7 @@ import { isGroup, isWorkingIn, type Bot } from '@shared/models'
 import { BotAvatar } from '../../components/Avatar'
 import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
+import { useModel } from '../../lib/observable'
 import type { BotStore } from '../../store/bot-store'
 import { SkillsTab, VaultTab } from '../bots/CapabilityTabs'
 import { MacChatButton } from '../thread/MacChatButton'
@@ -42,7 +43,7 @@ const GROUP_TABS: Tab[] = [
 const PER_MEMBER: TabId[] = ['browser', 'skills', 'vault']
 
 /** The panel beside a chat: the bot's computer, browser, files and routines (Maus's ComputerPanel). */
-export function ComputerPanel({ bot, store, width, onWidth, settings, close }: {
+export function ComputerPanel({ bot: initialBot, store: rawStore, width, onWidth, settings, close }: {
   bot: Bot
   store: BotStore
   width: number
@@ -50,6 +51,9 @@ export function ComputerPanel({ bot, store, width, onWidth, settings, close }: {
   settings: () => void
   close: () => void
 }) {
+  // Follow the store so a settings change shows up here without reopening the panel.
+  const store = useModel(rawStore)
+  const bot = store.bots.get(initialBot.id) ?? initialBot
   const group = isGroup(bot)
   const members = group ? store.members(bot) : []
   const [memberId, setMemberId] = useState('')
@@ -59,6 +63,8 @@ export function ComputerPanel({ bot, store, width, onWidth, settings, close }: {
   const member = members.find((m) => m.id === memberId) ?? members[0] ?? null
   const tabs = group ? GROUP_TABS : BOT_TABS
   const room = bot.memberSettings ?? {}
+  // A bot's own browser switch also unlocks it in a room (the host gates on either).
+  const browserOn = (m: Bot) => Boolean(room[m.id]?.browser || m.browser)
 
   return (
     <div className={`computer-panel ${resizing ? 'resizing' : ''}`} style={{ width }}>
@@ -109,12 +115,12 @@ export function ComputerPanel({ bot, store, width, onWidth, settings, close }: {
         {group ? (
           <>
             {tab === 'browser' && member ? (
-              room[member.id]?.browser ? (
+              browserOn(member) ? (
                 <BrowserTab bot={member} store={store} working={isWorkingIn(member, bot.id, null)} />
               ) : (
                 <div className="computer-pad">
                   <p className="computer-hint" style={font('footnote')}>
-                    The browser is off for {member.name} in this room. Turn it on in the group's settings.
+                    The browser is off for {member.name} in this room and in its own settings. Turn it on above or in the bot's settings.
                   </p>
                 </div>
               )

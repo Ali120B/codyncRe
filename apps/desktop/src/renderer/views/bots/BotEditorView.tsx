@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fastModeRefusal, fastModeShown } from '@shared/fast-mode'
 import { draftOf, type BotDraft } from '@shared/models'
 import { CharacterAvatar } from '../../components/Avatar'
-import { CardSection, ChoicePicker, IconButton, SearchField, Spinner, ValueRow } from '../../components/Controls'
+import { CardSection, ChoicePicker, IconButton, SearchField, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { ModalHeader, useDismiss } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
@@ -51,6 +51,8 @@ export function BotEditorView({ draft: initial }: { draft: BotDraft }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const online = store.connection.kind === 'online'
+  // Done is live once the essentials are there: a name for a new bot, and a usable agent.
+  const ready = (!isNew || draft.name.trim() !== '') && isValid(draft) && online && !saving
 
   // A new bot's connectors and skills start on once the computer has listed them.
   useEffect(() => {
@@ -58,7 +60,7 @@ export function BotEditorView({ draft: initial }: { draft: BotDraft }) {
   }, [isNew, plugins, store])
 
   const save = () => {
-    if (!isValid(draft) || saving || !online) return
+    if (!ready) return
     setSaving(true)
     setError(null)
     store
@@ -73,12 +75,18 @@ export function BotEditorView({ draft: initial }: { draft: BotDraft }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
-      <ModalHeader
-        title={isNew ? 'New bot' : 'Settings'}
-        trailing={saving ? <Spinner /> : <IconButton title={isNew ? 'Create' : 'Save'} icon="checkmark" disabled={!isValid(draft) || saving || !online} onClick={save} />}
-      />
+      <ModalHeader title={isNew ? 'New bot' : 'Settings'} />
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <BotSettingsForm draft={draft} onChange={setDraft} error={error} plugins={plugins} />
+      </div>
+      <div className="editor-footer">
+        <button className="editor-cancel" disabled={saving} onClick={() => dismiss()}>
+          Cancel
+        </button>
+        <span style={{ flex: 1 }} />
+        <button className="editor-done" disabled={!ready} onClick={save}>
+          {saving ? 'Saving…' : 'Done'}
+        </button>
       </div>
     </div>
   )

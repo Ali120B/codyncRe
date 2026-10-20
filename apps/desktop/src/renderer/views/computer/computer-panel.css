@@ -47,10 +47,13 @@
 .computer-tab {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   height: auto;
   padding: 5px 9px;
-  flex: none;
+  /* Fill the capsule evenly; scroll only when the labels no longer fit. */
+  flex: 1 1 0;
+  min-width: max-content;
   border-radius: 9px;
   font-size: calc(12px * var(--scale));
   font-weight: 500;
@@ -78,10 +81,12 @@
 
 /* The panel reads like a bot's Details: one grey surface holds the tab's content. */
 .computer-card {
+  width: 100%;
   height: 100%;
   border-radius: 16px;
   background: var(--surface);
   overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .computer-pad {

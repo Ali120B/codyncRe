@@ -41,6 +41,11 @@ export function BrowserTab({ bot, store, working }: { bot: Bot; store: BotStore;
   const user = state?.control === 'user'
   const engine = state?.engine ?? null
 
+  // An already-running browser shows itself; no need to press Start to see it.
+  useEffect(() => {
+    if (state?.running) setWatch(true)
+  }, [state?.running])
+
   const browser = async () => new BrowserClient(await store.ready(), bot.id)
   const perform = async (fn: (b: BrowserClient) => Promise<unknown>) => {
     try {

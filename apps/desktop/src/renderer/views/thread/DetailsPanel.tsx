@@ -6,6 +6,7 @@ import { CardSection, IconButton } from '../../components/Controls'
 import { Dialog } from '../../components/Overlay'
 import { Icon } from '../../components/Icon'
 import { font } from '../../lib/fonts'
+import { useModel } from '../../lib/observable'
 import { useStore } from '../../store/context'
 import { BotSettingsPanel } from '../bots/BotEditorView'
 import { GroupEditorView } from '../bots/GroupEditorView'
@@ -26,7 +27,7 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, share, ope
   openPlugins?: () => void
   close: () => void
 }) {
-  const store = useStore()
+  const store = useModel(useStore())
   const bot = store.bots.get(botId) ?? null
   const [returnedFromSettings, setReturnedFromSettings] = useState(false)
   /** Which settings section a Details row asked for (nonce re-mounts the form). */
@@ -74,8 +75,8 @@ export function DetailsPanel({ botId, routineId, editing, setEditing, share, ope
       <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
         {bot && isGroup(bot) ? (
           editing ? (
-            <div className="panel-slide from-trailing" style={{ height: '100%', overflowY: 'auto' }}>
-              <GroupEditorView group={bot} onSaved={() => setEditing(false)} />
+            <div className="panel-slide from-trailing" style={{ height: '100%' }}>
+              <GroupEditorView group={bot} onCancel={() => setEditing(false)} onSaved={() => setEditing(false)} />
             </div>
           ) : (
             <GroupDetails group={bot} onSettings={() => setEditing(true)} />

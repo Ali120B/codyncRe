@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { isGroup, type Bot, type GroupDraft } from '@shared/models'
 import { BotAvatar, GroupAvatar } from '../../components/Avatar'
-import { CardSection, ChoicePicker, IconButton, Spinner, Switch, ValueRow } from '../../components/Controls'
+import { CardSection, ChoicePicker, IconButton, Switch, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { Dialog, ModalHeader, useDismiss } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
@@ -115,12 +115,7 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
-      <ModalHeader
-        title={isNew ? 'New group chat' : 'Group chat'}
-        trailing={saving ? <Spinner /> : <IconButton title={isNew ? 'Create' : 'Save'} icon="checkmark" disabled={!canSave} onClick={save} />}
-        close={!!onCancel}
-        onClose={onCancel}
-      />
+      <ModalHeader title={isNew ? 'New group chat' : 'Group chat'} close={!!onCancel} onClose={onCancel} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <div className="group-form">
           <div className="group-identity">
@@ -184,7 +179,7 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
             ) : null}
           </CardSection>
           <span style={{ ...font('caption'), color: roomFull ? 'var(--warning)' : 'var(--tertiary)' }}>
-            {roomFull ? '50 bots is the limit for one group. ' : ''}A group needs at least 2 bots and can have up to 50. Everyone answers in turn unless you @mention someone. The globe and display switches give a member its browser and PC control in this room only — both start off and never change the bot's own settings.
+            {roomFull ? '50 bots is the limit for one group. ' : ''}A group needs at least 2 bots and can have up to 50. Everyone answers in turn unless you @mention someone. The globe and display switches only add browser/PC access in this room; a bot whose own browser or PC control is already on can still use it here. They never change the bot's own settings.
           </span>
 
           <CardSection title="Room">
@@ -238,6 +233,15 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
             </button>
           ) : null}
         </div>
+      </div>
+      <div className="editor-footer">
+        <span style={{ flex: 1 }} />
+        <button className="editor-cancel" disabled={saving} onClick={() => (onCancel ? onCancel() : dismiss())}>
+          Cancel
+        </button>
+        <button className="editor-done" disabled={!canSave} onClick={save}>
+          {saving ? 'Saving…' : 'Done'}
+        </button>
       </div>
       <DeleteBotDialog bot={confirmDelete} onClose={() => setConfirmDelete(null)} onDeleted={dismiss} />
       <Dialog
