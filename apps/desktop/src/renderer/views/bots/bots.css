@@ -364,11 +364,16 @@ button.member-row:hover {
 }
 
 .editor-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 34px;
   padding: 0 16px;
   border-radius: 999px;
   font-size: calc(13px * var(--scale));
   font-weight: 500;
+  line-height: 1;
+  text-align: center;
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 13%, transparent);
   transition: background var(--hover), opacity var(--hover);
@@ -383,12 +388,17 @@ button.member-row:hover {
 }
 
 .editor-done {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 34px;
   min-width: 92px;
   padding: 0 20px;
   border-radius: 999px;
   font-size: calc(13px * var(--scale));
   font-weight: 600;
+  line-height: 1;
+  text-align: center;
   color: var(--background);
   background: var(--text);
   transition: opacity var(--hover), transform var(--press);
