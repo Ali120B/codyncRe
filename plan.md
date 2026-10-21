@@ -9,10 +9,6 @@
   - Keep local use account-free; account sign-in stays optional.
   - Never commit Clerk/Cloudflare secrets.
 
-## Liked backlog
-
-- Live session handoff between bots (keep as a later feature; not part of the current batch).
-
 ## Current batch
 
 - Needs-you inbox above the account/plugins footer.
