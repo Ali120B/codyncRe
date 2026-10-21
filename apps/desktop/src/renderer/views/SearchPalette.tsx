@@ -16,27 +16,44 @@ export function matchBots(items: RosterItem[], query: string): RosterItem[] {
   return matchRoster(items, query)
 }
 
-/** Grok Bot's bot search: a floating list over the window, arrows/Enter or ⌘1-9 to open a bot. */
-export function SearchPalette({ open, items, onPick, onClose }: { open: boolean; items: RosterItem[]; onPick: (ref: BotRef) => void; onClose: () => void }) {
+/** One app-wide command in the ⌘K deck. */export interface PaletteAction {
+  id: string
+  title: string
+  subtitle?: string
+  icon: string
+  run: () => void
+}
+
+/** Grok Bot's bot search, now an app-wide command deck: arrows/Enter or ⌘1-9. */
+export function SearchPalette({ open, items, actions = [], onPick, onClose }: { open: boolean; items: RosterItem[]; actions?: PaletteAction[]; onPick: (ref: BotRef) => void; onClose: () => void }) {
   return (
     <Sheet open={open} onClose={onClose} width={640} dismissOnDim>
-      {open ? <PaletteBody items={items} onPick={onPick} onClose={onClose} /> : null}
+      {open ? <PaletteBody items={items} actions={actions} onPick={onPick} onClose={onClose} /> : null}
     </Sheet>
   )
 }
 
-function PaletteBody({ items, onPick, onClose }: { items: RosterItem[]; onPick: (ref: BotRef) => void; onClose: () => void }) {
+type PaletteRow = { kind: 'bot'; item: RosterItem } | { kind: 'action'; action: PaletteAction }
+
+function PaletteBody({ items, actions, onPick, onClose }: { items: RosterItem[]; actions: PaletteAction[]; onPick: (ref: BotRef) => void; onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const list = useRef<HTMLDivElement>(null)
-  const results = matchBots(items, query)
-  const pick = (item: RosterItem | undefined) => {
-    if (!item) return
-    onPick(item.ref)
+  const needle = query.trim().toLowerCase()
+  const matchedActions = actions.filter((action) => !needle || `${action.title} ${action.subtitle ?? ''}`.toLowerCase().includes(needle))
+  const matchedBots = matchBots(items, query)
+  const results: PaletteRow[] = [
+    ...matchedActions.map((action): PaletteRow => ({ kind: 'action', action })),
+    ...matchedBots.map((item): PaletteRow => ({ kind: 'bot', item })),
+  ]
+  const pick = (row: PaletteRow | undefined) => {
+    if (!row) return
+    if (row.kind === 'bot') onPick(row.item.ref)
+    else row.action.run()
     onClose()
   }
 
-  useEffect(() => setActive(0), [query])
+  useEffect(() => setActive(0), [query, results.length])
   useEffect(() => {
     list.current?.children[active]?.scrollIntoView({ block: 'nearest' })
   }, [active])
@@ -61,27 +78,44 @@ function PaletteBody({ items, onPick, onClose }: { items: RosterItem[]; onPick: 
     <div className="palette" onKeyDown={onKey}>
       <div className="palette-field">
         <Icon name="magnifyingglass" size={15} color="var(--secondary)" />
-        <input autoFocus value={query} placeholder="Search" aria-label="Search bots" spellCheck={false} onChange={(e) => setQuery(e.target.value)} />
+        <input autoFocus value={query} placeholder="Search bots or run a command" aria-label="Search bots or run a command" spellCheck={false} onChange={(e) => setQuery(e.target.value)} />
+        <span className="key-cap">{modifier}K</span>
       </div>
       <div className="palette-list" ref={list} role="listbox">
-        {results.map((item, i) => (
+        {results.map((row, i) => row.kind === 'action' ? (
           <button
-            key={refKey(item.ref)}
+            key={row.action.id}
             role="option"
             aria-selected={i === active}
             className={`palette-row ${i === active ? 'active' : ''}`}
             onMouseMove={() => setActive(i)}
-            onClick={() => pick(item)}
+            onClick={() => pick(row)}
           >
-            <AvatarWithStatus bot={item.bot} members={isGroup(item.bot) ? item.store.members(item.bot) : []} size={32} />
+            <span className="palette-action-icon"><Icon name={row.action.icon} size={14} /></span>
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span className="palette-line" style={{ ...font('body'), color: 'var(--text)' }}>{item.bot.name}</span>
-              {subtitle(item) ? <span className="palette-line" style={{ ...font('subheadline'), color: 'var(--secondary)' }}>{subtitle(item)}</span> : null}
+              <span className="palette-line" style={{ ...font('body'), color: 'var(--text)' }}>{row.action.title}</span>
+              {row.action.subtitle ? <span className="palette-line" style={{ ...font('subheadline'), color: 'var(--secondary)' }}>{row.action.subtitle}</span> : null}
+            </span>
+            {i < 9 ? <span className="key-cap palette-key">{`${modifier}${i + 1}`}</span> : null}
+          </button>
+        ) : (
+          <button
+            key={refKey(row.item.ref)}
+            role="option"
+            aria-selected={i === active}
+            className={`palette-row ${i === active ? 'active' : ''}`}
+            onMouseMove={() => setActive(i)}
+            onClick={() => pick(row)}
+          >
+            <AvatarWithStatus bot={row.item.bot} members={isGroup(row.item.bot) ? row.item.store.members(row.item.bot) : []} size={32} />
+            <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span className="palette-line" style={{ ...font('body'), color: 'var(--text)' }}>{row.item.bot.name}</span>
+              {subtitle(row.item) ? <span className="palette-line" style={{ ...font('subheadline'), color: 'var(--secondary)' }}>{subtitle(row.item)}</span> : null}
             </span>
             {i < 9 ? <span className="key-cap palette-key">{`${modifier}${i + 1}`}</span> : null}
           </button>
         ))}
-        {results.length === 0 ? <div className="palette-empty">No matching bots</div> : null}
+        {results.length === 0 ? <div className="palette-empty">No matching bots or commands</div> : null}
       </div>
     </div>
   )

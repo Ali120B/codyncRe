@@ -65,6 +65,7 @@ export type HostEvent =
   | { type: 'bot'; bot: Bot }
   | { type: 'botDeleted'; id: string; rev: number }
   | { type: 'entry'; entry: Entry }
+  | { type: 'entriesDeleted'; botId: string; ids: string[]; rev: number }
   | { type: 'usage'; usage: Usage }
   | { type: 'screen'; screen: ScreenState }
   | { type: 'accessRequests'; requests: AccessRequest[] }
@@ -102,6 +103,11 @@ export function parseEvent(line: string): HostEvent | null {
       const entry = raw.entry as Entry | undefined
       if (!entry || typeof entry.id !== 'string' || typeof entry.botId !== 'string') return { type: 'undecodable', kind: 'entry' }
       return { type, entry: { ...entry, data: entry.data ?? {} } }
+    }
+    case 'entriesDeleted': {
+      if (typeof raw.botId !== 'string' || !Array.isArray(raw.ids)) return { type: 'undecodable', kind: 'entriesDeleted' }
+      const ids = raw.ids.filter((id): id is string => typeof id === 'string')
+      return { type, botId: raw.botId, ids, rev: (raw.rev as number) ?? 0 }
     }
     case 'usage':
       return raw.usage ? { type, usage: raw.usage as Usage } : null

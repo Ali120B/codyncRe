@@ -1,6 +1,7 @@
 import { IconButton } from '../components/Controls'
 import { localAccountName } from '../lib/local-account'
 import { prefs, usePref } from '../lib/prefs'
+import { NeedsYouInbox } from './NeedsYouInbox'
 import { ProfileAvatar } from './PanelMenus'
 import { UpdateBadge } from './UpdateButton'
 import './sidebar-footer.css'
@@ -17,21 +18,24 @@ export function SidebarFooter({ accountOpen, onAccount, onExtensions, onTeamMap 
   return (
     <div className="sidebar-footer">
       <div className="sidebar-footer-fade" aria-hidden />
-      <div className={`profile-box ${accountOpen ? 'active' : ''}`}>
-        <button
-          className="profile-button"
-          aria-label={`Open account menu for ${name}`}
-          aria-expanded={accountOpen}
-          title={`${name} · account menu`}
-          onClick={onAccount}
-        >
-          <ProfileAvatar />
-          <span className="profile-name">{name}</span>
-        </button>
-        <IconButton title="Plugins" icon="puzzlepiece" size={34} onClick={onExtensions} />
-        <IconButton title="Team map" icon="point.3.connected.trianglepath.dotted" size={34} onClick={onTeamMap} />
+      <NeedsYouInbox />
+      <div className="footer-row">
+        <div className={`profile-box ${accountOpen ? 'active' : ''}`}>
+          <button
+            className="profile-button"
+            aria-label={`Open account menu for ${name}`}
+            aria-expanded={accountOpen}
+            title={`${name} · account menu`}
+            onClick={onAccount}
+          >
+            <ProfileAvatar />
+            <span className="profile-name">{name}</span>
+          </button>
+          <IconButton title="Plugins" icon="puzzlepiece" size={34} onClick={onExtensions} />
+          <IconButton title="Team map" icon="point.3.connected.trianglepath.dotted" size={34} onClick={onTeamMap} />
+        </div>
+        <UpdateBadge size={38} />
       </div>
-      <UpdateBadge size={38} />
     </div>
   )
 }

@@ -14,6 +14,7 @@ import { refKey, sameRef, parseRef, type BotRef } from '../store/app-model'
 import type { BotStore } from '../store/bot-store'
 import { useComputerRoster } from '../store/computer-roster'
 import { BotRoster } from './BotRoster'
+import { NeedsYouInbox } from './NeedsYouInbox'
 import { SidebarFooter } from './SidebarFooter'
 import { TeamMapView } from './team/TeamMapView'
 import { UpdateBadge } from './UpdateButton'
@@ -26,7 +27,7 @@ import { BotEditorView } from './bots/BotEditorView'
 import { MarketplaceView } from './marketplace/MarketplaceView'
 import { SettingsView, type SettingsPage } from './settings/SettingsView'
 import { ApprovalSheet } from './settings/ApprovalSheet'
-import { SearchPalette } from './SearchPalette'
+import { SearchPalette, type PaletteAction } from './SearchPalette'
 import { SearchResults } from './SearchResults'
 import { AccountWelcomeView } from './AccountWelcomeView'
 import { ComputerAccessView } from './computer-access/ComputerAccessView'
@@ -189,6 +190,18 @@ function ChatSplitView() {
   const listRef = useRef<HTMLDivElement>(null)
   useModels([...app.stores.values()])
 
+  // ⌘K is the command deck everywhere in the window, including while typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearching((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   useEffect(() => {
     const onResize = () => {
       setWindowSize({ width: window.innerWidth, height: window.innerHeight })
@@ -281,6 +294,23 @@ function ChatSplitView() {
   ]
 
   const openMarketplace = () => setMarketplace((selectedStore ?? app.local ?? onlineStores[0])?.computer.id ?? null)
+
+  /** ⌘K's app-wide commands, ahead of bot results. */
+  const paletteActions: PaletteAction[] = [
+    { id: 'new-chat', title: 'New chat', subtitle: 'Start a chat with a bot', icon: 'bubble.left', run: () => compose() },
+    { id: 'new-bot', title: 'Create a bot', subtitle: 'Choose an agent, folder and tools', icon: 'plus.circle', run: () => void createBot() },
+    { id: 'new-group', title: 'Create a group', subtitle: '2–50 bots in one room', icon: 'person.2', run: () => compose(true) },
+    { id: 'plugins', title: 'Extensions', subtitle: 'Skills, apps and MCP servers', icon: 'puzzlepiece', run: openMarketplace },
+    { id: 'settings', title: 'Settings', subtitle: 'App, voice, notifications and updates', icon: 'gearshape', run: () => setSettings('general') },
+    { id: 'computers', title: 'Computers', subtitle: 'Pair, connect and filter computers', icon: 'display', run: () => setSettings('computers') },
+    { id: 'usage', title: 'Usage', subtitle: 'Usage and limits', icon: 'chart.bar', run: () => setSettings('usage') },
+    { id: 'team-map', title: 'Team map', subtitle: 'See how your bots work together', icon: 'point.3.connected.trianglepath.dotted', run: () => setTeamMap(true) },
+    { id: 'account', title: 'Account', subtitle: 'Profile, sync and devices', icon: 'person.crop.circle', run: () => setShowAccount(true) },
+    ...(app.approvals.length
+      ? [{ id: 'approvals', title: 'Review approval requests', subtitle: `${app.approvals.length} waiting`, icon: 'lock.shield', run: () => app.reviewApprovals() } as PaletteAction]
+      : []),
+    { id: 'sidebar', title: compact ? 'Expand sidebar' : 'Collapse sidebar', subtitle: 'More room for the chat', icon: 'sidebar.left', run: () => setCompact(!compact) },
+  ]
 
   const botActions = (bot: Bot, store: BotStore): MenuItem[] => [
     { title: bot.pinned ? 'Unpin' : 'Pin', icon: 'pin', action: () => store.setPinned(bot, !bot.pinned) },
@@ -436,6 +466,7 @@ function ChatSplitView() {
             <IconButton title="Search" icon="magnifyingglass" onClick={() => setSearching(true)} />
             <IconButton title="New" icon="plus" size={36} buttonRef={railNewButton} disabled={!onlineStores.length} onClick={() => setRailNewMenu((o) => !o)} />
             <AnchoredMenu open={railNewMenu} onClose={() => setRailNewMenu(false)} anchor={railNewButton} items={newItems} />
+            <NeedsYouInbox compact />
             <IconButton title="Plugins" icon="puzzlepiece" size={36} onClick={openMarketplace} />
             <UpdateBadge size={32} />
             <button className="rail-profile" style={{ background: showAccount ? 'var(--bubble-agent)' : undefined }} aria-label="Open account menu for Account" title="Account" onClick={() => setShowAccount((s) => !s)}>
@@ -478,7 +509,7 @@ function ChatSplitView() {
         </div>
       ) : null}
 
-      <SearchPalette open={searching} items={visibleRoster} onPick={(ref) => app.select(ref)} onClose={() => setSearching(false)} />
+      <SearchPalette open={searching} items={visibleRoster} actions={paletteActions} onPick={(ref) => app.select(ref)} onClose={() => setSearching(false)} />
       <Sheet open={teamMap} onClose={() => setTeamMap(false)} width={680} height={Math.min(640, window.innerHeight - 60)}>
         {selectedStore ? <TeamMapView store={selectedStore} close={() => setTeamMap(false)} /> : null}
       </Sheet>

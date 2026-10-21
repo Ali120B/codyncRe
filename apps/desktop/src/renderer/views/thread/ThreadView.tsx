@@ -3,7 +3,7 @@ import { draftOf, isGroup, isWorkingIn, type Bot, type BotDraft, type Entry } fr
 import { BotAvatar, GroupAvatar, useWake } from '../../components/Avatar'
 import { Spinner } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { Sheet } from '../../components/Overlay'
+import { Sheet, Dialog } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { useFocusMessage } from '../../lib/focus-message'
 import { prefs, usePref } from '../../lib/prefs'
@@ -66,6 +66,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
   const [routineId, setRoutineId] = useState<string | null>(null)
   const [routineRequest, setRoutineRequest] = useState(0)
   const [showComputer, setShowComputer] = useState(false)
+  const [rewindTarget, setRewindTarget] = useState<Entry | null>(null)
   const [panelWidth, setPanelWidth] = usePref(prefs.computerPanelWidth)
   const root = useRef<HTMLDivElement>(null)
   const dock = useRef<HTMLDivElement>(null)
@@ -250,6 +251,12 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
     setCompactDetails(true)
   }, [])
 
+  const roomStandup = useCallback(() => {
+    if (!bot || !isGroup(bot)) return
+    const thread = activeChat === 'main' || store.pendingNewChat.has(bot.id) ? null : activeChat
+    void store.send('@all', bot.id, thread)
+  }, [bot, activeChat, store])
+
   const presentRoutine = (id: string | null) => {
     setRoutineId(id)
     setRoutineRequest((r) => r + 1)
@@ -286,6 +293,9 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           <div className="top-chrome-row">
             <span style={{ flex: 1 }} />
             {bot && !isGroup(bot) && !calling ? <ModelChip bot={bot} /> : null}
+            {bot && isGroup(bot) && !calling ? (
+              <MacChatButton title="Room standup" icon="person.3" direction={[0, 0]} onClick={roomStandup} />
+            ) : null}
             {bot && !calling ? (
               <MacChatButton title="Computer" icon="display" direction={[0, 0]} className={showComputer ? 'active' : undefined} onClick={toggleComputer} />
             ) : null}
@@ -299,6 +309,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
                 onComputer={toggleComputer}
                 onThreadModels={() => setThreadModelsSignal((n) => n + 1)}
                 onSettings={openSettingsPanel}
+                onStandup={roomStandup}
               />
             ) : null}
           </div>
@@ -334,6 +345,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           openRoutine={presentRoutine}
           openBotChat={setBotChat}
           focusEntryId={focus && !focus.threadId ? focus.entryId : null}
+          onRewind={setRewindTarget}
         />
         )}
         <div className="composer-dock" ref={dock}>
@@ -362,7 +374,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
         width={openThread ? Math.min(420, width * 0.45) : showComputer ? panelWidth : 400}
       >
         {openThread ? (
-          <RepliesView key={openThread} botId={botId} rootId={openThread} close={closeThread} />
+          <RepliesView key={openThread} botId={botId} rootId={openThread} close={closeThread} onRewind={setRewindTarget} />
         ) : showChats && bot ? (
           <ChatsPanel
             bot={bot}
@@ -425,7 +437,7 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
         ) : null}
       </Sheet>
       <Sheet open={openThread !== null && !wide} onClose={closeThread} width={440} height={600}>
-        {openThread ? <RepliesView botId={botId} rootId={openThread} close={closeThread} /> : null}
+        {openThread ? <RepliesView botId={botId} rootId={openThread} close={closeThread} onRewind={setRewindTarget} /> : null}
       </Sheet>
       <Sheet open={botChat !== null} onClose={() => setBotChat(null)} width={620} height={560}>
         {botChat ? <BotConversationView botId={botId} peerId={botChat} /> : null}
@@ -436,6 +448,29 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
       <Sheet open={templateDraft !== null} onClose={() => setTemplateDraft(null)}>
         {templateDraft ? <BotTemplateView draft={templateDraft} /> : null}
       </Sheet>
+      <Dialog
+        open={rewindTarget !== null}
+        title="Rewind to before this message?"
+        message={bot && isGroup(bot)
+          ? 'This restores every member’s files to how they were before this room turn, then removes this message and everything after it. This cannot be undone.'
+          : 'This restores the project files to how they were before this turn, then removes this message and everything after it. This cannot be undone.'}
+        actions={[
+          {
+            title: 'Rewind',
+            destructive: true,
+            action: () => {
+              const target = rewindTarget
+              if (!target) return
+              void store.rewind(target).then((ok) => {
+                if (!ok) return
+                if (target.data.chat === true) setActiveChat('main')
+                if (target.threadId && openThread === target.threadId) setOpenThread(null)
+              })
+            },
+          },
+        ]}
+        onClose={() => setRewindTarget(null)}
+      />
     </div>
   )
 }
@@ -483,7 +518,7 @@ function ConnectionSubtitle() {
 /** The messages: every loaded message, brought to the newest as it changes while the reader is at the bottom. */
 const PAGE = 40
 
-function Transcript({ botId, chatRoot = null, openTrace, openThread, openRoutine, openBotChat, focusEntryId }: { botId: string; chatRoot?: string | null; openTrace: () => void; openThread: (e: { id: string }) => void; openRoutine: (id: string | null) => void; openBotChat: (peerId: string) => void; focusEntryId: string | null }) {
+function Transcript({ botId, chatRoot = null, openTrace, openThread, openRoutine, openBotChat, focusEntryId, onRewind }: { botId: string; chatRoot?: string | null; openTrace: () => void; openThread: (e: { id: string }) => void; openRoutine: (id: string | null) => void; openBotChat: (peerId: string) => void; focusEntryId: string | null; onRewind?: (e: Entry) => void }) {
   const store = useStore()
   const bot = store.bots.get(botId) ?? null
   const thread = chatRoot ? chatEntries(store, botId, chatRoot) : store.chat(botId).filter((e) => e.data.chat !== true)
@@ -594,7 +629,7 @@ function Transcript({ botId, chatRoot = null, openTrace, openThread, openRoutine
           {items.length === 0 && bot ? <div style={{ paddingTop: 40 }}>{isGroup(bot) ? <GroupIntroCard group={bot} /> : <IntroCard bot={bot} />}</div> : null}
           {items.map((item) => (
             <div key={item.id} data-mid={item.id} className={arrivals.has(item.id) ? rowIn(item) : undefined}>
-              <Row item={item} chat={bot} openTrace={openTrace} openThread={chatRoot ? undefined : openThread} openRoutine={openRoutine} openBotChat={openBotChat} />
+              <Row item={item} chat={bot} openTrace={openTrace} openThread={chatRoot ? undefined : openThread} openRoutine={openRoutine} openBotChat={openBotChat} onRewind={onRewind} />
             </div>
           ))}
           {bot && live ? (
@@ -622,7 +657,7 @@ function Transcript({ botId, chatRoot = null, openTrace, openThread, openRoutine
   )
 }
 
-function Row({ item, chat, openTrace, openThread, openRoutine, openBotChat }: { item: ChatItem; chat: Bot | null; openTrace: () => void; openThread?: (e: { id: string }) => void; openRoutine: (id: string | null) => void; openBotChat: (peerId: string) => void }) {
+function Row({ item, chat, openTrace, openThread, openRoutine, openBotChat, onRewind }: { item: ChatItem; chat: Bot | null; openTrace: () => void; openThread?: (e: { id: string }) => void; openRoutine: (id: string | null) => void; openBotChat: (peerId: string) => void; onRewind?: (e: Entry) => void }) {
   if (item.kind === 'separator') {
     return <TimeSeparator date={item.date} />
   }
@@ -636,7 +671,7 @@ function Row({ item, chat, openTrace, openThread, openRoutine, openBotChat }: { 
       </button>
     )
   }
-  return <ChatRow entry={e} groupStart={item.groupStart} chat={chat} openTrace={openTrace} openThread={openThread} />
+  return <ChatRow entry={e} groupStart={item.groupStart} chat={chat} openTrace={openTrace} openThread={openThread} onRewind={onRewind} />
 }
 
 /** The start of an empty group chat: who's in it and how the room works. */

@@ -88,6 +88,27 @@ impl Actor {
                     self.notice("New session — the agent starts with a fresh context.", NoticeStyle::Divider);
                 }
             }
+            Cmd::ForgetLane { lane } => {
+                if self.turn.is_some() && self.lane == lane {
+                    self.stop().await;
+                }
+                // Rewind is authoritative: drop queued turns for this lane before they can
+                // recreate the messages the user just removed.
+                self.queue.retain(|queued| match queued {
+                    Queued::Group(turn) => turn.lane != lane,
+                    Queued::User { lane: queued_lane, .. } => queued_lane != &lane,
+                    Queued::Routine(_) | Queued::BotRequest(_) => true,
+                });
+                if lane.chat == self.cfg.id && lane.thread.is_none() {
+                    self.forget_session();
+                } else {
+                    let key = lane_key("session", &self.cfg.id, &lane);
+                    self.lane_sessions.remove(&key);
+                    if let Err(error) = self.hub.store.kv_set(&key, "") {
+                        tracing::warn!(bot = %self.cfg.id, error = format!("{error:#}"), "couldn't forget a lane's session");
+                    }
+                }
+            }
             Cmd::Reconfigure(cfg) => {
                 let cfg = *cfg;
                 let restart = cfg.backend != self.cfg.backend

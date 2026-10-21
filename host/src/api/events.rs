@@ -66,6 +66,11 @@ pub fn events_stream(
     for e in hub.store.entries_since(since, CATCH_UP_PER_BOT)? {
         catch_up.push(json!({"type": "entry", "rev": e.rev, "entry": e}));
     }
+    if since > 0 {
+        for (rev, bot_id, entry_id) in hub.store.tombstones_since(since)? {
+            catch_up.push(json!({"type": "entriesDeleted", "rev": rev, "botId": bot_id, "ids": [entry_id]}));
+        }
+    }
     catch_up.sort_by_key(|v| v["rev"].as_i64().unwrap_or(0));
     let hello = json!({
         "type": "hello",

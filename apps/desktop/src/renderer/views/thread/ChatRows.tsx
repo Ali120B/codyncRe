@@ -45,13 +45,15 @@ function workedText(ms: number): string {
 }
 
 /** One chat-visible entry in a chat or a thread, with what can be done to it. */
-export const ChatRow = memo(function ChatRow({ entry, groupStart, chat, openTrace, openThread }: {
+export const ChatRow = memo(function ChatRow({ entry, groupStart, chat, openTrace, openThread, onRewind }: {
   entry: Entry
   groupStart: boolean
   chat: Bot | null
   openTrace: () => void
   /** Main chat only: start (or open) the thread on this message. */
   openThread?: (e: Entry) => void
+  /** User messages only: restore files and messages to before this turn. */
+  onRewind?: (e: Entry) => void
 }) {
   const reply = openThread ? () => openThread(entry) : undefined
   const chip = entry.data.thread && entry.data.thread.count > 0 && openThread ? <ThreadChip summary={entry.data.thread} open={() => openThread(entry)} /> : null
@@ -59,7 +61,7 @@ export const ChatRow = memo(function ChatRow({ entry, groupStart, chat, openTrac
     case 'user':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingTop: groupStart ? 12 : 4 }}>
-          <UserBubble entry={entry} botWorking={!!chat && isWorking(chat)} reply={reply} />
+          <UserBubble entry={entry} botWorking={!!chat && isWorking(chat)} reply={reply} onRewind={onRewind} />
           <ReactionsRow entry={entry} />
           {chip}
         </div>
@@ -158,7 +160,7 @@ export function TimeSeparator({ date }: { date: number }) {
 
 const fullDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
-export function UserBubble({ entry, botWorking, reply }: { entry: Entry; botWorking: boolean; reply?: () => void }) {
+export function UserBubble({ entry, botWorking, reply, onRewind }: { entry: Entry; botWorking: boolean; reply?: () => void; onRewind?: (e: Entry) => void }) {
   const store = useStore()
   const [hovering, setHovering] = useState(false)
   const status = entry.data.status
@@ -174,6 +176,14 @@ export function UserBubble({ entry, botWorking, reply }: { entry: Entry; botWork
             items={() => [
               { title: 'Copy', icon: 'square.on.square', action: copy },
               ...(reply ? [{ title: 'Reply in thread', icon: 'arrowshape.turn.up.left', action: reply }] : []),
+              ...(onRewind
+                ? [{
+                    title: 'Rewind to before this message',
+                    subtitle: 'Undo this turn and its file changes',
+                    icon: 'arrow.uturn.backward',
+                    action: () => onRewind(entry),
+                  }]
+                : []),
             ]}
           >
             {entry.data.text}
@@ -181,7 +191,7 @@ export function UserBubble({ entry, botWorking, reply }: { entry: Entry; botWork
         ) : null}
         {status && status !== 'sent' ? <UserStatus entry={entry} botWorking={botWorking} hovering={hovering} /> : null}
         {/* Beside the bubble, inside its hover region: showing them never changes the height. */}
-        <MessageActions className="leading" visible={hovering} reactions={reactionPick(store, entry)} reply={reply} copy={copy} at={entry.createdAt} />
+        <MessageActions className="leading" visible={hovering} reactions={reactionPick(store, entry)} reply={reply} copy={copy} at={entry.createdAt} rewind={onRewind ? () => onRewind(entry) : undefined} />
       </div>
     </div>
   )
@@ -340,7 +350,7 @@ export function ReactionsRow({ entry }: { entry: Entry }) {
 }
 
 /** Compact actions beside the bubble: a reaction strip, reply in thread, more, and the time. */
-function MessageActions({ visible, className, reactions, reply, trace, copy, at }: {
+function MessageActions({ visible, className, reactions, reply, trace, copy, at, rewind }: {
   visible: boolean
   className: string
   reactions: ReactionPick
@@ -348,6 +358,7 @@ function MessageActions({ visible, className, reactions, reply, trace, copy, at 
   trace?: () => void
   copy: () => void
   at: number
+  rewind?: () => void
 }) {
   const [menu, setMenu] = useState<'reactions' | 'more' | null>(null)
   const smile = useRef<HTMLButtonElement>(null)
@@ -359,6 +370,7 @@ function MessageActions({ visible, className, reactions, reply, trace, copy, at 
         <Icon name="face.smiling" size={14} />
       </button>
       {reply ? <IconButton title="Reply in thread" icon="arrowshape.turn.up.left" size={26} onClick={reply} /> : null}
+      {rewind ? <IconButton title="Rewind to before this message" icon="arrow.uturn.backward" size={26} onClick={rewind} /> : null}
       <button ref={more} className="message-action" title="More message actions" aria-label="More message actions" onClick={() => setMenu('more')}>
         <Icon name="ellipsis" size={14} />
       </button>
@@ -368,7 +380,11 @@ function MessageActions({ visible, className, reactions, reply, trace, copy, at 
         open={menu === 'more'}
         onClose={() => setMenu(null)}
         anchor={more}
-        items={() => [{ title: 'Copy', icon: 'square.on.square', action: copy }, ...(trace ? [{ title: 'Show what it did', icon: 'list.bullet', action: trace }] : [])]}
+        items={() => [
+          { title: 'Copy', icon: 'square.on.square', action: copy },
+          ...(trace ? [{ title: 'Show what it did', icon: 'list.bullet', action: trace }] : []),
+          ...(rewind ? [{ title: 'Rewind to before this message', icon: 'arrow.uturn.backward', action: rewind }] : []),
+        ]}
       />
     </div>
   )

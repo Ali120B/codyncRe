@@ -475,6 +475,35 @@ impl Hub {
         updated
     }
 
+    /// Deletes rewound entries, broadcasts the batch, and refreshes the summaries of threads
+    /// that survived. Returns how many entries were removed.
+    pub fn delete_entries(&self, ids: &[String]) -> Result<usize> {
+        let (rev, entries) = self.store.delete_entries(ids)?;
+        let Some(chat) = entries.first().map(|e| e.bot_id.clone()) else { return Ok(0) };
+        {
+            let _guard = self.emit_lock.locked();
+            let _ = self.events.send(json!({
+                "type": "entriesDeleted", "rev": rev, "botId": chat, "ids": ids
+            }));
+        }
+        let mut roots = std::collections::BTreeSet::new();
+        let mut chats = std::collections::BTreeSet::new();
+        for entry in &entries {
+            chats.insert(entry.bot_id.clone());
+            if let Some(root) = &entry.thread_id {
+                roots.insert((entry.bot_id.clone(), root.clone()));
+            }
+        }
+        for (chat, root) in roots {
+            self.refresh_thread_summary(&chat, &root);
+        }
+        for chat in chats {
+            self.emit_bot(&chat);
+        }
+        Ok(entries.len())
+    }
+
+
     /// Toggles the user's `emoji` reaction on a chat message (`data.reactions`, oldest first).
     /// A message keeps `reactions: []` once reacted to, so it never turns unread again.
     pub fn react(&self, id: &str, emoji: &str) -> Result<Entry> {

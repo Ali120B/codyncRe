@@ -265,8 +265,7 @@ impl Store {
     }
 
     /// Chat-visible messages (the user's, final replies) in `lane` after `after_seq`, oldest first.
-    pub fn messages_after(&self, lane: &Lane, after_seq: i64, limit: i64) -> Result<Vec<Entry>> {
-        let c = self.db.locked();
+    pub fn messages_after(&self, lane: &Lane, after_seq: i64, limit: i64) -> Result<Vec<Entry>> {        let c = self.db.locked();
         let mut st = c.prepare(&format!(
             "SELECT {ENTRY_COLS} FROM entries WHERE bot_id = ?1 AND thread_id IS ?2 AND seq > ?3 AND
                (kind = 'user' OR (kind = 'agent' AND json_extract(data, '$.final') = 1))
@@ -357,6 +356,58 @@ impl Store {
             }
         }
         Ok(ids.len())
+    }
+
+    /// Every entry in `lane` after `after_seq`, including tool calls and thoughts (oldest first).
+    pub fn lane_entries_after(&self, lane: &Lane, after_seq: i64, limit: i64) -> Result<Vec<Entry>> {
+        let c = self.db.locked();
+        let mut st = c.prepare(&format!(
+            "SELECT {ENTRY_COLS} FROM entries WHERE bot_id = ?1 AND thread_id IS ?2 AND seq > ?3
+             ORDER BY seq LIMIT ?4"
+        ))?;
+        Ok(st
+            .query_map(params![lane.chat, lane.thread, after_seq, limit.clamp(1, 5000)], row_entry)?
+            .collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Deletes entries and leaves durable tombstones, so clients that reconnect don't keep
+    /// messages the user rewound. One revision covers the batch.
+    pub fn delete_entries(&self, ids: &[String]) -> Result<(i64, Vec<Entry>)> {
+        let mut c = self.db.locked();
+        let tx = c.transaction()?;
+        let mut entries = Vec::new();
+        for id in ids {
+            if let Some(entry) =
+                tx.query_row(&format!("SELECT {ENTRY_COLS} FROM entries WHERE id = ?1"), [id], row_entry).optional()?
+            {
+                entries.push(entry);
+            }
+        }
+        if entries.is_empty() {
+            tx.commit()?;
+            return Ok((0, entries));
+        }
+        let rev = next_rev(&tx)?;
+        let now = now_ms();
+        for entry in &entries {
+            tx.execute("DELETE FROM entries WHERE id = ?1", [&entry.id])?;
+            tx.execute(
+                "INSERT INTO entry_tombstones(id, bot_id, rev, deleted_at) VALUES(?1, ?2, ?3, ?4)
+                 ON CONFLICT(id) DO UPDATE SET rev = ?3, deleted_at = ?4",
+                params![entry.id, entry.bot_id, rev, now],
+            )?;
+        }
+        tx.commit()?;
+        Ok((rev, entries))
+    }
+
+    /// Tombstones after `since`, oldest revision first: `(rev, bot_id, entry_id)`.
+    pub fn tombstones_since(&self, since: i64) -> Result<Vec<(i64, String, String)>> {
+        let c = self.db.locked();
+        let mut st = c.prepare("SELECT rev, bot_id, id FROM entry_tombstones WHERE rev > ?1 ORDER BY rev")?;
+        Ok(st
+            .query_map([since], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?)
     }
 }
 

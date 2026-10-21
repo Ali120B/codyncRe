@@ -51,7 +51,10 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 
 - **Free and open source.** No subscription, no paid tier, Apache 2.0 licensed. It runs on your computer with the agents and accounts you already have.
 - **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.
-- **Many bots, one team.** Run as many bots as you like side by side, each with its own agent, project folder and approvals, all working at once. Put 2–50 in a **group room** and they answer in turn, like a team channel; `@name` picks who replies. Each member can get its own Browser or Computer access inside the room without changing its own setup, group Files show who wrote what, and group routines run with the room's context. Start a **thread** on any message to branch off without cluttering the main chat.
+- **Many bots, one team.** Run as many bots as you like side by side, each with its own agent, project folder and approvals, all working at once. Put 2–50 in a **group room** and they answer in turn, like a team channel; `@name` picks who replies. Type `@all` alone for a merged standup of every member's status and blocker, with owners. When one bot @mentions another, it automatically hands off what it tried, what changed and the next step. Each member can get its own Browser or Computer access inside the room without changing its own setup, group Files show who wrote what, and group routines run with the room's context. Start a **thread** on any message to branch off without cluttering the main chat.
+- **Undo a bad run.** Every turn snapshots the project folder and the chat before the agent starts. Open a message's menu and **Rewind to before this message** to restore the files and remove that turn and everything after it, in a direct chat or a group room.
+- **One place for what needs you.** The inbox above your account footer collects permission cards, failed sends, sign-ins, device approvals and bots whose last run failed. Click one to jump straight to it.
+- **⌘K for everything.** The command deck searches bots and runs app-wide actions: new chat, create a bot or group, Extensions, Settings, Computers, Usage, Team map, Account and approval review.
 - **Routines that fit the work.** Run a bot once, every few minutes, hourly, daily, on weekdays or a chosen day each week or month — or from a webhook. Set the time with a real time picker, choose the time zone, and see the next run before saving.
 - **Apps and skills when you need them.** Connect Gmail, Slack, GitHub, Notion and 1,000+ apps through Composio, or give bots reusable skills; the Marketplace leads with popular apps and expands only when you ask.
 - **Built in Rust.** `codync-host` is one small, fast Rust binary for macOS, Windows and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
@@ -207,6 +210,17 @@ cd relay && npm test             # relay tickets
 ```
 
 ## Changelog
+
+### 2.20 — command deck, inbox and rewind
+
+`⌘K` is now a command deck, not just bot search: create chats, bots and groups, and open
+Extensions, Settings, Computers, Usage, Team map, Account and approval review from the
+keyboard. A **Needs you** inbox sits above the account footer and gathers permission cards,
+failed sends, sign-ins, device approvals and failed runs. Every turn checkpoints the project
+folder and chat, so **Rewind to before this message** restores the files and removes that
+turn and later messages in direct chats and group rooms. In rooms, a bot that @mentions a
+peer sends a handoff packet (what it tried, what changed, the next step), and typing `@all`
+alone produces one merged standup with each member's status, blocker and owner.
 
 ### 2.19 — group rooms
 

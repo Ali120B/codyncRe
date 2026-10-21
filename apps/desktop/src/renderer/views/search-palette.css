@@ -54,6 +54,17 @@
   height: 22px;
   border-radius: 6px;
 }
+.palette-action-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--text-rgb), 0.07);
+  color: var(--secondary);
+}
 .palette-empty {
   padding: 28px 0;
   text-align: center;

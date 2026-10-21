@@ -218,6 +218,12 @@ export class BotSync extends BotMirror {
         this.bump(event.entry.rev)
         this.acknowledgeVisible(event.entry.botId, event.entry)
         break
+      case 'entriesDeleted': {
+        const gone = new Set(event.ids)
+        this.entries.set(event.botId, this.allEntries(event.botId).filter((e) => !gone.has(e.id)))
+        this.bump(event.rev)
+        break
+      }
       case 'usage':
         this.usage = event.usage
         break

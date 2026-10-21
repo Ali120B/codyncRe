@@ -66,6 +66,23 @@ export class BotStore extends BotSync {
     this.scheduleSave()
   }
 
+  /** Restores the files and messages from before a user message. */
+  async rewind(entry: Entry): Promise<boolean> {
+    try {
+      const result = await (
+        await this.ready()
+      ).call<{ ids?: string[] }>('rewind', { botId: entry.botId, entryId: entry.id }, 180_000)
+      const gone = new Set(result.ids ?? [])
+      if (gone.size) this.entries.set(entry.botId, this.allEntries(entry.botId).filter((e) => !gone.has(e.id)))
+      this.changed()
+      this.scheduleSave()
+      return true
+    } catch (error) {
+      this.setError(`Couldn't rewind: ${error instanceof Error ? error.message : String(error)}`)
+      return false
+    }
+  }
+
   async loadChatTitles(botId: string): Promise<void> {
     try {
       const res = await (await this.ready()).call<{ titles?: Record<string, string> }>('chatTitles', { botId })

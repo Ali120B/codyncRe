@@ -8,7 +8,7 @@ import { MacChatButton } from './MacChatButton'
  * The chat header's ⋯ menu: find in chat, the full conversation, copying the
  * transcript, the Computer panel and the bot's settings.
  */
-export function ChatHeaderMenu({ bot, showComputer, onFind, onChats, onFull, onComputer, onThreadModels, onSettings }: {
+export function ChatHeaderMenu({ bot, showComputer, onFind, onChats, onFull, onComputer, onThreadModels, onSettings, onStandup }: {
   bot: Bot
   showComputer: boolean
   onFind: () => void
@@ -17,6 +17,7 @@ export function ChatHeaderMenu({ bot, showComputer, onFind, onChats, onFull, onC
   onComputer: () => void
   onThreadModels: () => void
   onSettings: () => void
+  onStandup: () => void
 }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
@@ -39,6 +40,9 @@ export function ChatHeaderMenu({ bot, showComputer, onFind, onChats, onFull, onC
     { title: 'Chats', icon: 'bubble.left', action: onChats },
     { title: 'Full conversation', icon: 'list.bullet.rectangle', action: onFull },
     { title: 'Copy conversation', icon: 'doc.on.doc', action: copyConversation },
+    ...(isGroup(bot)
+      ? [{ title: 'Room standup', subtitle: 'Ask everyone for status and blockers', icon: 'person.3', action: onStandup } as MenuItem]
+      : []),
     { title: 'Computer', icon: 'display', selected: showComputer, divider: true, action: onComputer },
     ...(!isGroup(bot) ? [{ title: 'Thread models', icon: 'arrow.triangle.branch', action: onThreadModels } as MenuItem] : []),
     { title: isGroup(bot) ? 'Group settings' : 'Bot settings', icon: 'gearshape', action: onSettings },

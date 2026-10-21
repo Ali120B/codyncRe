@@ -68,7 +68,10 @@ impl Store {
                 rev INTEGER NOT NULL, kind TEXT NOT NULL, turn INTEGER NOT NULL, data TEXT NOT NULL,
                 created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
              CREATE INDEX IF NOT EXISTS entries_rev ON entries(rev);
-             CREATE INDEX IF NOT EXISTS entries_bot ON entries(bot_id, seq);",
+             CREATE INDEX IF NOT EXISTS entries_bot ON entries(bot_id, seq);
+             CREATE TABLE IF NOT EXISTS entry_tombstones(
+                id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, rev INTEGER NOT NULL, deleted_at INTEGER NOT NULL);
+             CREATE INDEX IF NOT EXISTS entry_tombstones_rev ON entry_tombstones(rev);",
         )?;
         migrate(&c)?;
         let secret_key = if path == Path::new(":memory:") {

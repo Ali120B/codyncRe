@@ -42,6 +42,7 @@ replies itself.
 | `react` | `entryId, emoji` | Toggles the user's reaction on a chat message (`data.reactions`, oldest first, at most 8). A reacted-to message never turns unread again. The bot isn't told. |
 | `respondPermission` | `entryId, optionId?` | Routed to `data.author`, so cards in a group reach the bot that asked. |
 | `markRead` | `botId, threadId?, all?` | The main chat, one thread (`threadId`), or everything (`all`, the roster's "Mark as read"). A no-op when nothing there is unread, so clients call it whenever a chat or thread is on screen. `send` marks its own lane read. |
+| `rewind` | `botId, entryId` | Restores the turn's workspace checkpoints and removes that user message and later entries in the lane (plus threads branching from it). Rejects while a member is working. |
 
 ## How a group answers (`host/src/chat/group.rs`, Grok Bot's design)
 
@@ -49,6 +50,12 @@ replies itself.
 - Who answers each round: the members @-mentioned since the user's last message (full
   name, name without spaces, or first word; `@all` / `@everyone`), or everyone if none is.
   Members speak one at a time; each round starts one member later.
+- A message that is just `@all` / `@everyone` is a **standup** instead: every member is asked
+  for a status and blocker, and the room gets one merged message with owners. The desktop's
+  Room standup action sends that message for you.
+- When a room member @mentions a peer in its reply, the host gives that peer one **handoff**
+  turn with a packet: what the sender tried, which files changed, and the next step. A peer
+  gets at most one handoff per room turn, and handoff replies don't cascade further.
 - A group's `description` ("About") tells its members what the room is for.
 - A member runs the turn in its **own main session** (its history is unified across chats),
   told who's in the room and what was said since it last spoke there, framed as

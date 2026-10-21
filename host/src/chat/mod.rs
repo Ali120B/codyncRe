@@ -8,6 +8,7 @@ pub mod memory;
 pub mod naming;
 pub mod outbox;
 pub mod prompt;
+pub mod rewind;
 pub mod team;
 pub(crate) mod title;
 pub mod uploads;

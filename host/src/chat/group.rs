@@ -14,11 +14,12 @@
 
 use crate::LockExt;
 use crate::agent::bot::Cmd;
-use crate::hub::Hub;
+use crate::agent::checkpoint;
+use crate::hub::{BotStatus, Hub};
 use crate::remote::push::{self, AlertKind};
-use crate::store::{BotConfig, BotKind, Entry, EntryKind, Lane, Store};
+use crate::store::{BotConfig, BotKind, Entry, EntryKind, Lane, Store, now_ms};
 use anyhow::{Result, anyhow, bail};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use tokio::sync::oneshot;
 
@@ -37,6 +38,8 @@ pub struct GroupTurn {
     pub prompt: String,
     /// The room turn that asked; a member skips it once a newer one started (see [`Rooms::current`]).
     pub epoch: u64,
+    /// A standup answer stays in the trace; the room gets one merged summary instead.
+    pub standup: bool,
     /// The reply the room sees, or `None` for a pass.
     pub reply: oneshot::Sender<Result<Option<String>>>,
 }
@@ -149,11 +152,26 @@ pub fn start_with(hub: &Arc<Hub>, group: &BotConfig, lane: Lane, done: Option<on
 }
 
 async fn run(hub: &Arc<Hub>, group_id: &str, lane: &Lane, epoch: u64) -> Result<()> {
+    let user_said = last_user_message(hub, lane)?.into_iter().collect::<Vec<_>>();
+    let Some(user) = user_said.first().cloned() else { return Ok(()) };
+    let group = hub.store.bot(group_id)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("group deleted"))?.config;
+    let members_now = members(hub, &group);
+    // The room checkpoints every member before the first bot can touch a file. This is
+    // one snapshot for the whole room turn, not one per speaker.
+    for member in &members_now {
+        if let Err(error) = checkpoint::capture(group_id, lane, user.turn, &member.id, &member.cwd).await {
+            tracing::warn!(bot = %member.id, error = format!("{error:#}"), "couldn't save a room checkpoint");
+        }
+    }
+    if is_standup_request(&user) {
+        return run_standup(hub, &group, lane, epoch, &members_now, user.turn).await;
+    }
+
     let mut replies = 0;
     let mut last_reply: Option<(String, String, String)> = None;
-    // Only the user's message picks speakers: a bot @-mentioning another member in its
-    // reply doesn't pull that member into a later round.
-    let user_said = last_user_message(hub, lane)?.into_iter().collect::<Vec<_>>();
+    // A bot @-mentioning a peer is a handoff: the peer gets one turn with what the first
+    // bot tried, what changed, and the next step. One handoff per peer per room turn.
+    let mut handed_off: HashSet<String> = HashSet::new();
     'rounds: for round in 0..MAX_ROUNDS {
         let group = hub.store.bot(group_id)?.filter(|r| !r.deleted).ok_or_else(|| anyhow!("group deleted"))?.config;
         let members = members(hub, &group);
@@ -174,17 +192,31 @@ async fn run(hub: &Arc<Hub>, group_id: &str, lane: &Lane, epoch: u64) -> Result<
             if replies >= MAX_REPLIES {
                 break 'rounds;
             }
-            let prompt = member_prompt(hub, &group, &members, member, lane)?;
-            let (reply, answer) = oneshot::channel();
-            let turn = GroupTurn { lane: lane.clone(), prompt, epoch, reply };
-            if hub.send_cmd(&member.id, Cmd::Group(turn)).is_err() {
+            if handed_off.contains(&member.id) {
                 continue;
             }
+            let prompt = member_prompt(hub, &group, &members, member, lane)?;
             // A failed, cancelled or overdue member turn counts as a pass; its error shows in the room.
-            if let Ok(Ok(Ok(Some(text)))) = tokio::time::timeout(crate::chat::team::ASK_TIMEOUT, answer).await {
+            if let Some(text) = ask_member(hub, member, lane, epoch, prompt, false).await {
                 spoke += 1;
                 replies += 1;
-                last_reply = Some((member.id.clone(), member.name.clone(), text));
+                last_reply = Some((member.id.clone(), member.name.clone(), text.clone()));
+                for target_id in handoff_targets(&text, &members, &member.id) {
+                    if replies >= MAX_REPLIES || !hub.groups.current(lane, epoch) {
+                        break;
+                    }
+                    if !handed_off.insert(target_id.clone()) {
+                        continue;
+                    }
+                    let Some(target) = members.iter().find(|m| m.id == target_id) else { continue };
+                    let packet = handoff_packet(hub, &group, lane, member, &text, user.seq);
+                    let Ok(prompt) = handoff_prompt(hub, &group, &members, target, lane, &packet) else { continue };
+                    if let Some(answer) = ask_member(hub, target, lane, epoch, prompt, false).await {
+                        replies += 1;
+                        spoke += 1;
+                        last_reply = Some((target.id.clone(), target.name.clone(), answer));
+                    }
+                }
             }
         }
         if spoke == 0 {
@@ -198,6 +230,226 @@ async fn run(hub: &Arc<Hub>, group_id: &str, lane: &Lane, epoch: u64) -> Result<
     }
     Ok(())
 }
+
+/// Queues one member turn and waits for its reply. A pass is `None`, as is a failure.
+async fn ask_member(
+    hub: &Arc<Hub>,
+    member: &BotConfig,
+    lane: &Lane,
+    epoch: u64,
+    prompt: String,
+    standup: bool,
+) -> Option<String> {
+    let (reply, answer) = oneshot::channel();
+    let turn = GroupTurn { lane: lane.clone(), prompt, epoch, standup, reply };
+    if hub.send_cmd(&member.id, Cmd::Group(turn)).is_err() {
+        return None;
+    }
+    match tokio::time::timeout(crate::chat::team::ASK_TIMEOUT, answer).await {
+        Ok(Ok(Ok(Some(text)))) => Some(text),
+        _ => None,
+    }
+}
+
+/// A room standup is the user writing just `@all` (or the header's standup action).
+fn is_standup_request(entry: &Entry) -> bool {
+    let text = entry.data["text"].as_str().unwrap_or_default().trim().to_lowercase();
+    let text = text.trim_end_matches(['!', '.', '?', ' ']);
+    matches!(text, "@all" | "@everyone" | "@standup" | "@all standup" | "@all status")
+}
+
+/// Ask every member for a status and blocker, then put one merged message in the room.
+async fn run_standup(
+    hub: &Arc<Hub>,
+    group: &BotConfig,
+    lane: &Lane,
+    epoch: u64,
+    members: &[BotConfig],
+    turn: i64,
+) -> Result<()> {
+    let mut answers: Vec<(String, String)> = Vec::new();
+    let mut pending: Vec<(&BotConfig, oneshot::Receiver<Result<Option<String>>>)> = Vec::new();
+    for member in members {
+        let runtime = hub.runtime(&member.id);
+        match runtime.status {
+            BotStatus::Working => answers.push((
+                member.name.clone(),
+                format!("**Working** — {} · _blocker: none reported_", nonempty(&runtime.activity, "a task")),
+            )),
+            BotStatus::NeedsInput => answers.push((
+                member.name.clone(),
+                "**Waiting for you** — needs approval to continue · _blocker: your input_".into(),
+            )),
+            BotStatus::Error => answers.push((
+                member.name.clone(),
+                "**Needs attention** — its last run failed · _blocker: a failed run_".into(),
+            )),
+            BotStatus::Idle => {
+                let prompt = standup_prompt(group, members, member);
+                let (reply, answer) = oneshot::channel();
+                let asked = GroupTurn { lane: lane.clone(), prompt, epoch, standup: true, reply };
+                if hub.send_cmd(&member.id, Cmd::Group(asked)).is_ok() {
+                    pending.push((member, answer));
+                } else {
+                    answers.push((member.name.clone(), "**No response** — couldn't reach it".into()));
+                }
+            }
+        }
+    }
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(90);
+    for (member, answer) in pending {
+        let left = deadline.saturating_duration_since(tokio::time::Instant::now());
+        match tokio::time::timeout(left, answer).await {
+            Ok(Ok(Ok(Some(text)))) => {
+                let (status, blocker) = parse_standup(&text);
+                answers.push((
+                    member.name.clone(),
+                    format!("**{}** · _blocker: {}_", nonempty(&status, "No update"), nonempty(&blocker, "none")),
+                ));
+            }
+            _ => answers.push((member.name.clone(), "**No response** — it didn't answer in time".into())),
+        }
+    }
+    if !hub.groups.current(lane, epoch) {
+        return Ok(());
+    }
+    // Preserve roster order, then add the one message the room actually sees.
+    let mut lines = vec!["**Room standup**".to_owned(), String::new()];
+    for member in members {
+        if let Some((_, line)) = answers.iter().find(|(name, _)| name == &member.name) {
+            lines.push(format!("- **{}** — {}", member.name, line));
+        }
+    }
+    if lines.len() == 2 {
+        lines.push("_No members answered._".into());
+    }
+    let text = lines.join("\n");
+    if hub.store.bot(&group.id)?.is_some_and(|r| !r.deleted) {
+        hub.add_entry(
+            lane,
+            EntryKind::Agent,
+            turn,
+            &serde_json::json!({
+                "text": text,
+                "author": group.id,
+                "final": true,
+                "standup": true,
+                "at": now_ms(),
+            }),
+        );
+    }
+    Ok(())
+}
+
+fn standup_prompt(group: &BotConfig, members: &[BotConfig], me: &BotConfig) -> String {
+    let peers = members.iter().filter(|m| m.id != me.id).map(|m| m.name.as_str()).collect::<Vec<_>>();
+    let with = if peers.is_empty() { "the user".to_owned() } else { format!("the user and {}", peers.join(", ")) };
+    format!(
+        "You are {}, in the group chat \"{}\" with {with}. This is a room standup. Do not use tools or change files. \
+         Reply with exactly two lines:\nSTATUS: one short sentence about what you are working on or what you last finished\n\
+         BLOCKER: none, or one short sentence about what you need\n\
+         Keep both lines under 20 words.",
+        me.name, group.name
+    )
+}
+
+fn parse_standup(text: &str) -> (String, String) {
+    let mut status = String::new();
+    let mut blocker = String::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if let Some(value) = line.strip_prefix("STATUS:") {
+            status = value.trim().to_owned();
+        } else if let Some(value) = line.strip_prefix("BLOCKER:") {
+            blocker = value.trim().to_owned();
+        }
+    }
+    if status.is_empty() {
+        status = text.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or_default().to_owned();
+    }
+    (status, blocker)
+}
+
+fn nonempty(text: &str, fallback: &str) -> String {
+    let text = text.trim();
+    if text.is_empty() { fallback.to_owned() } else { text.to_owned() }
+}
+
+/// Members a bot named in its room reply (never itself, never the user's `@all`).
+fn handoff_targets(text: &str, members: &[BotConfig], from: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for member in members {
+        if member.id == from || out.contains(&member.id) {
+            continue;
+        }
+        if handles(&member.name).iter().any(|h| mentions(text, h)) {
+            out.push(member.id.clone());
+        }
+    }
+    out
+}
+
+/// What the next bot needs to continue without repeating the handoff sender's work.
+fn handoff_packet(hub: &Hub, group: &BotConfig, lane: &Lane, from: &BotConfig, reply: &str, after_seq: i64) -> String {
+    let mut tried = Vec::new();
+    let mut changed = Vec::new();
+    if let Ok(entries) = hub.store.lane_entries_after(lane, after_seq, 5000) {
+        for entry in entries {
+            if entry.data["author"].as_str() != Some(from.id.as_str()) || entry.kind != EntryKind::Tool.as_str() {
+                continue;
+            }
+            let title = entry.data["title"].as_str().unwrap_or("a tool").trim();
+            if !title.is_empty() && !tried.iter().any(|t| t == title) {
+                tried.push(title.to_owned());
+            }
+            for diff in entry.data["diffs"].as_array().into_iter().flatten() {
+                if let Some(path) = diff["path"].as_str()
+                    && !changed.iter().any(|p| p == path)
+                {
+                    changed.push(path.to_owned());
+                }
+            }
+        }
+    }
+    let next = reply
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .next_back()
+        .unwrap_or("continue from their message");
+    format!(
+        "Handoff from {} in \"{}\".\nThey tried: {}\nChanged: {}\nNext: {}\nTheir message: {}",
+        from.name,
+        group.name,
+        if tried.is_empty() { "answered the room".to_owned() } else { tried.join(", ") },
+        if changed.is_empty() { "no file changes reported".to_owned() } else { changed.join(", ") },
+        clip(next, 300),
+        clip(reply, 1200),
+    )
+}
+
+fn handoff_prompt(
+    hub: &Hub,
+    group: &BotConfig,
+    members: &[BotConfig],
+    target: &BotConfig,
+    lane: &Lane,
+    packet: &str,
+) -> Result<String> {
+    let base = member_prompt(hub, group, members, target, lane)?;
+    Ok(format!(
+        "{packet}\n\nYou are picking up this handoff. Do not repeat work that is already done. \
+         Continue it or reply with what is blocking you. Your reply is the room's message.\n\n{base}"
+    ))
+}
+
+fn clip(text: &str, max: usize) -> String {
+    if text.chars().count() <= max {
+        return text.to_owned();
+    }
+    text.chars().take(max).collect::<String>() + "…"
+}
+
 
 fn members(hub: &Hub, group: &BotConfig) -> Vec<BotConfig> {
     group

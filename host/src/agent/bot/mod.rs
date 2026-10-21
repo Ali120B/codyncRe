@@ -89,6 +89,10 @@ pub enum Cmd {
     NewSession {
         thread: Option<String>,
     },
+    /// Rewind dropped this lane's messages: forget the agent context that saw them.
+    ForgetLane {
+        lane: Lane,
+    },
     Reconfigure(Box<BotConfig>),
     /// A thread's model changed (the pin lives in the store); open sessions switch now.
     ThreadModel {

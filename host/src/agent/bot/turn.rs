@@ -75,6 +75,24 @@ impl Actor {
             r.lane = Some(lane.clone());
         });
 
+        // A turn in the user's own chat gets a file checkpoint before the agent can touch
+        // anything. Group room turns are captured once, for every member, by the room.
+        if !hidden
+            && self.active_request.is_none()
+            && self.active_group.is_none()
+            && self.active_routine.is_none()
+            && let Err(error) = crate::agent::checkpoint::capture(
+                &self.lane.chat,
+                &self.lane,
+                turn,
+                &self.cfg.id,
+                &self.cfg.cwd,
+            )
+            .await
+        {
+            tracing::warn!(bot = %self.cfg.id, error = format!("{error:#}"), "couldn't save a turn checkpoint");
+        }
+
         if let Some(deadline) = self.routine_deadline {
             tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), self.ensure_session(&lane))
                 .await
@@ -238,7 +256,7 @@ impl Actor {
                 }
                 // An ask's answer belongs to its requesting bot and exchange notice.
                 // Independent messages still report to the user in this chat.
-                if !delegated {
+                if !delegated && !self.standup_turn() {
                     e.data["final"] = true.into();
                     self.hub.set_entry(&id, &e.data);
                 }
@@ -364,6 +382,10 @@ impl Actor {
                 .map(|r| r.config)
                 .collect(),
         )
+    }
+
+    fn standup_turn(&self) -> bool {
+        self.active_group.as_ref().is_some_and(|g| g.standup)
     }
 
     /// `turn_finished`, while the turn's start time is still in the runtime.

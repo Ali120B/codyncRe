@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { isWorkingIn } from '@shared/models'
+import { isWorkingIn, type Entry } from '@shared/models'
 import { IconButton } from '../../components/Controls'
 import { Sheet } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
@@ -16,7 +16,7 @@ import { useReading } from './reading'
  * continue there. In a bot's own chat the thread is a separate branch of the conversation (its
  * own session, forked from the chat); in a group the room answers inside the thread.
  */
-export function RepliesView({ botId, rootId, close }: { botId: string; rootId: string; close: () => void }) {
+export function RepliesView({ botId, rootId, close, onRewind }: { botId: string; rootId: string; close: () => void; onRewind?: (e: Entry) => void }) {
   const store = useStore()
   const chat = store.bots.get(botId) ?? null
   const root = store.allEntries(botId).find((e) => e.id === rootId)
@@ -66,7 +66,7 @@ export function RepliesView({ botId, rootId, close }: { botId: string; rootId: s
           {items.map((item) =>
             item.kind === 'entry' ? (
               <div key={item.id} data-mid={item.id} className={arrivals.has(item.id) ? rowIn(item) : undefined}>
-                <ChatRow entry={item.entry} groupStart={item.groupStart} chat={chat} openTrace={openTrace} />
+                <ChatRow entry={item.entry} groupStart={item.groupStart} chat={chat} openTrace={openTrace} onRewind={onRewind} />
               </div>
             ) : null,
           )}
