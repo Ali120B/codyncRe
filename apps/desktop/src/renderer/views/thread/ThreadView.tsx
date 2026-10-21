@@ -293,9 +293,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
           <div className="top-chrome-row">
             <span style={{ flex: 1 }} />
             {bot && !isGroup(bot) && !calling ? <ModelChip bot={bot} /> : null}
-            {bot && isGroup(bot) && !calling ? (
-              <MacChatButton title="Room standup" icon="person.3" direction={[0, 0]} onClick={roomStandup} />
-            ) : null}
             {bot && !calling ? (
               <MacChatButton title="Computer" icon="display" direction={[0, 0]} className={showComputer ? 'active' : undefined} onClick={toggleComputer} />
             ) : null}

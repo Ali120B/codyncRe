@@ -75,7 +75,7 @@ export function BotEditorView({ draft: initial }: { draft: BotDraft }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
-      <ModalHeader title={isNew ? 'New bot' : 'Settings'} />
+      <ModalHeader title={isNew ? 'New bot' : 'Settings'} close={false} />
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <BotSettingsForm draft={draft} onChange={setDraft} error={error} plugins={plugins} />
       </div>

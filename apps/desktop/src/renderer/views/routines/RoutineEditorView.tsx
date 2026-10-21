@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, ChoicePicker, IconButton, Spinner } from '../../components/Controls'
+import { ChoicePicker, IconButton } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { Dialog, ModalHeader } from '../../components/Overlay'
+import { Dialog, ModalHeader, useDismiss } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
 import { emptyDraft, errorText, sameDraft, type Routine, type RoutineScheduleDraft, type RoutineSchedulePreview } from './routine'
@@ -18,6 +18,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
   saved: (routine: Routine | null) => void
 }) {
   const store = useStore()
+  const dismiss = useDismiss()
   const [name, setName] = useState(routine?.name ?? '')
   const [instruction, setInstruction] = useState(routine?.instruction ?? '')
   const [schedule, setSchedule] = useState<RoutineScheduleDraft>(emptyDraft)
@@ -339,7 +340,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 700, minHeight: 0, background: 'var(--background)', color: 'var(--text)', ...font(13) }}>
-      <ModalHeader title={routine ? 'Edit routine' : 'Set up a routine'} />
+      <ModalHeader title={routine ? 'Edit routine' : 'Set up a routine'} close={false} />
       {/* The card fits the form; it scrolls only when taller than the window allows. */}
       <fieldset className="routine-form" disabled={busy || !loaded} style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: 20 }}>
@@ -427,7 +428,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
               <IconButton title="Delete routine" icon="trash" onClick={() => setConfirmDelete(true)} />
               <IconButton
                 title={started ? 'Started' : 'Test run'}
-                icon={started ? 'checkmark' : 'play.circle'}
+                icon="play.circle"
                 disabled={started || store.isOffline}
                 onClick={async () => {
                   try {
@@ -440,11 +441,13 @@ export function RoutineEditorView({ botId, routine, saved }: {
               />
             </>
           ) : null}
+          <button className="editor-cancel" disabled={busy} onClick={() => dismiss()}>
+            Cancel
+          </button>
           <span style={{ flex: 1 }} />
-          <Button disabled={!canSave} onClick={() => void save()} title="Save (⌘S)">
-            {busy ? <Spinner size={12} /> : null}
-            {busy ? 'Saving…' : routine ? 'Save changes' : 'Create routine'}
-          </Button>
+          <button className="editor-done" disabled={!canSave} onClick={() => void save()} title="Save (⌘S)">
+            {busy ? 'Saving…' : 'Done'}
+          </button>
         </div>
       </div>
 

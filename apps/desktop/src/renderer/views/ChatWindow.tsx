@@ -178,7 +178,6 @@ function ChatSplitView() {
   const [groupSettings, setGroupSettings] = useState<{ bot: Bot; store: BotStore } | null>(null)
   const [teamMap, setTeamMap] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<BotTarget | null>(null)
-  const [newSessionBot, setNewSessionBot] = useState<BotTarget | null>(null)
   const [marketplace, setMarketplace] = useState<string | null>(null)
   const [settings, setSettings] = useState<SettingsPage | null>(null)
   const openVoiceSettings = useCallback(() => setSettings('voice'), [])
@@ -318,8 +317,8 @@ function ChatSplitView() {
     ...(isGroup(bot)
       ? [{ title: 'Group settings', icon: 'gearshape', divider: true, action: () => setGroupSettings({ bot, store }) } as MenuItem]
       : [{ title: 'Edit Profile…', icon: 'square.and.pencil', divider: true, action: () => app.openSettings({ computerId: store.computer.id, botId: bot.id }) } as MenuItem]),
+    { title: 'New chat', icon: 'bubble.left', action: () => { store.startNewChat(bot.id); app.select({ computerId: store.computer.id, botId: bot.id }) } },
     { title: 'Copy conversation ID', icon: 'square.on.square', divider: true, action: () => window.codync.app.copy(bot.id) },
-    ...(isGroup(bot) ? [] : [{ title: 'New session', icon: 'arrow.counterclockwise', action: () => setNewSessionBot({ bot, store }) } as MenuItem]),
     { title: 'Hide from sidebar', icon: 'eye.slash', divider: true, action: () => store.setHidden(bot, true) },
     { title: 'Delete', icon: 'trash', destructive: true, action: () => setConfirmDelete({ bot, store }) },
   ]
@@ -541,13 +540,6 @@ function ChatSplitView() {
       <Sheet open={settings !== null} onClose={() => setSettings(null)} dismissOnDim width={Math.min(880, windowSize.width - 80)} height={Math.min(680, sheetHeight)}>
         {settings ? <SettingsView page={settings} /> : null}
       </Sheet>
-      <Dialog
-        open={newSessionBot !== null}
-        title="Start a new session?"
-        message="The conversation stays here, but the agent starts with a fresh context."
-        actions={newSessionBot ? [{ title: 'New session', action: () => newSessionBot.store.newSession(newSessionBot.bot.id) }] : []}
-        onClose={() => setNewSessionBot(null)}
-      />
       <Dialog
         open={confirmDelete !== null}
         title={`Delete ${confirmDelete?.bot.name ?? 'bot'}?`}

@@ -116,7 +116,7 @@ export function GroupEditorView({ group, members: initialMembers = [], onCancel,
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
-      <ModalHeader title={isNew ? 'New group chat' : 'Group chat'} close={!!onCancel} onClose={onCancel} />
+      <ModalHeader title={isNew ? 'New group chat' : 'Group chat'} close={false} />
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <div className="group-form">
           <div className="group-identity">
