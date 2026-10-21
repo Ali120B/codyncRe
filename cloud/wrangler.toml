@@ -44,12 +44,13 @@ simple = { limit = 60, period = 60 }
 [triggers]
 crons = ["*/15 * * * *"]
 
-# dev: the deployed test environment at dev-api.codync.dev (Clerk development instance).
+# dev: our own development deployment. Starts on workers.dev; add a custom domain later.
 [env.dev]
 name = "codync-cloud-dev"
-routes = [{ pattern = "dev-api.codync.dev", custom_domain = true }]
-vars = { CLERK_ISSUER = "https://sunny-mollusk-8651.clerk.accounts.dev" }
-d1_databases = [{ binding = "DB", database_name = "codync-dev", database_id = "0c03c398-3cec-4f06-a76e-998176ca19ae", migrations_dir = "migrations" }]
+workers_dev = true
+routes = []
+vars = { CLERK_ISSUER = "https://sweeping-marmoset-6208.clerk.accounts.dev" }
+d1_databases = [{ binding = "DB", database_name = "codync-dev", database_id = "f1a063d1-5b1e-4534-99bc-7231ca1b6d31", migrations_dir = "migrations" }]
 durable_objects.bindings = [{ name = "RELAY", class_name = "ComputerRelay" }]
 ratelimits = [{ name = "REGISTER_LIMITER", namespace_id = "1002", simple = { limit = 10, period = 60 } }, { name = "TURN_LIMITER", namespace_id = "1012", simple = { limit = 12, period = 60 } }, { name = "HOOK_LIMITER", namespace_id = "1022", simple = { limit = 60, period = 60 } }]
 triggers = { crons = ["*/15 * * * *"] }

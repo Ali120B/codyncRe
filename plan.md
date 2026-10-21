@@ -6,33 +6,25 @@ Build the native Android app, keep iOS until the parity gate is signed off, then
 `apps/ios/`. Detailed phases, stack, host/cloud changes and the removal gate:
 [docs/design/android-app.md](docs/design/android-app.md).
 
-## Then: own Clerk + Cloudflare
+## Dev infrastructure (done)
 
-Fast path first; custom domains and production polish come after the dev path works.
+- Worker: `https://codync-cloud-dev.codyncre.workers.dev` (`codync-cloud-dev`, workers.dev).
+- D1: `codync-dev` (`f1a063d1-5b1e-4534-99bc-7231ca1b6d31`), migrations applied.
+- Clerk: development app `codync dev`, issuer
+  `https://sweeping-marmoset-6208.clerk.accounts.dev`, Google enabled.
+- `apps/shared/Config/dev.plist` and the dev host point at this Worker.
+- `CLERK_SECRET_KEY` is set in the Worker. `CLERK_WEBHOOK_SECRET` is still needed after the
+  Clerk webhook is created.
 
-- **Cloudflare**
-  - Create/choose the Cloudflare account and run `npx wrangler login` from `cloud/`.
-  - Create a D1 database `codync-dev`; put its real `database_id` in `[env.dev]`.
-  - For the fastest start, deploy the dev Worker on `workers.dev` (add `workers_dev = true`,
-    remove the `dev-api.codync.dev` route). No DNS wait.
-  - Apply migrations, then set `CLERK_SECRET_KEY` and `CLERK_WEBHOOK_SECRET`.
-  - Deploy with `npx wrangler deploy --env dev`; check `/health`.
-- **Clerk**
-  - Create our own Clerk application (start with a Development instance).
-  - Enable Google sign-in; create the native Android app once its package ID is fixed.
-  - Copy the publishable key and the Frontend API URL into app config.
-  - Add the Worker webhook `https://<worker>/v1/webhooks/clerk` for `user.deleted`; copy its
-    signing secret to the Worker.
-- **Point clients at it**
-  - Update `apps/shared/Config/dev.plist` (Clerk publishable key + cloud URL).
-  - For dev, point the host with `CODYNC_CLOUD_URL`; for release builds, change the dev/main
-    URL in `host/src/environment.rs`.
-  - Keep local pairing account-free.
-- Never commit Clerk secret keys, webhook secrets, Cloudflare tokens, `google-services.json` or
-  service-account JSON.
+## Production infrastructure (later)
 
-Custom domains (`clerk.<domain>`, `api.<domain>`) and a production Clerk instance are a second
-step, once the dev flow is proven.
+- Custom domains instead of workers.dev.
+- Clerk production instance with our own Google OAuth credentials.
+- Apply migrations to the production D1 database, set production Worker secrets.
+- Change the main cloud URL in `host/src/environment.rs` and `apps/shared/Config/main.plist`.
+
+Never commit Clerk secret keys, webhook secrets, Cloudflare tokens, `google-services.json` or
+service-account JSON.
 
 ## Shipped in 2.20.0
 

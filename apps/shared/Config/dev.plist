@@ -3,8 +3,8 @@
 <plist version="1.0">
 <dict>
 	<key>clerkPublishableKey</key>
-	<string>pk_test_c3VubnktbW9sbHVzay04NjUxLmNsZXJrLmFjY291bnRzLmRldiQ</string>
+	<string>pk_test_c3dlZXBpbmctbWFybW9zZXQtNjIwOC5jbGVyay5hY2NvdW50cy5kZXYk</string>
 	<key>cloudURL</key>
-	<string>https://dev-api.codync.dev</string>
+	<string>https://codync-cloud-dev.codyncre.workers.dev</string>
 </dict>
 </plist>
