@@ -13,8 +13,9 @@ Build the native Android app, keep iOS until the parity gate is signed off, then
 - Clerk: development app `codync dev`, issuer
   `https://sweeping-marmoset-6208.clerk.accounts.dev`, Google enabled.
 - `apps/shared/Config/dev.plist` and the dev host point at this Worker.
-- `CLERK_SECRET_KEY` is set in the Worker. `CLERK_WEBHOOK_SECRET` is still needed after the
-  Clerk webhook is created.
+- Worker secrets `CLERK_SECRET_KEY` and `CLERK_WEBHOOK_SECRET` are set; the Clerk
+  `user.deleted` webhook points at `/v1/webhooks/clerk`.
+- Dev desktop signed in and this computer claimed to the Clerk account.
 
 ## Production infrastructure (later)
 
