@@ -1,9 +1,8 @@
 # Android app plan
 
-Status: scope re-audited against the whole fork; architecture locked, release split awaiting
-Ali's approval. No Android code exists yet. The iOS app stays in the repository until the
-parity gate at the end of this document is explicitly signed off. The v1/v1.1/v2 feature
-lists live in [plan.md](../../plan.md); this document is the build plan.
+Status: scope locked to one all-at-once v1. No Android code exists until Ali says go. The iOS
+app stays in the repository until Ali explicitly says remove it. The v1/v2 feature lists live
+in [plan.md](../../plan.md); this document is the build plan.
 
 ## Locked decisions
 
@@ -26,8 +25,9 @@ lists live in [plan.md](../../plan.md); this document is the build plan.
 | Accounts | Google sign-in + local QR pairing; account optional |
 | Notifications | FCM in v1 |
 | Offline | Read cached chats; sending waits for a connection |
-| v1 scope | Everything except voice calls, remote screen, multi-account and tablet/foldable layouts |
-| V1 shape | v1.0 daily driver + v1.1 workbench, pending approval |
+| v1 scope | Everything except voice calls, remote screen, widgets/ongoing status and tablet/foldable layouts |
+| V1 shape | One all-at-once release; internal M0–M5 milestones only |
+| Multi-account | Not planned |
 | Distribution | Sideloaded APK first; Play Store in v2 |
 | Package | `com.pokai.Codync.android`, dev suffix `.dev` |
 
@@ -48,9 +48,11 @@ Not in v1 (v2 unless explicitly waived):
 
 - Voice calls and realtime voice engines. Composer dictation is in v1.
 - Remote screen viewing/control.
-- Multiple signed-in accounts and account switching.
+- Home-screen widgets and an ongoing-status surface.
 - Tablet/foldable-specific layouts.
 - Play Store distribution.
+
+Multiple signed-in accounts and account switching are not planned.
 
 Non-goals:
 
@@ -111,7 +113,7 @@ apps/android/
   feature/settings/            # account, notifications, appearance, about
   feature/screen/              # v2 remote screen
   feature/call/                # v2 voice calls
-  feature/widgets/             # v1.1 Glance widgets and ongoing status
+  feature/widgets/             # v2 Glance widgets and ongoing status
 ```
 
 Keep wire models in `core/model` as Kotlin `@Serializable` classes with the same JSON names as
@@ -191,51 +193,49 @@ channel handshake keys, mailbox sealing and push sealing.
 
 ## Feature parity matrix
 
-Priorities are the delivery milestones in [plan.md](../../plan.md): **v1.0** is the daily
-driver, **v1.1** completes v1, **v2** is after v1 acceptance. A v1.1 row is still required
-before iOS removal.
+**v1** means the one complete release. **v2** is optional work after v1. Multi-account is not
+planned.
 
 | Area | Android scope | Priority |
 | --- | --- | --- |
-| Welcome / sign in | Google via Clerk, skip, local-only pairing, account restoration | v1.0 |
-| QR pairing | Camera, paste link, deep link, code confirmation | v1.0 |
-| Account computers | Discover, ask access, SAS, approve, revoke, remove, claim | v1.0 |
-| Transports | Direct SSE/HTTP + relay WebSocket, resume by `rev`, network/process recovery | v1.0 |
-| Offline | Cached chat reading, drafts, send-waits-for-link, honest connection state | v1.0 |
-| Push | FCM registration, encrypted alerts, deep links, per-bot mute, foreground handling | v1.0 |
-| Roster | All computers grouped, connection summary, filters, collapse, pin/reorder/hide, search | v1.0 |
-| Bot editor | Name, description, character/avatar, instructions, workspace, approval mode, tools, notifications | v1.0 |
-| Agents/models | ACP registry discovery, install state, model picker, model options, Fast mode, Cline, custom IDs | v1.0 |
-| Workspace picker | Browse the selected computer, choose once, remember per bot and group | v1.0 |
-| Multiple chats | Main + named chats per bot/group, own context, last line, delete, chats panel | v1.0 |
-| New chat / session | Recipient chips, multi-bot group setup, new session, per-chat new session | v1.0 |
-| Chat timeline | Streaming, final replies, markdown, code, trace/full conversation, copy, reactions, paging, jump-to-latest | v1.0 |
-| Composer | Text, files/photos/camera/paste, chips, slash commands, drafts, stop, dictation | v1.0 |
-| Approvals | Permission cards, allow once/always/deny, pending bar, sign-ins, failed sends, bot errors | v1.0 |
-| Threads | Replies, unread/read, root summaries, thread composer, per-thread model pinning | v1.0 |
-| Groups | 2–50 members, room setup, leader/rounds, member tools, group settings, delete | v1.0 |
-| Group room features | @mentions, one-shot responders, `@all` standup, handoffs, group Files, group routines, group Skills/Vault, room-scoped Browser/Computer | v1.0 |
-| Bot collaboration | Team MCP notices, grouped exchanges, pending requests, stop/cancel | v1.0 |
-| Rewind | Per-turn file + chat restore, confirmation/progress, direct and group | v1.0 |
-| Needs You | Permission cards, failed sends, sign-ins, device approvals, failed/waiting bots | v1.0 |
-| Command deck / search | Bots, chats, messages, app actions, approval review, exact-message deep links | v1.0 |
-| Team map | Bots and groups as a ring, ask arrows, group membership, click-through | v1.0 |
-| Attachments | Upload/download, 100 MB chunks, image preview, bot `send_file`, save/share, retry/cancel | v1.0 |
-| Settings | Account, computers/devices, notifications, appearance, analytics, support, about, sign out | v1.0 |
-| Routines | Bot and group routines, schedules, time zone/time picker, webhook, test run, records, delete | v1.1 |
-| Memory | Search, CRUD, pin, review, history/timeline, import/export, profile facts | v1.1 |
-| Marketplace | Agents/Node setup, MCP registry/custom/import, Composio, skills, credentials/vault, sign-in, per-bot toggles, setup terminal | v1.1 |
-| Usage | Per-computer/provider limits, reset times, provider status | v1.1 |
-| Computer panel | Computer, Cloud, Phones, Browser, Files, Routines; group tabs and member picker | v1.1 |
-| Browser | State, address, frames, tabs, start/stop, take control/release, expanded view | v1.1 |
-| Files | Browse/download allowed host files, group Files, share/save | v1.1 |
-| Accessibility/polish | Large fonts, reduced motion, haptics, contrast, battery/network profiling, crash reports | v1.1 |
+| Welcome / sign in | Google via Clerk, skip, local-only pairing, account restoration | v1 |
+| QR pairing | Camera, paste link, deep link, code confirmation | v1 |
+| Account computers | Discover, ask access, SAS, approve, revoke, remove, claim | v1 |
+| Transports | Direct SSE/HTTP + relay WebSocket, resume by `rev`, network/process recovery | v1 |
+| Offline | Cached chat reading, drafts, send-waits-for-link, honest connection state | v1 |
+| Push | FCM registration, encrypted alerts, deep links, per-bot mute, foreground handling | v1 |
+| Roster | All computers grouped, connection summary, filters, collapse, pin/reorder/hide, search | v1 |
+| Bot editor | Name, description, character/avatar, instructions, workspace, approval mode, tools, notifications | v1 |
+| Agents/models | ACP registry discovery, install state, model picker, model options, Fast mode, Cline, custom IDs | v1 |
+| Workspace picker | Browse the selected computer, choose once, remember per bot and group | v1 |
+| Multiple chats | Main + named chats per bot/group, own context, last line, delete, chats panel | v1 |
+| New chat / session | Recipient chips, multi-bot group setup, new session, per-chat new session | v1 |
+| Chat timeline | Streaming, final replies, markdown, code, trace/full conversation, copy, reactions, paging, jump-to-latest | v1 |
+| Composer | Text, files/photos/camera/paste, chips, slash commands, drafts, stop, dictation | v1 |
+| Approvals | Permission cards, allow once/always/deny, pending bar, sign-ins, failed sends, bot errors | v1 |
+| Threads | Replies, unread/read, root summaries, thread composer, per-thread model pinning | v1 |
+| Groups | 2–50 members, room setup, leader/rounds, member tools, group settings, delete | v1 |
+| Group room features | @mentions, one-shot responders, `@all` standup, handoffs, group Files, group routines, group Skills/Vault, room-scoped Browser/Computer | v1 |
+| Bot collaboration | Team MCP notices, grouped exchanges, pending requests, stop/cancel | v1 |
+| Rewind | Per-turn file + chat restore, confirmation/progress, direct and group | v1 |
+| Needs You | Permission cards, failed sends, sign-ins, device approvals, failed/waiting bots | v1 |
+| Command deck / search | Bots, chats, messages, app actions, approval review, exact-message deep links | v1 |
+| Team map | Bots and groups as a ring, ask arrows, group membership, click-through | v1 |
+| Attachments | Upload/download, 100 MB chunks, image preview, bot `send_file`, save/share, retry/cancel | v1 |
+| Settings | Account, computers/devices, notifications, appearance, analytics, support, about, sign out | v1 |
+| Routines | Bot and group routines, schedules, time zone/time picker, webhook, test run, records, delete | v1 |
+| Memory | Search, CRUD, pin, review, history/timeline, import/export, profile facts | v1 |
+| Marketplace | Agents/Node setup, MCP registry/custom/import, Composio, skills, credentials/vault, sign-in, per-bot toggles, setup terminal | v1 |
+| Usage | Per-computer/provider limits, reset times, provider status | v1 |
+| Computer panel | Computer, Cloud, Phones, Browser, Files, Routines; group tabs and member picker | v1 |
+| Browser | State, address, frames, tabs, start/stop, take control/release, expanded view | v1 |
+| Files | Browse/download allowed host files, group Files, share/save | v1 |
+| Accessibility/polish | Large fonts, reduced motion, haptics, contrast, battery/network profiling, crash reports | v1 |
 | Voice calls | Android speech/TTS, OpenAI/Gemini realtime, group calls, settings, background audio | v2 |
 | Remote screen | WebRTC view/control, touch mapping, orientation, TURN, permissions/takeover | v2 |
-| Widgets/status | Glance bot/usage widgets and ongoing work/needs-you surface | v1.1 |
-| Account switching | Multiple signed-in accounts, isolated caches/keys, fast switch | v2 |
+| Widgets/status | Glance bot/usage widgets and ongoing work/needs-you surface | v2 |
 | Tablet/foldable | Adaptive list/detail and split layouts | v2 |
-| Distribution | Signed sideload APK; Play internal/closed/public in v2 | v1.0 / v2 |
+| Distribution | Signed sideload APK; Play internal/closed/public in v2 | v1 / v2 |
 
 ## Host, cloud and relay changes
 
@@ -252,8 +252,8 @@ These are shared changes and should land before or alongside the Android client:
    - Add `FCM_SERVICE_ACCOUNT` (or equivalent) as a Worker secret; never commit
      `google-services.json` or a service-account JSON.
    - Keep encrypted title/body; Android decrypts locally and posts a notification.
-   - Define Android status updates for working/needs-you/done/failed. Ongoing status is a
-     v1.1 surface; it supplements normal FCM alerts rather than replacing them.
+   - Define Android status updates for working/needs-you/done/failed. Ongoing status is a v2
+     surface; v1 uses normal FCM alerts.
    - Register FCM tokens per install/account context, retire them on logout/removal, and keep
      APNs tickets working.
 3. **Deep links**
@@ -330,7 +330,8 @@ and push; no debug host.
 - Bot/group editors, model options/Fast mode, workspace picker, templates, delete.
 - UI shell: glass nav, hidden-in-chat behavior, settings, connection states.
 
-Exit: v1.0 usable as the daily driver; every fork chat feature in the audit table works.
+Exit: internal build is usable as the daily driver; every fork chat feature in the audit table
+works.
 
 ### M4 — workbench (4–5 weeks)
 
@@ -341,9 +342,8 @@ Exit: v1.0 usable as the daily driver; every fork chat feature in the audit tabl
 - Usage and provider limits.
 - Computer panel: Computer, Cloud, Phones, Browser, Files, Routines; group tabs/member picker.
 - Browser frames/takeover/expanded view and file download/share.
-- Glance bot/usage widgets and the working/needs-you ongoing notification.
 
-Exit: a user can configure and operate a computer entirely from Android; v1.1 is complete.
+Exit: a user can configure and operate a computer entirely from Android; v1 is feature-complete.
 
 ### M5 — hardening and v1 release (2–3 weeks)
 
@@ -356,12 +356,14 @@ Exit: a user can configure and operate a computer entirely from Android; v1.1 is
 
 Exit: signed v1 APK installed and accepted; iOS still in the repository.
 
-### v2 — voice, screen, accounts and store
+### v2 — voice, screen, widgets and store
 
 - Voice calls and realtime engines; remote screen/WebRTC/TURN.
-- Multi-account switching; tablet/foldable layouts.
+- Glance widgets and the working/needs-you ongoing status surface.
+- Tablet/foldable layouts.
 - Play internal/closed/public, data safety, store assets.
-- iOS removal only after the gate below, not at v1 by default.
+- Multi-account is not planned.
+- iOS removal only when Ali explicitly says so.
 
 ## Testing strategy
 
@@ -380,20 +382,18 @@ Exit: signed v1 APK installed and accepted; iOS still in the repository.
 
 ## Release and iOS removal gate
 
-Do not delete iOS merely because Android compiles, and do not treat v1 as “100%” if v2
-features still matter to Ali. Remove iOS only when all of these are true:
+Do not delete iOS merely because Android compiles. Remove it only when Ali explicitly says so.
+v2 does not automatically block removal; it is optional unless Ali says otherwise. Before
+asking him, all of these must be true:
 
-- Every v1.0 and v1.1 row in the parity matrix passes on a physical Android phone.
-- v2 rows (voice, remote screen, account switching, tablet/foldable) either pass or are
-  explicitly waived in writing by Ali.
+- Every v1 row in the parity matrix passes on a physical Android phone.
 - The Android app can pair, sign in, recover from process death and receive push without a
   connected desktop.
-- A signed release APK installs over the previous build; if Play is used, its testing track is
-  live with the same build.
+- A signed release APK installs over the previous build.
 - The host and cloud accept Android devices in production, not only dev.
 - Desktop approval and device lists show Android correctly.
 - README, AGENTS, docs and release notes name Android as the phone client.
-- Ali says Android is 100% code.
+- Ali says Android is complete and explicitly authorizes deleting iOS.
 
 When that happens, remove in this order:
 
@@ -422,11 +422,8 @@ When that happens, remove in this order:
 
 ## Open decisions
 
-- Approve the v1.0/v1.1 staging or require one all-at-once v1.
-- Confirm that widgets/ongoing status stay in v1.1 and multi-account/tablet/foldable are v2.
-- Confirm that team map, computer panel, browser and files are v1.1.
-- Confirm whether iOS removal waits for v2 voice/screen or can follow v1 with a written waiver.
-- Firebase project ownership for FCM.
-- Release keystore location outside the repository.
-- Whether Clerk's Android SDK is mature enough or FAPI + Custom Tabs is the safer path; decide
-  during the M0 spike.
+Scope is settled: one all-at-once v1, every fork feature in v1, voice/screen/widgets/tablet in
+v2, no multi-account, iOS removed only when Ali says, new Firebase project.
+
+Still needed: Ali's explicit **go**, the Firebase `google-services.json` in M1, and the release
+keystore location outside the repository in M5. Decide the Clerk SDK path during the M0 spike.
