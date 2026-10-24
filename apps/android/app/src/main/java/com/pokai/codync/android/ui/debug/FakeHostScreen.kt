@@ -128,7 +128,7 @@ fun FakeHostScreen(
             item { SectionLabel("Host state") }
             item {
                 SectionCard {
-                    SettingsRow("Version", subtitle = "3.0.0 · protocol v1", icon = CodyncIcons.Cloud, showChevron = false, trailing = { Text("OK", color = colors.added, style = CodyncType.caption) })
+                    SettingsRow("Version", subtitle = "3.0.3 · protocol v1", icon = CodyncIcons.Cloud, showChevron = false, trailing = { Text("OK", color = colors.added, style = CodyncType.caption) })
                     com.pokai.codync.design.DividerLine(inset = 54.dp)
                     SettingsRow("Revision", subtitle = "resume point after reconnect", icon = CodyncIcons.Sync, showChevron = false, trailing = { Text("${fake.rev}", color = colors.tertiary, style = CodyncType.caption) })
                     com.pokai.codync.design.DividerLine(inset = 54.dp)

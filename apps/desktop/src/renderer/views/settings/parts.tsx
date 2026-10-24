@@ -9,7 +9,9 @@ export const thisMac = isMac ? 'this Mac' : 'this computer'
 
 /** The icon for a device by its account platform: phones, Macs, and other desktops. */
 export function deviceIcon(platform: string | null | undefined) {
-  return platform === 'ios' ? 'iphone' : platform === 'macos' ? 'laptopcomputer' : 'desktopcomputer'
+  if (platform === 'ios' || platform === 'android') return 'iphone'
+  if (platform === 'macos') return 'laptopcomputer'
+  return 'desktopcomputer'
 }
 
 /** Keeps `children` mounted while it fades and folds away. */

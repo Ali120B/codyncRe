@@ -26,9 +26,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -42,8 +41,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,18 +57,21 @@ import com.pokai.codync.android.fake.FakeTransport
 import com.pokai.codync.android.ui.LargeHeader
 import com.pokai.codync.android.ui.SearchField
 import com.pokai.codync.android.ui.SectionLabel
-import com.pokai.codync.android.ui.relativeShort
 import com.pokai.codync.android.ui.rosterStamp
 import com.pokai.codync.design.CharacterAvatar
 import com.pokai.codync.design.CodyncIcon
 import com.pokai.codync.design.CodyncIcons
+import com.pokai.codync.design.CodyncMenuAnchor
+import com.pokai.codync.design.CodyncMenuItem
 import com.pokai.codync.design.FilterChip
 import com.pokai.codync.design.GlassIconButton
 import com.pokai.codync.design.PrimaryButton
+import com.pokai.codync.design.SecondaryButton
 import com.pokai.codync.design.SectionCard
 import com.pokai.codync.design.Spinner
 import com.pokai.codync.design.StatusDot
 import com.pokai.codync.design.UnreadBadge
+import com.pokai.codync.design.theme.AvatarPalette
 import com.pokai.codync.design.theme.CodyncTheme
 import com.pokai.codync.design.theme.CodyncType
 
@@ -75,26 +82,30 @@ private enum class RosterFilter(val label: String) {
     Rooms("Rooms"),
 }
 
+private enum class CreateKind { Bot, Group, Chat }
+
 @Composable
 fun BotsScreen(
     fake: FakeHostState,
     onOpenChat: (botId: String, chatId: String) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenFakeHost: () -> Unit,
+    onOpenBotDetails: (String) -> Unit,
 ) {
     val colors = CodyncTheme.colors
-    var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(RosterFilter.All) }
     var collapsed by rememberSaveable { mutableStateOf(setOf<String>()) }
     var showHidden by rememberSaveable { mutableStateOf(false) }
-    var showNewChat by rememberSaveable { mutableStateOf(false) }
+    var showCreateMenu by remember { mutableStateOf(false) }
+    var createKind by remember { mutableStateOf<CreateKind?>(null) }
 
     val visible = fake.visibleBots().filter { bot ->
         val matchesQuery = query.isBlank() ||
             bot.name.contains(query, ignoreCase = true) ||
             bot.description.contains(query, ignoreCase = true) ||
-            bot.lastLine.contains(query, ignoreCase = true)
+            bot.lastLine.contains(query, ignoreCase = true) ||
+            bot.backend.contains(query, ignoreCase = true)
         val matchesFilter = when (filter) {
             RosterFilter.All -> true
             RosterFilter.Working -> bot.status == "working"
@@ -116,19 +127,33 @@ fun BotsScreen(
             title = "Bots",
             subtitle = "${fake.computers.size} computers · $online online · rev ${fake.rev}",
             trailing = {
-                GlassIconButton(CodyncIcons.Search, "Search", onClick = { searching = !searching })
-                GlassIconButton(CodyncIcons.Add, "New chat", onClick = { showNewChat = true })
+                CodyncMenuAnchor(
+                    expanded = showCreateMenu,
+                    onDismissRequest = { showCreateMenu = false },
+                    items = listOf(
+                        CodyncMenuItem("New bot", CodyncIcons.PersonAdd) {
+                            createKind = CreateKind.Bot
+                        },
+                        CodyncMenuItem("New group", CodyncIcons.GroupAdd) {
+                            createKind = CreateKind.Group
+                        },
+                        CodyncMenuItem("New chat", CodyncIcons.AddComment) {
+                            createKind = CreateKind.Chat
+                        },
+                    ),
+                ) {
+                    GlassIconButton(CodyncIcons.Add, "Create", onClick = { showCreateMenu = true })
+                }
             },
         )
 
-        if (searching) {
-            SearchField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = "Search bots, rooms and messages",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
+        SearchField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = "Search bots, rooms and messages",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            onOpen = onOpenSearch,
+        )
 
         Row(
             Modifier
@@ -145,7 +170,7 @@ fun BotsScreen(
 
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 118.dp),
+            contentPadding = PaddingValues(bottom = 128.dp),
         ) {
             if (query.isNotBlank() || filter != RosterFilter.All) {
                 if (visible.isEmpty()) {
@@ -157,13 +182,19 @@ fun BotsScreen(
                         )
                     }
                 } else {
-                    item { SectionLabel(if (query.isNotBlank()) "Results" else filter.label, trailing = "${visible.size}") }
+                    item {
+                        SectionLabel(
+                            if (query.isNotBlank()) "Results" else filter.label,
+                            trailing = "${visible.size}",
+                        )
+                    }
                     items(visible, key = { it.id }) { bot ->
                         BotListRow(
                             fake = fake,
                             bot = bot,
                             onOpenChat = onOpenChat,
                             onDebug = onOpenFakeHost,
+                            onOpenDetails = { onOpenBotDetails(bot.id) },
                         )
                     }
                 }
@@ -171,7 +202,7 @@ fun BotsScreen(
                 if (pinned.isNotEmpty()) {
                     item { SectionLabel("Pinned", trailing = "${pinned.size}") }
                     items(pinned, key = { "pinned_${it.id}" }) { bot ->
-                        BotListRow(fake, bot, onOpenChat, onOpenFakeHost)
+                        BotListRow(fake, bot, onOpenChat, onOpenFakeHost, { onOpenBotDetails(bot.id) })
                     }
                 }
 
@@ -186,7 +217,11 @@ fun BotsScreen(
                                 count = bots.size,
                                 collapsed = computer.id in collapsed,
                                 onClick = {
-                                    collapsed = if (computer.id in collapsed) collapsed - computer.id else collapsed + computer.id
+                                    collapsed = if (computer.id in collapsed) {
+                                        collapsed - computer.id
+                                    } else {
+                                        collapsed + computer.id
+                                    }
                                 },
                             )
                         }
@@ -202,7 +237,7 @@ fun BotsScreen(
                                 }
                             }
                             items(bots, key = { it.id }) { bot ->
-                                BotListRow(fake, bot, onOpenChat, onOpenFakeHost)
+                                BotListRow(fake, bot, onOpenChat, onOpenFakeHost, { onOpenBotDetails(bot.id) })
                             }
                         }
                     }
@@ -213,13 +248,18 @@ fun BotsScreen(
                         Row(
                             Modifier
                                 .fillMaxWidth()
+                                .combinedClickable(onClick = { showHidden = !showHidden })
                                 .padding(horizontal = 22.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             CodyncIcon(CodyncIcons.Hide, tint = colors.tertiary, size = 16.dp)
                             Spacer(Modifier.width(7.dp))
                             Text(
-                                if (showHidden) "Hide hidden bots" else "Show ${hidden.size} hidden bot${if (hidden.size == 1) "" else "s"}",
+                                if (showHidden) {
+                                    "Hide hidden bots"
+                                } else {
+                                    "Show ${hidden.size} hidden bot${if (hidden.size == 1) "" else "s"}"
+                                },
                                 color = colors.secondary,
                                 style = CodyncType.footnote,
                                 modifier = Modifier.weight(1f),
@@ -229,7 +269,7 @@ fun BotsScreen(
                     }
                     if (showHidden) {
                         items(hidden, key = { "hidden_${it.id}" }) { bot ->
-                            BotListRow(fake, bot, onOpenChat, onOpenFakeHost, dimmed = true)
+                            BotListRow(fake, bot, onOpenChat, onOpenFakeHost, { onOpenBotDetails(bot.id) }, dimmed = true)
                         }
                     }
                 }
@@ -248,15 +288,32 @@ fun BotsScreen(
         }
     }
 
-    if (showNewChat) {
-        NewChatSheet(
+    when (createKind) {
+        CreateKind.Bot -> CreateBotSheet(
             fake = fake,
-            onDismiss = { showNewChat = false },
+            onDismiss = { createKind = null },
+            onCreated = { botId ->
+                createKind = null
+                onOpenChat(botId, fake.mainChatId(botId))
+            },
+        )
+        CreateKind.Group -> CreateGroupSheet(
+            fake = fake,
+            onDismiss = { createKind = null },
+            onCreated = { botId ->
+                createKind = null
+                onOpenChat(botId, fake.mainChatId(botId))
+            },
+        )
+        CreateKind.Chat -> NewChatSheet(
+            fake = fake,
+            onDismiss = { createKind = null },
             onStart = { botId, chatId ->
-                showNewChat = false
+                createKind = null
                 onOpenChat(botId, chatId)
             },
         )
+        null -> Unit
     }
 }
 
@@ -281,7 +338,11 @@ private fun ConnectionStrip(fake: FakeHostState, onClick: () -> Unit) {
             },
         )
         Spacer(Modifier.width(7.dp))
-        Text(fake.transport.label, color = colors.text, style = CodyncType.caption.copy(fontWeight = FontWeight.Medium))
+        Text(
+            fake.transport.label,
+            color = colors.text,
+            style = CodyncType.caption.copy(fontWeight = FontWeight.Medium),
+        )
         Spacer(Modifier.width(8.dp))
         Text("rev ${fake.rev}", color = colors.tertiary, style = CodyncType.caption)
         Spacer(Modifier.weight(1f))
@@ -294,7 +355,7 @@ private fun ConnectionStrip(fake: FakeHostState, onClick: () -> Unit) {
 @Composable
 private fun ComputerHeader(
     name: String,
-    platform: String,
+    @Suppress("UNUSED_PARAMETER") platform: String,
     transport: FakeTransport,
     count: Int,
     collapsed: Boolean,
@@ -347,11 +408,44 @@ private fun BotListRow(
     bot: FakeBot,
     onOpenChat: (String, String) -> Unit,
     onDebug: () -> Unit,
+    onOpenDetails: () -> Unit,
     dimmed: Boolean = false,
 ) {
     val colors = CodyncTheme.colors
     var menu by remember { mutableStateOf(false) }
-    Box {
+    CodyncMenuAnchor(
+        expanded = menu,
+        onDismissRequest = { menu = false },
+        items = listOf(
+            CodyncMenuItem(if (bot.kind == "group") "Group details" else "Bot details", CodyncIcons.Info, onClick = onOpenDetails),
+            CodyncMenuItem("New chat", CodyncIcons.AddComment) {
+                onOpenChat(bot.id, fake.createChat(bot.id))
+            },
+            CodyncMenuItem(if (bot.pinned) "Unpin" else "Pin", CodyncIcons.Pin) {
+                fake.togglePin(bot.id)
+            },
+            CodyncMenuItem(
+                if (bot.unread > 0) "Mark read" else "Mark unread",
+                CodyncIcons.MailRead,
+            ) {
+                if (bot.unread > 0) fake.markRead(bot.id)
+            },
+            CodyncMenuItem(
+                if (bot.hidden) "Show ${if (bot.kind == "group") "group" else "bot"}"
+                else "Hide ${if (bot.kind == "group") "group" else "bot"}",
+                CodyncIcons.Hide,
+            ) {
+                if (bot.hidden) {
+                    val index = fake.bots.indexOfFirst { it.id == bot.id }
+                    if (index >= 0) fake.bots[index] = fake.bots[index].copy(hidden = false)
+                } else {
+                    fake.hideBot(bot.id)
+                }
+            },
+            CodyncMenuItem("Fixture host", CodyncIcons.Science, onClick = onDebug),
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -369,7 +463,10 @@ private fun BotListRow(
             BotAvatar(fake = fake, bot = bot)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     if (bot.pinned) {
                         CodyncIcon(CodyncIcons.Pin, tint = colors.tertiary, size = 11.dp)
                         Spacer(Modifier.width(4.dp))
@@ -380,75 +477,31 @@ private fun BotListRow(
                         style = CodyncType.body.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier.weight(1f),
                     )
                     if (bot.kind == "group") {
-                        Spacer(Modifier.width(5.dp))
+                        Spacer(Modifier.width(6.dp))
                         Text("ROOM", color = colors.tertiary, style = CodyncType.caption2)
                     }
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(10.dp))
                     Text(
                         rosterStamp(bot.lastAt),
                         color = if (bot.unread > 0) colors.text else colors.tertiary,
                         style = CodyncType.caption,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
                     )
                 }
                 Spacer(Modifier.height(3.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    BotPreview(bot)
-                    Spacer(Modifier.weight(1f))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.weight(1f)) { BotPreview(bot) }
+                    Spacer(Modifier.width(8.dp))
                     if (bot.unread > 0) UnreadBadge(bot.unread)
                 }
             }
-        }
-
-        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            DropdownMenuItem(
-                text = { Text("New chat") },
-                leadingIcon = { CodyncIcon(CodyncIcons.AddComment, size = 18.dp) },
-                onClick = {
-                    menu = false
-                    val id = fake.createChat(bot.id)
-                    onOpenChat(bot.id, id)
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(if (bot.pinned) "Unpin" else "Pin") },
-                leadingIcon = { CodyncIcon(CodyncIcons.Pin, size = 18.dp) },
-                onClick = {
-                    menu = false
-                    fake.togglePin(bot.id)
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(if (bot.unread > 0) "Mark read" else "Mark unread") },
-                leadingIcon = { CodyncIcon(CodyncIcons.MailRead, size = 18.dp) },
-                onClick = {
-                    menu = false
-                    if (bot.unread > 0) fake.markRead(bot.id)
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(if (bot.hidden) "Show bot" else "Hide bot") },
-                leadingIcon = { CodyncIcon(CodyncIcons.Hide, size = 18.dp) },
-                onClick = {
-                    menu = false
-                    if (bot.hidden) {
-                        val index = fake.bots.indexOfFirst { it.id == bot.id }
-                        if (index >= 0) fake.bots[index] = fake.bots[index].copy(hidden = false)
-                    } else {
-                        fake.hideBot(bot.id)
-                    }
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Fixture host") },
-                leadingIcon = { CodyncIcon(CodyncIcons.Science, size = 18.dp) },
-                onClick = {
-                    menu = false
-                    onDebug()
-                },
-            )
         }
     }
 }
@@ -512,6 +565,11 @@ fun BotAvatar(fake: FakeHostState, bot: FakeBot, size: androidx.compose.ui.unit.
             character = bot.character,
             size = size,
             statusRing = ring,
+            mood = when (bot.status) {
+                "needsInput" -> com.pokai.codync.design.AvatarMood.NeedsInput
+                "working" -> com.pokai.codync.design.AvatarMood.Working
+                else -> com.pokai.codync.design.AvatarMood.Idle
+            },
         )
         if (bot.status == "working") {
             Box(
@@ -529,6 +587,232 @@ fun BotAvatar(fake: FakeHostState, bot: FakeBot, size: androidx.compose.ui.unit.
 }
 
 @Composable
+private fun CreateBotSheet(
+    fake: FakeHostState,
+    onDismiss: () -> Unit,
+    onCreated: (botId: String) -> Unit,
+) {
+    val colors = CodyncTheme.colors
+    var name by rememberSaveable { mutableStateOf("") }
+    var computerId by rememberSaveable {
+        mutableStateOf(
+            fake.computers.firstOrNull { it.transport != FakeTransport.Offline }?.id
+                ?: fake.computers.first().id,
+        )
+    }
+    var colorId by rememberSaveable { mutableStateOf("violet") }
+    var shapeId by rememberSaveable { mutableStateOf("blob") }
+    val focus = remember { FocusRequester() }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = colors.background,
+        contentColor = colors.text,
+        dragHandle = null,
+    ) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("New bot", color = colors.text, style = CodyncType.title)
+                    Text("Local fixture for now — real create lands with the host.", color = colors.secondary, style = CodyncType.footnote)
+                }
+                GlassIconButton(CodyncIcons.Close, "Close", onDismiss)
+            }
+            Spacer(Modifier.height(16.dp))
+            CharacterAvatar("Preview", colorId, shapeId, size = 64.dp, character = "✨")
+            Spacer(Modifier.height(14.dp))
+            FieldLabel("Name")
+            NameField(value = name, onValueChange = { name = it }, placeholder = "Atlas", focusRequester = focus)
+            Spacer(Modifier.height(14.dp))
+            FieldLabel("Computer")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                fake.computers.forEach { computer ->
+                    val active = computerId == computer.id
+                    FilterChip(computer.name, active) { computerId = computer.id }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            FieldLabel("Color")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AvatarPalette.colors.forEach { swatch ->
+                    val active = colorId == swatch.id
+                    Box(
+                        Modifier
+                            .size(if (active) 32.dp else 28.dp)
+                            .clip(CircleShape)
+                            .background(swatch.color)
+                            .combinedClickable(onClick = { colorId = swatch.id }),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (active) {
+                            CodyncIcon(CodyncIcons.Check, tint = Color.White, size = 14.dp)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            FieldLabel("Shape")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AvatarPalette.shapes.forEach { shape ->
+                    FilterChip(shape.replaceFirstChar { it.uppercase() }, shapeId == shape) { shapeId = shape }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            PrimaryButton(
+                text = "Create bot",
+                onClick = {
+                    val id = fake.createBot(
+                        name = name.ifBlank { "New bot" },
+                        computerId = computerId,
+                        color = colorId,
+                        shape = shapeId,
+                    )
+                    onCreated(id)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                leading = CodyncIcons.PersonAdd,
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun CreateGroupSheet(
+    fake: FakeHostState,
+    onDismiss: () -> Unit,
+    onCreated: (botId: String) -> Unit,
+) {
+    val colors = CodyncTheme.colors
+    var name by rememberSaveable { mutableStateOf("") }
+    var selected by rememberSaveable {
+        mutableStateOf(fake.visibleBots().filter { it.kind != "group" }.take(2).map { it.id }.toSet())
+    }
+    val agents = fake.visibleBots().filter { it.kind != "group" }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = colors.background,
+        contentColor = colors.text,
+        dragHandle = null,
+    ) {
+        Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("New group", color = colors.text, style = CodyncType.title)
+                    Text("Pick members for a room. Turns still run on member bots.", color = colors.secondary, style = CodyncType.footnote)
+                }
+                GlassIconButton(CodyncIcons.Close, "Close", onDismiss)
+            }
+            Spacer(Modifier.height(16.dp))
+            FieldLabel("Room name")
+            NameField(value = name, onValueChange = { name = it }, placeholder = "Launch Room")
+            Spacer(Modifier.height(14.dp))
+            FieldLabel("Members")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                agents.forEach { bot ->
+                    val active = bot.id in selected
+                    Row(
+                        Modifier
+                            .clip(CircleShape)
+                            .background(if (active) colors.accentFill else colors.surface)
+                            .combinedClickable(onClick = {
+                                selected = if (active) selected - bot.id else selected + bot.id
+                            })
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CharacterAvatar(bot.name, bot.color, bot.shape, size = 22.dp, character = bot.character)
+                        Spacer(Modifier.width(7.dp))
+                        Text(
+                            bot.name,
+                            color = if (active) colors.onAccent else colors.text,
+                            style = CodyncType.caption.copy(fontWeight = FontWeight.Medium),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            SectionCard(Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CodyncIcon(CodyncIcons.Info, tint = colors.tertiary, size = 17.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Groups are rooms over member bots. Fixture-only until the host create API lands.",
+                        color = colors.secondary,
+                        style = CodyncType.footnote,
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            PrimaryButton(
+                text = "Create group",
+                onClick = {
+                    val id = fake.createGroup(
+                        name = name.ifBlank { "New room" },
+                        memberIds = selected.toList(),
+                    )
+                    onCreated(id)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = selected.isNotEmpty(),
+                leading = CodyncIcons.GroupAdd,
+            )
+            Spacer(Modifier.height(8.dp))
+            SecondaryButton("Cancel", onDismiss, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(
+        text.uppercase(),
+        color = CodyncTheme.colors.tertiary,
+        style = CodyncType.caption,
+        modifier = Modifier.padding(bottom = 7.dp),
+    )
+}
+
+@Composable
+private fun NameField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    focusRequester: FocusRequester? = null,
+) {
+    val colors = CodyncTheme.colors
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(colors.surface)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        if (value.isEmpty()) {
+            Text(placeholder, color = colors.tertiary, style = CodyncType.body)
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+            textStyle = TextStyle(
+                color = colors.text,
+                fontSize = 16.sp,
+                fontFamily = CodyncType.body.fontFamily,
+            ),
+            singleLine = true,
+            cursorBrush = SolidColor(colors.text),
+        )
+    }
+}
+
+@Composable
 private fun NewChatSheet(
     fake: FakeHostState,
     onDismiss: () -> Unit,
@@ -537,10 +821,9 @@ private fun NewChatSheet(
     val colors = CodyncTheme.colors
     var selected by rememberSaveable { mutableStateOf<String?>(fake.visibleBots().firstOrNull()?.id) }
     val bots = fake.visibleBots()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = colors.background,
         contentColor = colors.text,
         dragHandle = null,
@@ -549,12 +832,15 @@ private fun NewChatSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("New chat", color = colors.text, style = CodyncType.title)
-                    Text("Choose one bot to start. Group setup lands with M3.", color = colors.secondary, style = CodyncType.footnote)
+                    Text("Choose one bot or room to start.", color = colors.secondary, style = CodyncType.footnote)
                 }
                 GlassIconButton(CodyncIcons.Close, "Close", onDismiss)
             }
             Spacer(Modifier.height(16.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 bots.forEach { bot ->
                     val active = selected == bot.id
                     Row(
@@ -576,27 +862,14 @@ private fun NewChatSheet(
                 }
             }
             Spacer(Modifier.height(20.dp))
-            SectionCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CodyncIcon(CodyncIcons.Info, tint = colors.tertiary, size = 17.dp)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "The chat starts empty. Each chat keeps its own context and model.",
-                        color = colors.secondary,
-                        style = CodyncType.footnote,
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
             PrimaryButton(
                 text = "Start chat",
                 onClick = {
-                val bot = selected?.let(fake::bot) ?: return@PrimaryButton
-                val chatId = fake.createChat(bot.id)
-                onStart(bot.id, chatId)
+                    val bot = selected?.let(fake::bot) ?: return@PrimaryButton
+                    onStart(bot.id, fake.createChat(bot.id))
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = selected != null || bots.isNotEmpty(),
+                enabled = selected != null,
             )
             Spacer(Modifier.height(12.dp))
         }

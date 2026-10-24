@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -11,6 +12,17 @@ val releaseStore = System.getenv("CODYNC_KEYSTORE_FILE")
 val releaseStorePassword = System.getenv("CODYNC_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("CODYNC_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("CODYNC_KEY_PASSWORD")
+// local.properties is gitignored; the publishable key is public but environment-specific.
+val localProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+val clerkPublishableKey = (
+    providers.gradleProperty("clerkPublishableKey").orNull
+        ?: System.getenv("CLERK_PUBLISHABLE_KEY")
+        ?: localProperties.getProperty("clerkPublishableKey")
+    ).orEmpty()
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
 
 android {
     namespace = "com.pokai.codync.android"
@@ -20,12 +32,12 @@ android {
         applicationId = "com.pokai.Codync.android"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "3.0.0"
+        versionCode = 7
+        versionName = "3.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "CLOUD_URL", "\"https://api.codync.dev\"")
-        buildConfigField("String", "CLERK_PUBLISHABLE_KEY", "\"\"")
+        buildConfigField("String", "CLERK_PUBLISHABLE_KEY", "\"$clerkPublishableKey\"")
     }
 
     flavorDimensions += "channel"
@@ -100,11 +112,21 @@ kotlin {
 dependencies {
     implementation(project(":core:design"))
     implementation(project(":core:model"))
+    implementation(project(":core:crypto"))
+    implementation(project(":core:transport"))
+    implementation(project(":core:data"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.clerk.android.api)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode.scanning)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

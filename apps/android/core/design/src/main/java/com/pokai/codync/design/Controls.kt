@@ -8,8 +8,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -118,7 +119,7 @@ fun GlassIconButton(
     modifier: Modifier = Modifier,
     size: Dp = 38.dp,
     iconSize: Dp = 20.dp,
-    tint: Color = LocalContentColor.current,
+    tint: Color = CodyncTheme.colors.text,
     enabled: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -137,6 +138,39 @@ fun GlassIconButton(
         contentAlignment = Alignment.Center,
     ) {
         CodyncIcon(symbol, tint = tint, size = iconSize, contentDescription = contentDescription)
+    }
+}
+
+/** Soft destructive action — same pill shape as Secondary, danger tint. */
+@Composable
+fun DestructiveButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    leading: Symbol? = null,
+) {
+    val colors = CodyncTheme.colors
+    val haptics = LocalHapticFeedback.current
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clip(CircleShape)
+            .background(colors.danger.copy(alpha = if (colors.isDark) 0.18f else 0.10f))
+            .clickable(enabled = enabled) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            }
+            .padding(horizontal = 18.dp)
+            .alpha(if (enabled) 1f else 0.4f),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        if (leading != null) {
+            CodyncIcon(leading, tint = colors.danger, size = 17.dp)
+            Spacer(Modifier.width(7.dp))
+        }
+        Text(text, color = colors.danger, style = CodyncType.body.copy(fontWeight = FontWeight.Medium), maxLines = 1)
     }
 }
 
@@ -191,6 +225,7 @@ fun SectionCard(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsRow(
     title: String,
@@ -202,12 +237,21 @@ fun SettingsRow(
     showChevron: Boolean = true,
     destructive: Boolean = false,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val colors = CodyncTheme.colors
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                when {
+                    onClick != null || onLongClick != null -> Modifier.combinedClickable(
+                        onClick = { onClick?.invoke() },
+                        onLongClick = onLongClick,
+                    )
+                    else -> Modifier
+                },
+            )
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -308,8 +352,8 @@ fun Pill(
 fun FilterChip(
     text: String,
     selected: Boolean,
-    onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit,
 ) {
     val colors = CodyncTheme.colors
     Box(

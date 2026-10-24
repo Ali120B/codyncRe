@@ -41,14 +41,14 @@ import dev.chrisbanes.haze.hazeEffect
  */
 @Immutable
 data class GlassConfig(
-    val blurRadius: Dp = 26.dp,
+    val blurRadius: Dp = 20.dp,
     val tintAlpha: Float = 0.52f,
     val refractionStrength: Float = 0.78f,
     val refractionHeight: Float = 0.26f,
     val refractionDisplacement: Dp = 22.dp,
     val specular: Float = 0.46f,
     val noise: Float = 0.035f,
-    val quality: Float = 0.6f,
+    val quality: Float = 0.45f,
 )
 
 val LocalGlassConfig = staticCompositionLocalOf { GlassConfig() }

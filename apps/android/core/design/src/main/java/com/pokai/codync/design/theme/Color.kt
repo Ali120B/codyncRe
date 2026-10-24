@@ -100,6 +100,11 @@ object AvatarPalette {
         AvatarSwatch("blue", "Blue", Color(0xFF1084FE)),
         AvatarSwatch("violet", "Violet", Color(0xFF9159FE)),
         AvatarSwatch("magenta", "Magenta", Color(0xFFFF309B)),
+        AvatarSwatch("lime", "Lime", Color(0xFF84CC16)),
+        AvatarSwatch("emerald", "Emerald", Color(0xFF10B981)),
+        AvatarSwatch("sky", "Sky", Color(0xFF0EA5E9)),
+        AvatarSwatch("indigo", "Indigo", Color(0xFF6366F1)),
+        AvatarSwatch("slate", "Slate", Color(0xFF64748B)),
         AvatarSwatch("gray", "Gray", Color(0xFF777777)),
     )
 

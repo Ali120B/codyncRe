@@ -42,6 +42,7 @@ import com.pokai.codync.android.ui.relativeShort
 import com.pokai.codync.android.ui.roster.BotAvatar
 import com.pokai.codync.design.CodyncIcon
 import com.pokai.codync.design.CodyncIcons
+import com.pokai.codync.design.DestructiveButton
 import com.pokai.codync.design.EmptyState
 import com.pokai.codync.design.Pill
 import com.pokai.codync.design.PrimaryButton
@@ -174,18 +175,10 @@ private fun NeedsCard(
                             fake.resolveNeed(item.id)
                             fake.reply(item.chatId, item.botId, "Allowed from now on. Running it now.")
                         })
-                        Text(
-                            "Deny",
-                            color = colors.danger,
-                            style = CodyncType.subheadline,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable {
-                                    fake.resolveNeed(item.id)
-                                    fake.reply(item.chatId, item.botId, "Denied. I'll stop here.")
-                                }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                        )
+                        DestructiveButton("Deny", onClick = {
+                            fake.resolveNeed(item.id)
+                            fake.reply(item.chatId, item.botId, "Denied. I'll stop here.")
+                        })
                     }
                     "failed" -> {
                         PrimaryButton(
@@ -212,15 +205,7 @@ private fun NeedsCard(
                             fake.markRead(bot.id)
                             onOpenChat(bot.id, item.chatId, item.messageId)
                         })
-                        Text(
-                            "Dismiss",
-                            color = colors.secondary,
-                            style = CodyncType.subheadline,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable { fake.resolveNeed(item.id) }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                        )
+                        SecondaryButton("Dismiss", onClick = { fake.resolveNeed(item.id) })
                     }
                 }
             }

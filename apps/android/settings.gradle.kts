@@ -24,3 +24,6 @@ rootProject.name = "Codync"
 include(":app")
 include(":core:design")
 include(":core:model")
+include(":core:crypto")
+include(":core:transport")
+include(":core:data")

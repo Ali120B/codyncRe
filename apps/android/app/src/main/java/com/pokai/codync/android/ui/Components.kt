@@ -46,6 +46,8 @@ fun SearchField(
     placeholder: String = "Search",
     autofocus: Boolean = false,
     onSubmit: (() -> Unit)? = null,
+    /** When set, the field is a button that opens the full search screen instead of typing inline. */
+    onOpen: (() -> Unit)? = null,
 ) {
     val colors = CodyncTheme.colors
     val focus = LocalFocusManager.current
@@ -55,43 +57,48 @@ fun SearchField(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(colors.surface)
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CodyncIcon(CodyncIcons.Search, tint = colors.tertiary, size = 18.dp)
         Spacer(Modifier.width(8.dp))
-        Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) {
-                Text(placeholder, color = colors.tertiary, style = CodyncType.body)
+        if (onOpen != null) {
+            Text(placeholder, color = colors.tertiary, style = CodyncType.body, modifier = Modifier.weight(1f))
+        } else {
+            Box(Modifier.weight(1f)) {
+                if (value.isEmpty()) {
+                    Text(placeholder, color = colors.tertiary, style = CodyncType.body)
+                }
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(if (autofocus) Modifier.focusRequester(focusRequester) else Modifier),
+                    textStyle = TextStyle(color = colors.text, fontSize = CodyncType.body.fontSize, fontFamily = CodyncType.body.fontFamily),
+                    singleLine = true,
+                    cursorBrush = SolidColor(colors.text),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            focus.clearFocus()
+                            onSubmit?.invoke()
+                        },
+                    ),
+                )
             }
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(if (autofocus) Modifier.focusRequester(focusRequester) else Modifier),
-                textStyle = TextStyle(color = colors.text, fontSize = CodyncType.body.fontSize, fontFamily = CodyncType.body.fontFamily),
-                singleLine = true,
-                cursorBrush = SolidColor(colors.text),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        focus.clearFocus()
-                        onSubmit?.invoke()
-                    },
-                ),
-            )
-        }
-        if (value.isNotEmpty()) {
-            CodyncIcon(
-                CodyncIcons.Close,
-                tint = colors.tertiary,
-                size = 17.dp,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable { onValueChange("") },
-                contentDescription = "Clear",
-            )
+            if (value.isNotEmpty()) {
+                CodyncIcon(
+                    CodyncIcons.Close,
+                    tint = colors.tertiary,
+                    size = 17.dp,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { onValueChange("") },
+                    contentDescription = "Clear",
+                )
+            }
         }
     }
 }

@@ -36,4 +36,19 @@ class FakeHostTest {
         assertEquals(initialCount + 1, newMessages.size)
         assertEquals("Hello test message", newMessages.last().text)
     }
+
+    @Test
+    fun testCreateBotAndGroup() {
+        val state = FakeHostState()
+        val botId = state.createBot("Pixel 2", character = "🫧", color = "blue")
+        assertNotNull(state.bot(botId))
+        assertEquals("Pixel 2", state.bot(botId)?.name)
+        assertTrue(state.chatsFor(botId).isNotEmpty())
+
+        val groupId = state.createGroup("Ship Room", listOf("bot_atlas", "bot_scout"))
+        val group = state.bot(groupId)
+        assertNotNull(group)
+        assertEquals("group", group?.kind)
+        assertEquals(2, group?.members?.size)
+    }
 }

@@ -18,7 +18,7 @@ class WireJsonTest {
 
     @Test
     fun testCompatibilityConstants() {
-        assertEquals("3.0.0", Compatibility.APP_VERSION)
+        assertEquals("3.0.3", Compatibility.APP_VERSION)
         assertEquals("3.0.0", Compatibility.MIN_HOST_VERSION)
         assertEquals(1, Compatibility.PROTOCOL_VERSION)
     }

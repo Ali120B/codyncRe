@@ -1,6 +1,9 @@
 package com.pokai.codync.android.ui.search
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,176 +21,156 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.pokai.codync.android.fake.FakeChat
-import com.pokai.codync.android.fake.FakeHostState
-import com.pokai.codync.android.ui.HeaderIconButton
-import com.pokai.codync.android.ui.SearchField
-import com.pokai.codync.android.ui.SectionLabel
-import com.pokai.codync.android.ui.roster.BotAvatar
+import com.pokai.codync.data.SessionStore
 import com.pokai.codync.design.CharacterAvatar
 import com.pokai.codync.design.CodyncIcon
 import com.pokai.codync.design.CodyncIcons
-import com.pokai.codync.design.Pill
 import com.pokai.codync.design.SectionCard
+import com.pokai.codync.design.Symbol
 import com.pokai.codync.design.theme.CodyncTheme
 import com.pokai.codync.design.theme.CodyncType
+import com.pokai.codync.android.ui.HeaderIconButton
+import com.pokai.codync.android.ui.SearchField
+import com.pokai.codync.android.ui.SectionLabel
+import kotlinx.coroutines.delay
 
 @Composable
 fun CommandDeckScreen(
-    fake: FakeHostState,
+    session: SessionStore,
     onBack: () -> Unit,
     onOpenChat: (botId: String, chatId: String, messageId: String?) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenWorkbench: () -> Unit,
+    onOpenPairing: () -> Unit,
     onOpenGlassLab: () -> Unit,
-    onOpenFakeHost: () -> Unit,
 ) {
     val colors = CodyncTheme.colors
+    val hostBots by session.bots().collectAsState(initial = emptyList())
     var query by rememberSaveable { mutableStateOf("") }
-    val bots = remember(query) {
-        fake.visibleBots().filter {
-            query.isBlank() || it.name.contains(query, ignoreCase = true) || it.description.contains(query, ignoreCase = true)
-        }
+    var barReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(30)
+        barReady = true
     }
-    val chats = remember(query) {
-        fake.chats.filter { chat ->
-            val bot = fake.bot(chat.botId)
-            query.isBlank() || chat.title.contains(query, ignoreCase = true) || chat.lastLine.contains(query, ignoreCase = true) ||
-                (bot?.name?.contains(query, ignoreCase = true) == true)
-        }.sortedByDescending { it.updatedAt }
+    val barScale by animateFloatAsState(
+        targetValue = if (barReady) 1f else 0.92f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
+        label = "searchBarScale",
+    )
+    val barAlpha by animateFloatAsState(
+        targetValue = if (barReady) 1f else 0f,
+        animationSpec = tween(180),
+        label = "searchBarAlpha",
+    )
+    val bots = remember(query, hostBots) {
+        hostBots.filterNot { it.hidden }.filter { bot ->
+            query.isBlank() || bot.name.contains(query, ignoreCase = true) ||
+                bot.description.contains(query, ignoreCase = true) ||
+                bot.lastMessage?.contains(query, ignoreCase = true) == true
+        }.sortedWith(compareByDescending<com.pokai.codync.model.Bot> { it.pinned }.thenBy { it.position }.thenBy { it.name.lowercase() })
     }
+    data class Action(val title: String, val subtitle: String, val symbol: Symbol, val run: () -> Unit)
     val actions = remember(query) {
         listOf(
-            Triple("Settings", "Account, notifications, appearance and about", CodyncIcons.Settings) to onOpenSettings,
-            Triple("Glass lab", "Tune blur, tint, refraction and quality", CodyncIcons.Palette) to onOpenGlassLab,
-            Triple("Fake host", "M0 connection state and events", CodyncIcons.Science) to onOpenFakeHost,
-        ).filter { query.isBlank() || it.first.first.contains(query, ignoreCase = true) || it.first.second.contains(query, ignoreCase = true) }
+            Action("Settings", "Appearance, notifications and computers", CodyncIcons.Settings, onOpenSettings),
+            Action("Workbench", "Choose a bot to open its details", CodyncIcons.Build, onOpenWorkbench),
+            Action("Pair a computer", "Scan its QR code or paste a Codync link", CodyncIcons.QrCode, onOpenPairing),
+            Action("Glass lab", "Preview the liquid-glass treatment", CodyncIcons.Palette, onOpenGlassLab),
+        ).filter { query.isBlank() || it.title.contains(query, ignoreCase = true) || it.subtitle.contains(query, ignoreCase = true) }
     }
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp)
+                .graphicsLayer { scaleX = barScale; scaleY = barScale; alpha = barAlpha },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             HeaderIconButton(CodyncIcons.Back, "Back", onBack)
             SearchField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = "Bots, chats and actions",
+                placeholder = "Search bots and actions",
                 autofocus = true,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
         }
-
         LazyColumn(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
             modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (actions.isNotEmpty()) {
                 item { SectionLabel("Actions") }
-                items(actions.size, key = { "action_$it" }) { index ->
-                    val (action, callback) = actions[index]
-                    ResultRow(
-                        leading = {
-                            SectionCard(Modifier.width(38.dp).height(38.dp)) {
-                                Column(Modifier.fillMaxWidth().height(38.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                                    CodyncIcon(action.third, tint = colors.text, size = 19.dp)
-                                }
-                            }
-                        },
-                        title = action.first,
-                        subtitle = action.second,
-                        onClick = callback,
-                    )
-                }
-            }
-
-            if (bots.isNotEmpty()) {
-                item { SectionLabel("Bots", trailing = "${bots.size}") }
-                items(bots, key = { "bot_${it.id}" }) { bot ->
-                    ResultRow(
-                        leading = { BotAvatar(fake, bot, size = 38.dp) },
-                        title = bot.name,
-                        subtitle = "${fake.computer(bot.computerId)?.name ?: "Computer"} · ${bot.lastLine}",
-                        onClick = { onOpenChat(bot.id, fake.mainChatId(bot.id), null) },
-                        trailing = if (bot.unread > 0) ({ com.pokai.codync.design.UnreadBadge(bot.unread) }) else null,
-                    )
-                }
-            }
-
-            if (chats.isNotEmpty()) {
-                item { SectionLabel("Chats", trailing = "${chats.size}") }
-                items(chats, key = { "chat_${it.id}" }) { chat ->
-                    val bot = fake.bot(chat.botId)
-                    ResultRow(
-                        leading = {
-                            SectionCard(Modifier.width(38.dp).height(38.dp)) {
-                                Column(Modifier.fillMaxWidth().height(38.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                                    CodyncIcon(CodyncIcons.Chat, tint = colors.secondary, size = 19.dp)
-                                }
-                            }
-                        },
-                        title = chat.title,
-                        subtitle = "${bot?.name ?: "Chat"} · ${chat.lastLine}",
-                        onClick = { onOpenChat(chat.botId, chat.id, null) },
-                        trailing = if (chat.unread > 0) ({ com.pokai.codync.design.UnreadBadge(chat.unread) }) else null,
-                    )
-                }
-            }
-
-            if (actions.isEmpty() && bots.isEmpty() && chats.isEmpty()) {
                 item {
-                    Column(Modifier.padding(vertical = 50.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No matches", color = colors.text, style = CodyncType.headline)
-                        Text("Try a bot name, a chat title or an action.", color = colors.secondary, style = CodyncType.footnote)
+                    SectionCard {
+                        actions.forEach { action -> ActionRow(action.title, action.subtitle, action.symbol, action.run) }
                     }
                 }
             }
+            if (bots.isNotEmpty()) {
+                item { SectionLabel("Bots and groups", trailing = "${bots.size}") }
+                items(bots, key = { it.id }) { bot ->
+                    SectionCard {
+                        Row(
+                            Modifier.fillMaxWidth().clickable { onOpenChat(bot.id, "main", null) }.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CharacterAvatar(bot.name, bot.avatarColor, bot.avatarShape, size = 40.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(bot.name, color = colors.text, style = CodyncType.body.copy(fontWeight = FontWeight.SemiBold))
+                                Text(
+                                    when (bot.status) {
+                                        "working" -> bot.activity.ifBlank { "Working" }
+                                        "needsInput" -> bot.activity.ifBlank { "Needs you" }
+                                        else -> bot.lastMessage ?: bot.description.ifBlank { bot.backend }
+                                    },
+                                    color = colors.secondary,
+                                    style = CodyncType.footnote,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (bots.isEmpty() && query.isNotBlank()) {
+                item {
+                    Text("No host bot matches that search.", modifier = Modifier.padding(12.dp), color = colors.tertiary, style = CodyncType.footnote)
+                }
+            }
+            item { Spacer(Modifier.height(40.dp)) }
         }
     }
 }
 
 @Composable
-private fun ResultRow(
-    leading: @Composable () -> Unit,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    trailing: (@Composable () -> Unit)? = null,
-) {
+private fun ActionRow(title: String, subtitle: String, symbol: Symbol, onClick: () -> Unit) {
     val colors = CodyncTheme.colors
     Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 9.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        leading()
-        Spacer(Modifier.width(11.dp))
+        CodyncIcon(symbol, tint = colors.text, size = 20.dp)
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = colors.text, style = CodyncType.body.copy(fontWeight = FontWeight.Medium), maxLines = 1)
-            Text(subtitle, color = colors.secondary, style = CodyncType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, color = colors.text, style = CodyncType.body.copy(fontWeight = FontWeight.Medium))
+            Text(subtitle, color = colors.secondary, style = CodyncType.footnote)
         }
-        if (trailing != null) {
-            Spacer(Modifier.width(8.dp))
-            trailing()
-        }
-        Spacer(Modifier.width(6.dp))
-        CodyncIcon(CodyncIcons.ChevronRight, tint = colors.tertiary, size = 16.dp)
     }
 }

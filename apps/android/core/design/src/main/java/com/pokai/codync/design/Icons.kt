@@ -122,7 +122,9 @@ object CodyncIcons {
     val Warning = s(0xF083, "Warning")
     val Visible = s(0xE8F4, "Visible")
     val ArrowForward = s(0xE5C8, "Continue")
-    val ArrowUp = s(0xE5D8, "Jump to latest")
+    val ArrowUp = s(0xE5D8, "Up")
+    // arrow_downward (E5DB) is not in the subset font — KeyboardDown is.
+    val ArrowDown = s(0xE313, "Jump to latest")
     val KeyboardDown = s(0xE313, "Show less")
     val KeyboardUp = s(0xE316, "Show more")
     val Menu = s(0xE5D2, "Menu")
