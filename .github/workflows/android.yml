@@ -68,9 +68,10 @@ jobs:
         env:
           CODYNC_KEYSTORE_FILE: ${{ secrets.CODYNC_KEYSTORE_FILE }}
         run: |
-          if [ -n "$CODYNC_KEYSTORE_FILE" ]; then
-            echo "$CODYNC_KEYSTORE_FILE" | base64 --decode > codync-release.jks
+          if [ -n "$CODYNC_KEYSTORE_FILE" ] && echo "$CODYNC_KEYSTORE_FILE" | base64 --decode > codync-release.jks 2>/dev/null && keytool -list -keystore codync-release.jks -storepass "${{ secrets.CODYNC_KEYSTORE_PASSWORD || 'codync-release' }}" >/dev/null 2>&1; then
+            echo "Using provided keystore"
           else
+            rm -f codync-release.jks
             keytool -genkeypair -v -keystore codync-release.jks -alias codync -keyalg RSA -keysize 2048 -validity 10000 -storepass codync-release -keypass codync-release -dname "CN=codync,OU=codync,O=codync,L=Sharjah,ST=Sharjah,C=AE"
           fi
       - name: Assemble prod release
