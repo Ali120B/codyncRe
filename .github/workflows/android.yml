@@ -76,7 +76,7 @@ jobs:
           export CODYNC_KEYSTORE_FILE="$(pwd)/codync-release.jks"
           ./gradlew :app:assembleProdRelease
       - name: Locate APK
-        run: find apps/android/app/build/outputs/apk -name "*.apk" -print
+        run: find . -name "*.apk" -print
       - name: Upload APK to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
