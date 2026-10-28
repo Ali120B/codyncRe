@@ -219,12 +219,6 @@ fun LiveChatScreen(
             layout.totalItemsCount == 0 || (layout.visibleItemsInfo.lastOrNull()?.index ?: 0) >= layout.totalItemsCount - 2
         }
     }
-    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
-    LaunchedEffect(imeBottom) {
-        if (imeBottom > 0 && nearLatest) {
-            listState.animateScrollToItem(finalListItemIndex.coerceAtLeast(0))
-        }
-    }
     val scope = rememberCoroutineScope()
     DisposableEffect(botId) {
         scope.launch { session.call("setViewing", buildJsonObject { put("botId", botId) }) }
@@ -232,6 +226,12 @@ fun LiveChatScreen(
     }
     var initialScrollDone by remember(botId, chatId) { mutableStateOf(false) }
     val finalListItemIndex = entries.lastIndex + if (threadMode && rootEntry != null) 1 else 0
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(imeBottom) {
+        if (imeBottom > 0 && nearLatest) {
+            listState.animateScrollToItem(finalListItemIndex.coerceAtLeast(0))
+        }
+    }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         val added = uris.mapNotNull { uri -> pendingFile(context, uri) }
         if (added.size != uris.size) sendError = "Some files couldn't be added. Attachments must be under 100 MB each."
