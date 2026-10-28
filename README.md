@@ -66,6 +66,7 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 | | Platform | App | Highlights |
 |---|---|---|---|
 | 📱 | **iPhone** | Native SwiftUI | Chat with bots, approvals, push notifications, Live Activity, widgets, remote screen, voice calls |
+| 🤖 | **Android** | Native Kotlin (Jetpack Compose) | Chat with bots, approvals, push notifications, computer panel, files, workspaces sync |
 | 💻 | **macOS** | Desktop app (Electron), menu bar + window | Runs the host, chat window, usage in the menu bar, iPhone pairing |
 | 🪟 | **Windows** | Desktop app (Electron), tray + window | Runs the host, chat window, iPhone pairing (no remote screen yet) |
 | 🐧 | **Linux** | Desktop app (Electron), tray + window | Chat window, iPhone pairing; the host runs on desktops and headless servers |
