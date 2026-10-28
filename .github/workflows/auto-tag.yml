@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "apps/Codync.xcodeproj/project.pbxproj"
+      - "apps/android/app/build.gradle.kts"
+      - "apps/desktop/package.json"
+      - "host/Cargo.toml"
 
 permissions:
   contents: write
@@ -23,7 +26,9 @@ jobs:
       - name: Read version from pbxproj
         id: version
         run: |
-          VERSION=$(grep -m1 'MARKETING_VERSION' apps/Codync.xcodeproj/project.pbxproj | sed 's/.*= //;s/;//;s/ //g')
+          if [ -f apps/android/app/build.gradle.kts ]; then
+            VERSION=$(grep -m1 'versionName = ' apps/android/app/build.gradle.kts | sed 's/.*= "//;s/"//')
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
 
