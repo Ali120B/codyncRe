@@ -81,6 +81,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          APK=$(find apps/android/app/build/outputs/apk -name "*.apk" | head -1)
+          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
           echo "Uploading $APK"
           gh release upload "${GITHUB_REF_NAME}" "$APK" --clobber
