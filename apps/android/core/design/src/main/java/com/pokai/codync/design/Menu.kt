@@ -8,6 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
@@ -28,7 +29,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -50,8 +53,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.pokai.codync.design.theme.CodyncTheme
 import com.pokai.codync.design.theme.CodyncType
@@ -67,7 +75,8 @@ data class CodyncMenuItem(
 )
 
 /**
- * Custom glass-styled context menu. A restrained fade and scale keeps it anchored to the trigger.
+ * Custom glass-styled context menu. It grows from the trigger corner, then gets out of the way
+ * quickly when dismissed.
  */
 @Composable
 fun CodyncMenu(
@@ -88,7 +97,7 @@ fun CodyncMenu(
             visibility.targetState = true
         } else if (renderPopup) {
             visibility.targetState = false
-            delay(160)
+            delay(135)
             renderPopup = false
         }
     }
@@ -104,32 +113,36 @@ fun CodyncMenu(
     val popupOffset = with(density) {
         IntOffset(offset.x.roundToPx(), offset.y.roundToPx())
     }
+    val positionProvider = remember(popupOffset) {
+        FitMenuInWindow(
+            offset = popupOffset,
+            margin = with(density) { 8.dp.roundToPx() },
+        )
+    }
+    val maxMenuHeight = (LocalConfiguration.current.screenHeightDp - 32).coerceAtLeast(120).dp
 
     Popup(
-        alignment = Alignment.TopEnd,
-        offset = popupOffset,
+        popupPositionProvider = positionProvider,
         onDismissRequest = onDismissRequest,
-        properties = PopupProperties(focusable = true, clippingEnabled = false),
+        properties = PopupProperties(focusable = true, clippingEnabled = true),
     ) {
         AnimatedVisibility(
             visibleState = visibility,
-            enter = fadeIn(tween(125, easing = FastOutSlowInEasing)) + slideInVertically(
-                animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow),
-                initialOffsetY = { -it / 12 },
-            ) + scaleIn(
-                animationSpec = spring(
-                    dampingRatio = 0.9f,
-                    stiffness = Spring.StiffnessMediumLow,
+            enter = fadeIn(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) +
+                slideInVertically(
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                    initialOffsetY = { -with(density) { 8.dp.roundToPx() } },
+                ) + scaleIn(
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                    initialScale = 0.88f,
+                    transformOrigin = TransformOrigin(1f, 0f),
                 ),
-                initialScale = 0.94f,
-                transformOrigin = TransformOrigin(1f, 0f),
-            ),
-            exit = fadeOut(tween(95, easing = FastOutSlowInEasing)) + slideOutVertically(
-                animationSpec = tween(105, easing = FastOutSlowInEasing),
-                targetOffsetY = { -it / 18 },
+            exit = fadeOut(animationSpec = tween(120, easing = FastOutSlowInEasing)) + slideOutVertically(
+                animationSpec = tween(120, easing = FastOutSlowInEasing),
+                targetOffsetY = { -with(density) { 4.dp.roundToPx() } },
             ) + scaleOut(
-                animationSpec = tween(105, easing = FastOutSlowInEasing),
-                targetScale = 0.97f,
+                animationSpec = tween(120, easing = FastOutSlowInEasing),
+                targetScale = 0.94f,
                 transformOrigin = TransformOrigin(1f, 0f),
             ),
         ) {
@@ -145,6 +158,8 @@ fun CodyncMenu(
                     .clip(shape)
                     .background(fill)
                     .border(0.7.dp, stroke, shape)
+                    .heightIn(max = maxMenuHeight)
+                    .verticalScroll(rememberScrollState())
                     .padding(vertical = 6.dp),
             ) {
                 items.forEachIndexed { index, item ->
@@ -200,6 +215,40 @@ fun CodyncMenu(
                 }
             }
         }
+    }
+}
+
+/** Places a floating menu below its actual anchor when possible and keeps it inside the app window. */
+private class FitMenuInWindow(
+    private val offset: IntOffset,
+    private val margin: Int,
+) : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val maxX = (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin)
+        val rawX = if (layoutDirection == LayoutDirection.Ltr) {
+            anchorBounds.right - popupContentSize.width + offset.x
+        } else {
+            anchorBounds.left + offset.x
+        }
+        val x = rawX.coerceIn(margin, maxX)
+
+        val below = anchorBounds.bottom + offset.y
+        val above = anchorBounds.top - popupContentSize.height - offset.y
+        val availableBelow = windowSize.height - anchorBounds.bottom - margin
+        val availableAbove = anchorBounds.top - margin
+        val rawY = when {
+            below + popupContentSize.height <= windowSize.height - margin -> below
+            above >= margin -> above
+            availableBelow >= availableAbove -> below
+            else -> above
+        }
+        val maxY = (windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin)
+        return IntOffset(x, rawY.coerceIn(margin, maxY))
     }
 }
 

@@ -24,6 +24,7 @@ class AndroidHostSession(context: Context) {
     private val cache = HostCacheDb(context.applicationContext)
     private val json = Json { ignoreUnknownKeys = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private lateinit var pushManager: AndroidPushManager
     lateinit var store: SessionStore
         private set
 
@@ -35,6 +36,7 @@ class AndroidHostSession(context: Context) {
                 store.restoreCache(computer, cached.bots, cached.entriesByBot, cached.chatTitlesByBot)
             }
         }, outbox = cache)
+        pushManager = AndroidPushManager(context.applicationContext, store, identity)
 
         val computers = loadComputers()
         scope.launch {
@@ -51,8 +53,15 @@ class AndroidHostSession(context: Context) {
                         CacheWrite(it.id, state.bots, state.entriesByBot, state.chatTitlesByBot)
                     }
                 }
+                // Connection/revision updates keep the durable collections by reference. Avoid
+                // a deep equality walk over the cached transcript or resetting the write timer
+                // for host events that do not change cached data.
+                .distinctUntilChanged { old, new ->
+                    old.bots === new.bots &&
+                        old.entriesByBot === new.entriesByBot &&
+                        old.chatTitlesByBot === new.chatTitlesByBot
+                }
                 .debounce(350)
-                .distinctUntilChanged()
                 .collect { write ->
                     val cached = CachedHostData(write.bots, write.entriesByBot, write.chatTitlesByBot)
                     withContext(Dispatchers.IO) { cache.save(write.computerId, cached) }

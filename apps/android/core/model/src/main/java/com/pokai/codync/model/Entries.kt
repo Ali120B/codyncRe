@@ -1,6 +1,7 @@
 package com.pokai.codync.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class Entry(
@@ -46,6 +47,7 @@ data class EntryData(
     val author: String? = null,
     val thread: ThreadSummary? = null,
     val reactions: List<String>? = null,
+    val connectionRequest: JsonObject? = null,
     val attachments: List<Attachment>? = null,
     val files: List<SharedFile>? = null,
     val callSeconds: Int? = null,
@@ -114,9 +116,11 @@ data class SharedFile(
     val sha256: String = "",
 )
 
-/** Chat-visible rows: user, final agent, permission, notice. */
+/** Chat-visible rows: user, final agent reply, permission, notice. */
 fun Entry.isChatVisible(): Boolean = when (kind) {
     "user", "permission", "notice" -> true
+    // Match desktop: streamed narration, thoughts, plans, tool status and intermediate
+    // assistant rows are trace. The transcript shows only the completed assistant reply.
     "agent" -> data.final == true
     else -> false
 }

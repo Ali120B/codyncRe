@@ -59,6 +59,7 @@ internal object DirectPairingClient {
             throw IOException("This pairing code has no direct address or Codync Cloud relay.")
         }
 
+        val failures = mutableListOf<String>()
         var failure: Throwable? = null
         for (url in base.urls) {
             try {
@@ -66,6 +67,7 @@ internal object DirectPairingClient {
             } catch (error: Throwable) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
                 failure = error
+                failures += "$url: ${error.message ?: error::class.simpleName}"
             }
         }
         if (!offer.relay.isNullOrBlank()) {
@@ -74,9 +76,14 @@ internal object DirectPairingClient {
             } catch (error: Throwable) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
                 failure = error
+                failures += "relay: ${error.message ?: error::class.simpleName}"
             }
         }
-        throw IOException(failure?.message ?: "Can't reach the computer on this network", failure)
+        throw IOException(
+            failures.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+                ?: "Can't reach the computer on this network",
+            failure,
+        )
     }
 
     private suspend fun pairDirect(

@@ -61,7 +61,7 @@ pub struct Hub {
     emit_lock: Mutex<()>,
     bots: Mutex<HashMap<String, BotHandle>>,
     runtime: Mutex<HashMap<String, Runtime>>,
-    pub ios_clients: AtomicUsize,
+    pub phone_clients: AtomicUsize,
     pub usage: Mutex<Usage>,
     keep_awake: Mutex<service::KeepAwake>,
     /// Generation of the authorized-device table and pairing offers: bumped on every
@@ -77,11 +77,16 @@ pub struct Hub {
     pub screen: Arc<Screen>,
     /// Per-bot headless browsers (see `browser`).
     pub browser: crate::browser::Browser,
+    /// The bot whose chat is currently open on a connected phone, if any.
+    pub viewing: Mutex<Option<String>>,
     /// Setup terminals (installs, sign-ins).
     pub terms: Arc<crate::agent::term::Terms>,
 }
 
 impl Hub {
+    pub fn is_viewing(&self, bot: &str) -> bool {
+        self.viewing.locked().as_deref() == Some(bot)
+    }
     pub fn busy(&self) -> bool {
         self.runtime.locked().values().any(|r| matches!(r.status, BotStatus::Working | BotStatus::NeedsInput))
             || self.terms.busy()
@@ -104,7 +109,7 @@ impl Hub {
             emit_lock: Mutex::new(()),
             bots: Mutex::default(),
             runtime: Mutex::default(),
-            ios_clients: AtomicUsize::new(0),
+            phone_clients: AtomicUsize::new(0),
             usage: Mutex::default(),
             keep_awake: Mutex::default(),
             auth: watch::Sender::new(0),
@@ -115,6 +120,7 @@ impl Hub {
             screen,
             browser: crate::browser::Browser::default(),
             terms: Arc::default(),
+            viewing: Mutex::new(None),
         })
     }
 
@@ -199,10 +205,6 @@ impl Hub {
         }
         if cfg.is_group() {
             cfg.members = crate::chat::group::valid_members(&self.store, &cfg.id, &cfg.members)?;
-            // The same bots again: open the group they already share (Grok Bot's rule).
-            if let Some(existing) = crate::chat::group::with_members(&self.store, &cfg.members)? {
-                return Ok(self.bot_value(&existing).unwrap_or(Value::Null));
-            }
         }
         validate(&cfg)?;
         crate::agent::workspace::prepare(&mut cfg)?;
@@ -574,8 +576,8 @@ impl Hub {
         Ok(removed)
     }
 
-    pub fn ios_connected(&self) -> bool {
-        self.ios_clients.load(Ordering::Relaxed) > 0
+    pub fn phone_connected(&self) -> bool {
+        self.phone_clients.load(Ordering::Relaxed) > 0
     }
 }
 

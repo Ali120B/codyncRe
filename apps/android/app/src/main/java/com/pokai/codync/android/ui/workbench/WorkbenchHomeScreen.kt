@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.pokai.codync.android.ui.SectionLabel
+import com.pokai.codync.android.ui.BotIdentityAvatar
 import com.pokai.codync.data.SessionStore
 import com.pokai.codync.design.CodyncIcons
 import com.pokai.codync.design.EmptyState
@@ -22,6 +23,8 @@ fun WorkbenchHomeScreen(
     session: SessionStore,
     onBack: () -> Unit,
     onOpenBotDetails: (String) -> Unit,
+    onOpenTeamMap: () -> Unit = {},
+    onOpenExtensions: () -> Unit = {},
 ) {
     val bots by session.bots().collectAsState(initial = emptyList())
     val computers by session.computers().collectAsState(initial = emptyList())
@@ -44,6 +47,26 @@ fun WorkbenchHomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             ) {
+                item {
+                    SectionCard(Modifier.padding(bottom = 8.dp)) {
+                        SettingsRow(
+                            title = "Team map",
+                            subtitle = "Agents, rooms and membership",
+                            icon = CodyncIcons.Groups,
+                            onClick = onOpenTeamMap,
+                        )
+                    }
+                }
+                item {
+                    SectionCard(Modifier.padding(bottom = 8.dp)) {
+                        SettingsRow(
+                            title = "Extensions",
+                            subtitle = "MCP servers, apps, skills and credentials",
+                            icon = CodyncIcons.Extension,
+                            onClick = onOpenExtensions,
+                        )
+                    }
+                }
                 item { SectionLabel("Bots and groups", trailing = "${visibleBots.size}") }
                 items(visibleBots, key = { it.id }) { bot ->
                     SectionCard(Modifier.padding(bottom = 8.dp)) {
@@ -54,7 +77,7 @@ fun WorkbenchHomeScreen(
                             } else {
                                 "${bot.backend} · details, memory, routines"
                             },
-                            icon = if (bot.kind == "group") CodyncIcons.Groups else CodyncIcons.Bots,
+                            leading = { BotIdentityAvatar(bot, bots, size = 34.dp) },
                             onClick = { onOpenBotDetails(bot.id) },
                         )
                     }

@@ -1,8 +1,12 @@
 # Android app plan
 
-Status: scope locked to one all-at-once v1. No Android code exists until Ali says go. The iOS
-app stays in the repository until Ali explicitly says remove it. The v1/v2 feature lists live
-in [plan.md](../../plan.md); this document is the build plan.
+Status: scope locked to one all-at-once v1. Android work is active in `apps/android/` and talks
+to the real host. Pairing, account discovery, roster, core chat, and the Android FCM client and
+relay paths are implemented, but M0–M2 are not marked complete: delivery needs the Codync Firebase
+project config and relay service-account secret, and the latest source has not had a local compile
+pass because Gradle cannot initialize its native library in the current environment. The iOS app
+stays in the repository until Ali explicitly says remove it. The v1/v2 feature lists live in
+[plan.md](../../plan.md); this document is the build plan.
 
 ## Locked decisions
 
@@ -25,7 +29,7 @@ in [plan.md](../../plan.md); this document is the build plan.
 | Accounts | Google sign-in + local QR pairing; account optional |
 | Notifications | FCM in v1 |
 | Offline | Read cached chats; sending waits for a connection |
-| v1 scope | Everything except voice calls, remote screen, widgets/ongoing status and tablet/foldable layouts |
+| v1 scope | Everything except voice calls and remote screen |
 | V1 shape | One all-at-once release; internal M0–M5 milestones only |
 | Multi-account | Not planned |
 | Distribution | Sideloaded APK first; Play Store in v2 |
@@ -48,8 +52,6 @@ Not in v1 (v2 unless explicitly waived):
 
 - Voice calls and realtime voice engines. Composer dictation is in v1.
 - Remote screen viewing/control.
-- Home-screen widgets and an ongoing-status surface.
-- Tablet/foldable-specific layouts.
 - Play Store distribution.
 
 Multiple signed-in accounts and account switching are not planned.
@@ -113,7 +115,7 @@ apps/android/
   feature/settings/            # account, notifications, appearance, about
   feature/screen/              # v2 remote screen
   feature/call/                # v2 voice calls
-  feature/widgets/             # v2 Glance widgets and ongoing status
+  (feature/widgets removed; widgets no longer in v2 scope)
 ```
 
 Keep wire models in `core/model` as Kotlin `@Serializable` classes with the same JSON names as
@@ -159,7 +161,7 @@ Room cache + DataStore preferences
 5. Channel: signed ephemeral X25519 ECDH, HKDF-SHA256, ChaCha20-Poly1305. Reconnect on `4011`.
 6. Signed HTTP: `Codync-Sig` exactly as defined in `docs/reference/remote-relay.md`, including
    lowercase authority, exact request target and body hash.
-7. Logout/removal: destroy the context's device key, push key, cache, drafts and widget data.
+7. Logout/removal: destroy the context's device key, push key, cache and drafts.
 8. Never log keys, pairing codes, session tokens, push tickets or decrypted notification text.
 
 Crypto acceptance is not “it compiles.” The Kotlin implementation must reproduce every shared
@@ -230,11 +232,10 @@ planned.
 | Computer panel | Computer, Cloud, Phones, Browser, Files, Routines; group tabs and member picker | v1 |
 | Browser | State, address, frames, tabs, start/stop, take control/release, expanded view | v1 |
 | Files | Browse/download allowed host files, group Files, share/save | v1 |
-| Accessibility/polish | Large fonts, reduced motion, haptics, contrast, battery/network profiling, crash reports | v1 |
+| Polish | Haptics, battery/network profiling, crash reports | v1 |
 | Voice calls | Android speech/TTS, OpenAI/Gemini realtime, group calls, settings, background audio | v2 |
 | Remote screen | WebRTC view/control, touch mapping, orientation, TURN, permissions/takeover | v2 |
-| Widgets/status | Glance bot/usage widgets and ongoing work/needs-you surface | v2 |
-| Tablet/foldable | Adaptive list/detail and split layouts | v2 |
+
 | Distribution | Signed sideload APK; Play internal/closed/public in v2 | v1 / v2 |
 
 ## Host, cloud and relay changes
@@ -348,7 +349,7 @@ Exit: a user can configure and operate a computer entirely from Android; v1 is f
 ### M5 — hardening and v1 release (2–3 weeks)
 
 - Offline/process-death/Doze/network-switch testing.
-- Accessibility, large fonts, reduced motion, contrast, haptics.
+- Haptics and basic polish.
 - Battery/network profiling, crash reporting and redaction checks.
 - Signed release APK, versioning, release notes and install/upgrade path.
 - Run the parity matrix with two phones and at least two computers.
@@ -356,11 +357,9 @@ Exit: a user can configure and operate a computer entirely from Android; v1 is f
 
 Exit: signed v1 APK installed and accepted; iOS still in the repository.
 
-### v2 — voice, screen, widgets and store
+### v2 — voice, screen and store
 
 - Voice calls and realtime engines; remote screen/WebRTC/TURN.
-- Glance widgets and the working/needs-you ongoing status surface.
-- Tablet/foldable layouts.
 - Play internal/closed/public, data safety, store assets.
 - Multi-account is not planned.
 - iOS removal only when Ali explicitly says so.
@@ -408,22 +407,24 @@ When that happens, remove in this order:
    `apps/desktop/package.json`.
 6. Keep the old iOS releases downloadable; do not rewrite tags or delete history.
 
-## First sprint backlog (after approval)
+## Current implementation gaps
 
-1. Create the Android Gradle skeleton, CI workflow and glass prototype.
-2. Port `CodyncKit/Models` to Kotlin with JSON round-trip fixtures.
-3. Build `core/crypto` and pass all shared vectors.
-4. Implement OkHttp SSE + direct RPC against the dev host.
-5. Build a debug pairing screen and stream a real bot's chats and entries.
-6. Add `android` platform support to host/cloud and a dev D1 migration.
-7. Spike Clerk Android Google sign-in, FCM delivery and the official SDK versions.
-8. Add the fork-only host methods to the Android wire inventory: chats, rewind, standup,
-   handoffs, team map data, computer panel/browser, group room tabs.
+- Configure FCM for the Codync Android app and complete the encrypted notification path through
+  the fork-owned relay. The app reads flavor-specific `google-services.json` files from
+  `apps/android/app/src/dev/` and `apps/android/app/src/prod/`; upload the Firebase service-account
+  JSON to the relay as the `FCM_SERVICE_ACCOUNT` Worker secret. Neither config nor credentials
+  belong in git. The Android token is registered with each host as it is connected; the host seals
+  alert content to the Android-only X25519 push key before sending it to the relay.
+- Compile and install the current dev APK, then exercise pairing, account access, chat, offline
+  cache and file flows on a real phone.
+- Finish the remaining fork feature audit in M3–M4 against the live host APIs. The milestone
+  table remains a scope map until those flows are verified.
 
 ## Open decisions
 
-Scope is settled: one all-at-once v1, every fork feature in v1, voice/screen/widgets/tablet in
+Scope is settled: one all-at-once v1, every fork feature in v1, voice/screen in
 v2, no multi-account, iOS removed only when Ali says, new Firebase project.
 
-Still needed: Ali's explicit **go**, the Firebase `google-services.json` in M1, and the release
-keystore location outside the repository in M5. Decide the Clerk SDK path during the M0 spike.
+Still needed: the Codync Android Firebase project and relay credentials for M2 push, plus an
+external release keystore when preparing M5. The Clerk Android SDK path has been selected and
+the local-pairing path remains available without Clerk configuration.

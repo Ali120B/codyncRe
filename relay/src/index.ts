@@ -1,16 +1,16 @@
 // Codync push relay.
 //
-// The APNs key lives only here. The phone registers its device (or Live
+// APNs and FCM credentials live only here. The phone registers its provider (or Live
 // Activity) token and gets back an opaque, encrypted *ticket*; it hands the
 // ticket to its own codync-host, which can then ask the relay to push to that
 // one device — without ever learning the raw token or holding a shared secret.
 //
-//   POST /register { token, env: "sandbox" | "production", kind: "alert" | "liveactivity" } -> { ticket }
+//   POST /register { platform: "ios" | "android", token, env?: "sandbox" | "production", kind } -> { ticket }
 //   POST /push     { ticket, alert?: { title, body }, threadId?, category?, data?, mutableContent?,
 //                    liveActivity?: { event: "update" | "end", contentState } }
 //
-// `mutableContent: true` sets `mutable-content: 1` so the Notification Service Extension can replace the
-// generic alert with the host's end-to-end encrypted title/body (`data.sealed`).
+// iOS `mutableContent: true` lets its Notification Service Extension replace the generic alert.
+// Android receives a data-only FCM message and decrypts `data.sealed` in its messaging service.
 
 import { ApnsClient, Notification, PushType, Priority } from "@fivesheepco/cloudflare-apns2";
 
@@ -20,11 +20,14 @@ export interface Env {
   APNS_SIGNING_KEY: string;
   /** base64 of 32 random bytes: `openssl rand -base64 32` */
   TICKET_KEY: string;
+  /** JSON contents of the Codync Android Firebase service account key. */
+  FCM_SERVICE_ACCOUNT?: string;
 }
 
 type ApnsEnv = "sandbox" | "production";
 type Kind = "alert" | "liveactivity";
-interface TicketPayload { t: string; e: ApnsEnv; k: Kind; b?: string }
+type Platform = "ios" | "android";
+interface TicketPayload { t: string; p?: Platform; e?: ApnsEnv; k: Kind; b?: string }
 
 const BUNDLE_ID = "com.pokai.Codync.ios";
 
@@ -99,14 +102,20 @@ function client(env: Env, apnsEnv: ApnsEnv, kind: Kind, bundleId?: string): Apns
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 async function register(req: Request, env: Env): Promise<Response> {
-  const body = (await req.json().catch(() => null)) as { token?: string; env?: string; kind?: string; bundleId?: string } | null;
-  if (typeof body?.token !== "string" || !/^(?:[0-9a-fA-F]{2}){16,100}$/.test(body.token)) return json({ error: "invalid token" }, 400);
-  if (body.env !== "production" && body.env !== "sandbox") return json({ error: "invalid environment" }, 400);
+  const body = (await req.json().catch(() => null)) as { token?: string; platform?: string; env?: string; kind?: string; bundleId?: string } | null;
+  if (body?.platform !== undefined && body.platform !== "ios" && body.platform !== "android") return json({ error: "invalid platform" }, 400);
+  const platform: Platform = body?.platform === "android" ? "android" : "ios";
+  if (typeof body?.token !== "string" || body.token.length > 4096 ||
+      (platform === "ios" ? !/^(?:[0-9a-fA-F]{2}){16,100}$/.test(body.token) : !/^[\x21-\x7E]{32,4096}$/.test(body.token))) {
+    return json({ error: "invalid token" }, 400);
+  }
+  if (platform === "ios" && body.env !== "production" && body.env !== "sandbox") return json({ error: "invalid environment" }, 400);
+  if (platform === "android" && body.kind !== "alert") return json({ error: "invalid kind" }, 400);
   if (body.kind !== "alert" && body.kind !== "liveactivity") return json({ error: "invalid kind" }, 400);
-  if (body.bundleId !== undefined && body.bundleId !== BUNDLE_ID && body.bundleId !== `${BUNDLE_ID}.dev`) return json({ error: "invalid bundle identifier" }, 400);
-  const e: ApnsEnv = body.env;
+  if (platform === "ios" && body.bundleId !== undefined && body.bundleId !== BUNDLE_ID && body.bundleId !== `${BUNDLE_ID}.dev`) return json({ error: "invalid bundle identifier" }, 400);
+  const e: ApnsEnv | undefined = body.env === "production" || body.env === "sandbox" ? body.env : undefined;
   const k: Kind = body.kind === "liveactivity" ? "liveactivity" : "alert";
-  return json({ ticket: await sealTicket(env, { t: body.token, e, k, ...(body.bundleId ? { b: body.bundleId } : {}) }) });
+  return json({ ticket: await sealTicket(env, { t: body.token, p: platform, ...(e ? { e } : {}), k, ...(body.bundleId ? { b: body.bundleId } : {}) }) });
 }
 
 export interface PushBody {
@@ -117,6 +126,73 @@ export interface PushBody {
   data?: Record<string, unknown>;
   mutableContent?: boolean;
   liveActivity?: { event?: "update" | "end"; timestamp?: number; staleDate?: number; contentState?: Record<string, unknown> };
+}
+
+const utf8 = new TextEncoder();
+const text64url = (text: string) => b64url(utf8.encode(text));
+interface FcmServiceAccount { project_id: string; client_email: string; private_key: string }
+let fcmTokenCache: { key: string; token: string; expiresAt: number } | null = null;
+
+async function fcmAccessToken(account: FcmServiceAccount): Promise<string> {
+  const key = `${account.project_id}:${account.client_email}`;
+  if (fcmTokenCache?.key === key && fcmTokenCache.expiresAt > Date.now() + 60_000) return fcmTokenCache.token;
+  const now = Math.floor(Date.now() / 1000);
+  const unsigned = `${text64url(JSON.stringify({ alg: "RS256", typ: "JWT" }))}.${text64url(JSON.stringify({
+    iss: account.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  }))}`;
+  const pem = account.private_key.replace(/\\n/g, "\n").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, "");
+  const der = Uint8Array.from(atob(pem), (char) => char.charCodeAt(0));
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8", der, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"],
+  );
+  const signature = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, utf8.encode(unsigned)));
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: `${unsigned}.${b64url(signature)}`,
+    }),
+  });
+  if (!response.ok) throw new Error("FCM authentication failed");
+  const result = await response.json() as { access_token?: string; expires_in?: number };
+  if (!result.access_token) throw new Error("FCM returned no access token");
+  fcmTokenCache = { key, token: result.access_token, expiresAt: Date.now() + (result.expires_in ?? 3600) * 1000 };
+  return result.access_token;
+}
+
+async function fcmPush(env: Env, ticket: TicketPayload, body: PushBody): Promise<Response> {
+  if (ticket.k !== "alert" || !body.alert) return json({ error: "Android supports alert notifications only" }, 400);
+  if (!env.FCM_SERVICE_ACCOUNT) return json({ error: "FCM is not configured on this relay" }, 503);
+  try {
+    const account = JSON.parse(env.FCM_SERVICE_ACCOUNT) as FcmServiceAccount;
+    if (!account.project_id || !account.client_email || !account.private_key) throw new Error("bad service account");
+    const token = await fcmAccessToken(account);
+    const data: Record<string, string> = {};
+    for (const [key, value] of Object.entries(body.data ?? {})) {
+      if (typeof value !== "string") return json({ error: "invalid Android push data" }, 400);
+      data[key] = value;
+    }
+    data.fallbackTitle = (body.alert.title ?? "Codync").slice(0, 120);
+    data.fallbackBody = (body.alert.body ?? "").slice(0, 400);
+    const response = await fetch(`https://fcm.googleapis.com/v1/projects/${encodeURIComponent(account.project_id)}/messages:send`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: { token: ticket.t, data, android: { priority: "HIGH", ttl: "3600s" } },
+      }),
+    });
+    if (response.ok) return json({ ok: true });
+    const failure = await response.json().catch(() => null) as { error?: { status?: string } } | null;
+    if (failure?.error?.status === "UNREGISTERED") return json({ error: "unregistered", gone: true }, 410);
+    return json({ error: "FCM rejected the notification" }, 502);
+  } catch {
+    return json({ error: "FCM delivery failed" }, 502);
+  }
 }
 
 /** The `aps` dictionary for an alert push. */
@@ -161,7 +237,9 @@ async function push(req: Request, env: Env): Promise<Response> {
   const t = body?.ticket ? await openTicket(env, body.ticket) : null;
   if (!body || !t) return json({ error: "invalid ticket" }, 403);
   // ponytail: no per-ticket rate limit; add a Durable Object counter if tickets get abused.
+  if ((t.p ?? "ios") === "android") return fcmPush(env, t, body);
   try {
+    const apnsEnvironment = t.e ?? "production";
     if (t.k === "alert") {
       if (!body.alert || typeof body.alert !== "object" ||
           (body.alert.title !== undefined && typeof body.alert.title !== "string") ||
@@ -179,14 +257,14 @@ async function push(req: Request, env: Env): Promise<Response> {
       if (new TextEncoder().encode(JSON.stringify(notification.buildApnsOptions())).length > 4096) {
         return json({ error: "payload too large" }, 413);
       }
-      await client(env, t.e, "alert", t.b).send(notification);
+      await client(env, apnsEnvironment, "alert", t.b).send(notification);
     } else {
       const la = body.liveActivity;
       if (!la) return json({ error: "liveActivity required" }, 400);
       let aps: Record<string, unknown>;
       try { aps = liveActivityAps(la); }
       catch { return json({ error: "invalid liveActivity" }, 400); }
-      await client(env, t.e, "liveactivity", t.b).send(
+      await client(env, apnsEnvironment, "liveactivity", t.b).send(
         new Notification(t.t, {
           type: PushType.liveactivity,
           priority: la.event === "end" || la.contentState?.status === "needsInput" ? Priority.immediate : Priority.throttled,
@@ -211,7 +289,10 @@ async function push(req: Request, env: Env): Promise<Response> {
 export function latestTicketIndices(tickets: Array<TicketPayload | null>): Set<number> {
   const latest = new Map<string, number>();
   tickets.forEach((ticket, index) => {
-    if (ticket) latest.set(`${ticket.b ?? BUNDLE_ID}:${ticket.e}:${ticket.k}:${ticket.t.toLowerCase()}`, index);
+    if (ticket) {
+      const token = (ticket.p ?? "ios") === "ios" ? ticket.t.toLowerCase() : ticket.t;
+      latest.set(`${ticket.p ?? "ios"}:${ticket.b ?? BUNDLE_ID}:${ticket.e ?? ""}:${ticket.k}:${token}`, index);
+    }
   });
   return new Set(latest.values());
 }

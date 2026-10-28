@@ -1,22 +1,30 @@
 package com.pokai.codync.android.ui.roster
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -25,9 +33,9 @@ import androidx.compose.ui.unit.dp
 import com.pokai.codync.data.SessionStore
 import com.pokai.codync.model.Bot
 import com.pokai.codync.android.ui.LargeHeader
-import com.pokai.codync.android.ui.SearchField
+import com.pokai.codync.android.ui.BotIdentityAvatar
 import com.pokai.codync.android.ui.SectionLabel
-import com.pokai.codync.design.CharacterAvatar
+import com.pokai.codync.design.CodyncIcon
 import com.pokai.codync.design.CodyncIcons
 import com.pokai.codync.design.CodyncMenuAnchor
 import com.pokai.codync.design.CodyncMenuItem
@@ -36,7 +44,6 @@ import com.pokai.codync.design.FilterChip
 import com.pokai.codync.design.GlassIconButton
 import com.pokai.codync.design.PrimaryButton
 import com.pokai.codync.design.SectionCard
-import com.pokai.codync.design.SettingsRow
 import com.pokai.codync.design.StatusDot
 import com.pokai.codync.design.theme.CodyncTheme
 import com.pokai.codync.design.theme.CodyncType
@@ -44,74 +51,82 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.rememberScrollState
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.put
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun LiveBotsScreen(
     session: SessionStore,
     onOpenChat: (botId: String, chatId: String) -> Unit,
     onOpenBotDetails: (String) -> Unit,
     onPair: () -> Unit,
+    onCreateBot: () -> Unit,
 ) {
     val hostBots by session.bots().collectAsState(initial = emptyList())
-    val connection by session.connection().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
+    val computers by session.computers().collectAsState(initial = emptyList())
+    val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
     val actionError by session.actionError().collectAsState(initial = null)
     val colors = CodyncTheme.colors
-    val scope = rememberCoroutineScope()
-    var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf("All") }
-    var menuBotId by remember { mutableStateOf<String?>(null) }
     var showNewChat by remember { mutableStateOf(false) }
-    val bots = hostBots.filter { bot ->
-        val matchesQuery = query.isBlank() ||
-            bot.name.contains(query, ignoreCase = true) ||
-            bot.description.contains(query, ignoreCase = true) ||
-            (bot.lastMessage?.contains(query, ignoreCase = true) == true)
-        val matchesFilter = when (filter) {
-            "Working" -> !bot.hidden && bot.status == "working"
-            "Needs you" -> !bot.hidden && bot.status == "needsInput"
-            "Groups" -> !bot.hidden && bot.kind == "group"
-            "Hidden" -> bot.hidden
-            else -> !bot.hidden
-        }
-        matchesQuery && matchesFilter
-    }.sortedWith(compareByDescending<Bot> { it.pinned }.thenBy { it.position }.thenBy { it.name.lowercase() })
-    val orderedHostBots = remember(hostBots) {
-        hostBots.sortedWith(compareByDescending<Bot> { it.pinned }.thenBy { it.position }.thenBy { it.name.lowercase() })
+    var createMenuOpen by remember { mutableStateOf(false) }
+    val bots = remember(hostBots, filter) {
+        hostBots.filter { bot ->
+            when (filter) {
+                "Working" -> !bot.hidden && bot.status == "working"
+                "Needs you" -> !bot.hidden && bot.status == "needsInput"
+                "Groups" -> !bot.hidden && bot.kind == "group"
+                "Hidden" -> bot.hidden
+                else -> !bot.hidden
+            }
+        }.sortedWith(compareByDescending<Bot> { it.pinned }.thenBy { it.position }.thenBy { it.name.lowercase() })
     }
     val computer = connection.computer
 
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
         LargeHeader(
-            title = "Bots",
+            title = "Home",
             subtitle = when {
                 computer == null -> "Pair a Codync computer to load its bots"
-                connection.kind == com.pokai.codync.transport.TransportKind.Direct -> "${computer.name} · Connected · rev ${connection.rev}"
-                connection.kind == com.pokai.codync.transport.TransportKind.Relay -> "${computer.name} · Connected through Codync Cloud · rev ${connection.rev}"
-                else -> "${computer.name} · Connecting to host"
+                else -> computer.name
             },
             trailing = {
-                if (computer == null) {
-                    PrimaryButton("Pair", onClick = onPair)
-                } else {
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        StatusDot(color = if (connection.kind == com.pokai.codync.transport.TransportKind.Offline) colors.warning else colors.added)
-                        Spacer(Modifier.width(6.dp))
-                        GlassIconButton(CodyncIcons.AddComment, "New chat", onClick = { showNewChat = true })
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    if (computer == null) {
+                        PrimaryButton("Pair", onClick = onPair)
+                    } else {
+                    }
+                    CodyncMenuAnchor(
+                        expanded = createMenuOpen,
+                        onDismissRequest = { createMenuOpen = false },
+                        items = listOf(
+                            CodyncMenuItem("Create new bot", CodyncIcons.Add, enabled = computer != null, onClick = onCreateBot),
+                            CodyncMenuItem("Create group chat", CodyncIcons.Groups, enabled = computer != null, onClick = { showNewChat = true }),
+                        ),
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).background(CodyncTheme.colors.surface.copy(alpha = 0.7f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            GlassIconButton(CodyncIcons.Add, "Create bot or group", onClick = { createMenuOpen = true })
+                        }
                     }
                 }
             },
         )
-        SearchField(
-            value = query,
-            onValueChange = { query = it },
-            placeholder = "Search bots and groups",
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
+        if (computers.size > 1) {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                computers.forEach { host ->
+                    FilterChip(
+                        text = host.name,
+                        selected = connection.computer?.id == host.id,
+                        onClick = { if (connection.computer?.id != host.id) session.connect(host) },
+                    )
+                }
+            }
+        }
         Row(
             Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -139,110 +154,118 @@ fun LiveBotsScreen(
                 symbol = CodyncIcons.Bots,
             )
         } else {
+            val groups = bots.filter { it.kind == "group" }
+            val singleBots = bots.filter { it.kind != "group" }
+            var botsExpanded by rememberSaveable { mutableStateOf(true) }
+            var groupsExpanded by rememberSaveable { mutableStateOf(true) }
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
-                item { SectionLabel(computer?.name ?: "Computer", trailing = "${bots.size}") }
-                items(bots, key = { it.id }) { bot ->
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { botsExpanded = !botsExpanded }.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 7.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Text("BOTS", color = colors.tertiary, style = CodyncType.caption)
+                        Spacer(Modifier.weight(1f))
+                        Text("${singleBots.size}", color = colors.tertiary, style = CodyncType.caption)
+                        Spacer(Modifier.width(6.dp))
+                        CodyncIcon(if (botsExpanded) CodyncIcons.ChevronDown else CodyncIcons.ChevronRight, tint = colors.tertiary, size = 14.dp)
+                    }
+                }
+                if (botsExpanded) {
+                    items(singleBots, key = { it.id }) { bot ->
                     SectionCard {
-                        SettingsRow(
-                            title = bot.name,
-                            subtitle = when (bot.status) {
-                                "working" -> bot.activity.ifBlank { "Working" }
-                                "needsInput" -> bot.activity.ifBlank { "Needs you" }
-                                else -> bot.lastMessage ?: bot.description.ifBlank { bot.backend }
-                            },
-                            icon = if (bot.kind == "group") CodyncIcons.Groups else CodyncIcons.Bots,
-                            trailing = {
+                        Row(
+                            Modifier.fillMaxWidth().combinedClickable(
+                                onClick = { onOpenChat(bot.id, "main") },
+                                onLongClick = { onOpenBotDetails(bot.id) },
+                            ).padding(horizontal = 14.dp, vertical = 11.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            BotIdentityAvatar(bot, hostBots, size = 46.dp)
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                    CharacterAvatar(
-                                        name = bot.name,
-                                        colorId = bot.avatarColor,
-                                        shapeId = bot.avatarShape,
-                                        size = 34.dp,
-                                        modifier = Modifier.clip(RoundedCornerShape(50)),
-                                    )
-                                    val samePinnedGroup = orderedHostBots.filter { it.pinned == bot.pinned }
-                                    val position = samePinnedGroup.indexOfFirst { it.id == bot.id }
-                                    CodyncMenuAnchor(
-                                        expanded = menuBotId == bot.id,
-                                        onDismissRequest = { menuBotId = null },
-                                        items = buildList {
-                                            add(CodyncMenuItem(
-                                                if (bot.kind == "group") "Group details" else "Bot details",
-                                                CodyncIcons.Info,
-                                                onClick = {
-                                                    menuBotId = null
-                                                    onOpenBotDetails(bot.id)
-                                                },
-                                            ))
-                                            add(CodyncMenuItem("New chat", CodyncIcons.AddComment, onClick = {
-                                                menuBotId = null
-                                                onOpenChat(bot.id, "new")
-                                            }))
-                                            add(CodyncMenuItem(if (bot.pinned) "Unpin" else "Pin to top", CodyncIcons.Pin, onClick = {
-                                                menuBotId = null
-                                                scope.launch { session.call("updateBot", buildJsonObject {
-                                                    put("id", bot.id)
-                                                    put("pinned", !bot.pinned)
-                                                }) }
-                                            }))
-                                            add(CodyncMenuItem(if (bot.hidden) "Show bot" else "Hide bot", if (bot.hidden) CodyncIcons.Visible else CodyncIcons.Hide, onClick = {
-                                                menuBotId = null
-                                                scope.launch { session.call("updateBot", buildJsonObject {
-                                                    put("id", bot.id)
-                                                    put("hidden", !bot.hidden)
-                                                }) }
-                                            }))
-                                            if (position > 0) add(CodyncMenuItem("Move up", CodyncIcons.ArrowUp, onClick = {
-                                                menuBotId = null
-                                                val mutable = orderedHostBots.toMutableList()
-                                                val current = mutable.indexOfFirst { it.id == bot.id }
-                                                val previous = mutable.indexOfFirst { it.id == samePinnedGroup[position - 1].id }
-                                                val row = mutable[current]
-                                                mutable[current] = mutable[previous]
-                                                mutable[previous] = row
-                                                scope.launch { session.call("reorderBots", buildJsonObject {
-                                                    put("ids", buildJsonArray { mutable.forEach { add(JsonPrimitive(it.id)) } })
-                                                }) }
-                                            }))
-                                            if (position >= 0 && position < samePinnedGroup.lastIndex) add(CodyncMenuItem("Move down", CodyncIcons.ArrowDown, onClick = {
-                                                menuBotId = null
-                                                val mutable = orderedHostBots.toMutableList()
-                                                val current = mutable.indexOfFirst { it.id == bot.id }
-                                                val next = mutable.indexOfFirst { it.id == samePinnedGroup[position + 1].id }
-                                                val row = mutable[current]
-                                                mutable[current] = mutable[next]
-                                                mutable[next] = row
-                                                scope.launch { session.call("reorderBots", buildJsonObject {
-                                                    put("ids", buildJsonArray { mutable.forEach { add(JsonPrimitive(it.id)) } })
-                                                }) }
-                                            }))
-                                            if (bot.unread > 0) add(CodyncMenuItem("Mark as read", CodyncIcons.Done, onClick = {
-                                                menuBotId = null
-                                                scope.launch { session.call("markRead", buildJsonObject {
-                                                    put("botId", bot.id)
-                                                    put("all", true)
-                                                }) }
-                                            }))
-                                        },
-                                    ) {
-                                        GlassIconButton(
-                                            CodyncIcons.More,
-                                            "Actions for ${bot.name}",
-                                            onClick = { menuBotId = bot.id },
-                                            size = 38.dp,
-                                            iconSize = 20.dp,
-                                        )
+                                    Text(bot.name, color = colors.text, style = CodyncType.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), maxLines = 1)
+                                    if (bot.unread > 0) {
+                                        Spacer(Modifier.width(7.dp))
+                                        Text("${bot.unread}", color = colors.onAccent, style = CodyncType.caption, modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(colors.accentFill).padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
                                 }
-                            },
-                            onClick = { onOpenChat(bot.id, "main") },
-                            onLongClick = { menuBotId = bot.id },
-                        )
+                                Text(
+                                    when (bot.status) {
+                                        "working" -> bot.activity.ifBlank { "Working" }
+                                        "needsInput" -> bot.activity.ifBlank { "Needs you" }
+                                        else -> bot.lastMessage ?: bot.description.ifBlank { bot.backend }
+                                    },
+                                    color = colors.secondary,
+                                    style = CodyncType.footnote,
+                                    maxLines = 1,
+                                )
+                            }
+                            if (bot.status == "working") {
+                                com.pokai.codync.design.Spinner(size = 14.dp, color = colors.secondary)
+                            } else if (bot.status == "needsInput" || bot.status == "error") {
+                                StatusDot(color = colors.warning)
+                            }
+                        }
                     }
+                }
+                }
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { groupsExpanded = !groupsExpanded }.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 7.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Text("GROUPS", color = colors.tertiary, style = CodyncType.caption)
+                        Spacer(Modifier.weight(1f))
+                        Text("${groups.size}", color = colors.tertiary, style = CodyncType.caption)
+                        Spacer(Modifier.width(6.dp))
+                        CodyncIcon(if (groupsExpanded) CodyncIcons.ChevronDown else CodyncIcons.ChevronRight, tint = colors.tertiary, size = 14.dp)
+                    }
+                }
+                if (groupsExpanded) {
+                    items(groups, key = { it.id }) { bot ->
+                    SectionCard {
+                        Row(
+                            Modifier.fillMaxWidth().combinedClickable(
+                                onClick = { onOpenChat(bot.id, "main") },
+                                onLongClick = { onOpenBotDetails(bot.id) },
+                            ).padding(horizontal = 14.dp, vertical = 11.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            BotIdentityAvatar(bot, hostBots, size = 46.dp)
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                    Text(bot.name, color = colors.text, style = CodyncType.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), maxLines = 1)
+                                    if (bot.unread > 0) {
+                                        Spacer(Modifier.width(7.dp))
+                                        Text("${bot.unread}", color = colors.onAccent, style = CodyncType.caption, modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(colors.accentFill).padding(horizontal = 6.dp, vertical = 2.dp))
+                                    }
+                                }
+                                Text(
+                                    when (bot.status) {
+                                        "working" -> bot.activity.ifBlank { "Working" }
+                                        "needsInput" -> bot.activity.ifBlank { "Needs you" }
+                                        else -> bot.lastMessage ?: bot.description.ifBlank { bot.backend }
+                                    },
+                                    color = colors.secondary,
+                                    style = CodyncType.footnote,
+                                    maxLines = 1,
+                                )
+                            }
+                            if (bot.status == "working") {
+                                com.pokai.codync.design.Spinner(size = 14.dp, color = colors.secondary)
+                            } else if (bot.status == "needsInput" || bot.status == "error") {
+                                StatusDot(color = colors.warning)
+                            }
+                        }
+                    }
+                }
                 }
             }
         }
@@ -251,8 +274,10 @@ fun LiveBotsScreen(
     if (showNewChat) {
         NewChatSheet(
             session = session,
-            bots = hostBots.filterNot { it.hidden },
+            bots = hostBots,
+            forceGroup = true,
             onDismiss = { showNewChat = false },
+            onCreateBot = onCreateBot,
             onOpenChat = { botId, chatId ->
                 showNewChat = false
                 onOpenChat(botId, chatId)

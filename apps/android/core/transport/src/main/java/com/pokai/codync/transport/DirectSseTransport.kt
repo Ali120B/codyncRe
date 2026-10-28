@@ -32,7 +32,6 @@ import okhttp3.sse.EventSources
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import java.io.IOException
 import java.net.URI
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
@@ -139,8 +138,8 @@ class DirectSseTransport(
         val path = "/events?since=$since&client=$clientId"
         val uri = URI.create(base)
         val authority = authorityOf(uri)
-        val ts = System.currentTimeMillis() / 1000
-        val nonce = UUID.randomUUID().toString().replace("-", "").take(16)
+        val ts = System.currentTimeMillis()
+        val nonce = Codec.b64(Keys.randomBytes(16))
         val sig = CodyncSig.header(
             deviceKey,
             ts,
@@ -189,8 +188,8 @@ class DirectSseTransport(
         val payload = body.toString().toByteArray(Charsets.UTF_8)
         val uri = URI.create(base)
         val authority = authorityOf(uri)
-        val ts = System.currentTimeMillis() / 1000
-        val nonce = UUID.randomUUID().toString().replace("-", "").take(16)
+        val ts = System.currentTimeMillis()
+        val nonce = Codec.b64(Keys.randomBytes(16))
         val sig = CodyncSig.header(
             deviceKey,
             ts,

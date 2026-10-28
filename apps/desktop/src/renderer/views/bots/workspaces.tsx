@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button, CardSection, DropdownMenu, IconButton, Pill } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Overlay'
@@ -73,6 +73,7 @@ export function WorkspacePicker({ value, onChange, personal = true, placeholder 
           start={value || store.hello?.home || null}
           onPick={(path) => {
             rememberWorkspace(path)
+            void store.ready().then((c) => c.call('addWorkspace', { path })).catch(() => {})
             onChange(path)
             setPicking(false)
           }}
@@ -87,10 +88,34 @@ export function WorkspacesCard({ store }: { store: BotStore | null }) {
   const [list] = usePref(prefs.workspaces)
   const [typed, setTyped] = useState('')
   const [picking, setPicking] = useState(false)
+  useEffect(() => {
+    if (!store) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const c = await store.ready()
+        const res = await c.call<{ workspaces?: string[] }>('workspaces', {})
+        if (cancelled) return
+        const hostList = Array.isArray(res.workspaces) ? res.workspaces : []
+        const local = prefs.workspaces.get()
+        if (hostList.length === 0 && local.length > 0) {
+          await c.call('setWorkspaces', { workspaces: local })
+        } else if (hostList.length > 0) {
+          const merged = [...hostList]
+          for (const p of local) if (!merged.includes(p)) merged.push(p)
+          const capped = merged.slice(0, 12)
+          prefs.workspaces.set(capped)
+          if (capped.length !== hostList.length) await c.call('setWorkspaces', { workspaces: capped })
+        }
+      } catch {}
+    })()
+    return () => { cancelled = true }
+  }, [store])
   const add = () => {
     const path = expandWorkspace(typed, store?.hello?.home)
     if (!path) return
     rememberWorkspace(path)
+    void store?.ready().then((c) => c.call('addWorkspace', { path })).catch(() => {})
     setTyped('')
   }
   return (
@@ -105,7 +130,7 @@ export function WorkspacesCard({ store }: { store: BotStore | null }) {
               <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={path}>
                 {path}
               </span>
-              <IconButton title={`Remove ${path}`} icon="xmark" onClick={() => forgetWorkspace(path)} />
+              <IconButton title={`Remove ${path}`} icon="xmark" onClick={() => { forgetWorkspace(path); void store?.ready().then((c) => c.call('removeWorkspace', { path })).catch(() => {}) }} />
             </div>
           ))
         )}
@@ -138,6 +163,7 @@ export function WorkspacesCard({ store }: { store: BotStore | null }) {
               start={store.hello?.home ?? null}
               onPick={(path) => {
                 rememberWorkspace(path)
+                void store?.ready().then((c) => c.call('addWorkspace', { path })).catch(() => {})
                 setPicking(false)
               }}
             />

@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 class MainActivity : AppCompatActivity() {
     private var pairingLink by mutableStateOf<String?>(null)
     private var botLink by mutableStateOf<String?>(null)
+    private var oauthLink by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Apply persisted theme BEFORE inflate so splash/window aren't white in dark mode.
@@ -27,12 +28,15 @@ class MainActivity : AppCompatActivity() {
         handleClerkCallback(intent)
         pairingLink = intent?.dataString
         botLink = intent?.dataString?.takeIf { com.pokai.codync.android.ui.BotLink.parse(it) != null }
+        oauthLink = intent?.data?.takeIf { it.host == "oauth" && it.scheme in setOf("codync", "codync-dev") }?.toString()
         setContent {
             CodyncApp(
                 pairingLink = pairingLink,
                 botLink = botLink,
+                oauthLink = oauthLink,
                 onPairingLinkConsumed = { pairingLink = null },
                 onBotLinkConsumed = { botLink = null },
+                onOAuthLinkConsumed = { oauthLink = null },
             )
         }
     }
@@ -43,6 +47,7 @@ class MainActivity : AppCompatActivity() {
         handleClerkCallback(intent)
         pairingLink = intent.dataString
         botLink = intent.dataString?.takeIf { com.pokai.codync.android.ui.BotLink.parse(it) != null }
+        oauthLink = intent.data?.takeIf { it.host == "oauth" && it.scheme in setOf("codync", "codync-dev") }?.toString()
     }
 
     private fun handleClerkCallback(intent: android.content.Intent?) {

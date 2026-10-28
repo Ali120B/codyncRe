@@ -56,6 +56,11 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
             )
             .await?
         }
+        "setViewing" => {
+            let bot = b["botId"].as_str().unwrap_or("");
+            *hub.viewing.locked() = if (bot.is_empty()) { None } else { Some(bot.to_owned()) };
+            json!({"ok": true})
+        }
         "hello" => {
             let port = hub.port;
             json!({
@@ -74,6 +79,7 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
                 "rev": hub.store.current_rev(),
                 "screen": hub.screen.state(),
                 "analytics": hub.analytics.state(),
+                "workspaces": load_workspaces(&hub.store),
                 // Shells out to `tailscale`: keep it off the async workers.
                 "urls": tokio::task::spawn_blocking(move || crate::service::addresses(port)).await?,
             })
@@ -185,8 +191,43 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
             let args = b.get("arguments").filter(|a| a.is_object()).cloned().unwrap_or_else(|| json!({}));
             crate::screen::computer(hub, str_arg(&b, "botId")?, str_arg(&b, "name")?, args).await?
         }
+        "workspaces" => {
+            json!({"workspaces": load_workspaces(&hub.store)})
+        }
+        "addWorkspace" => {
+            let path = str_arg(&b, "path")?;
+            let clean = {
+                let t = path.trim_end_matches('/');
+                if t.is_empty() { "/".to_owned() } else { t.to_owned() }
+            };
+            let mut list = load_workspaces(&hub.store);
+            if !list.iter().any(|p| p == &clean) {
+                list.insert(0, clean);
+                list.truncate(12);
+            }
+            hub.store.kv_set("workspaces", &serde_json::to_string(&list)?)?;
+            json!({"workspaces": list})
+        }
+        "removeWorkspace" => {
+            let path = str_arg(&b, "path")?;
+            let mut list = load_workspaces(&hub.store);
+            list.retain(|p| p != path);
+            hub.store.kv_set("workspaces", &serde_json::to_string(&list)?)?;
+            json!({"workspaces": list})
+        }
+        "setWorkspaces" => {
+            let arr = b["workspaces"].as_array().context("`workspaces` must be an array")?;
+            let list: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
+            hub.store.kv_set("workspaces", &serde_json::to_string(&list)?)?;
+            json!({"workspaces": list})
+        }
         _ => return Ok(ControlFlow::Continue(b)),
     }))
+}
+
+/// Reads the host-stored workspace folders (newest first), falling back to empty.
+fn load_workspaces(store: &crate::store::Store) -> Vec<String> {
+    store.kv_get("workspaces").and_then(|raw| serde_json::from_str(&raw).ok()).unwrap_or_default()
 }
 
 /// Blocking (`std::fs`): call through `spawn_blocking`.

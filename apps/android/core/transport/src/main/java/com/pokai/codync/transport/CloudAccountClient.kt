@@ -27,7 +27,6 @@ import okhttp3.Response
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import java.io.IOException
 import java.net.URI
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
@@ -119,8 +118,8 @@ class CloudAccountClient(
             .apply {
                 if (body != null) header("Content-Type", "application/json")
                 if (signed) {
-                    val timestamp = System.currentTimeMillis() / 1000
-                    val nonce = UUID.randomUUID().toString().replace("-", "").take(16)
+                    val timestamp = System.currentTimeMillis()
+                    val nonce = Codec.b64(Keys.randomBytes(16))
                     val authority = buildString {
                         append(uri.host.orEmpty())
                         if (uri.port > 0) append(':').append(uri.port)

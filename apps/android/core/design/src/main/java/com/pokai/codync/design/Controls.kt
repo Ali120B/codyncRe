@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -219,8 +220,9 @@ fun SectionCard(
     Column(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.surface),
+            .clip(RoundedCornerShape(20.dp))
+            .background(colors.surface)
+            .border(0.6.dp, colors.border, RoundedCornerShape(20.dp)),
         content = content,
     )
 }
@@ -238,6 +240,7 @@ fun SettingsRow(
     destructive: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val colors = CodyncTheme.colors
     Row(
@@ -255,7 +258,10 @@ fun SettingsRow(
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) {
+        if (leading != null) {
+            leading()
+            Spacer(Modifier.width(11.dp))
+        } else if (icon != null) {
             Box(
                 Modifier
                     .size(30.dp)
@@ -360,8 +366,9 @@ fun FilterChip(
         modifier = modifier
             .clip(CircleShape)
             .background(if (selected) colors.accentFill else colors.surface)
+            .border(0.6.dp, if (selected) colors.accentFill else colors.border, CircleShape)
             .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 7.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
         Text(
             text = text,
@@ -383,7 +390,7 @@ fun Spinner(size: Dp = 16.dp, color: Color = CodyncTheme.colors.secondary) {
     Canvas(Modifier.size(size)) {
         drawArc(
             color = color,
-            startAngle = -20f,
+            startAngle = turn - 20f,
             sweepAngle = 280f,
             useCenter = false,
             style = Stroke(width = size.toPx() / 9f, cap = StrokeCap.Round),

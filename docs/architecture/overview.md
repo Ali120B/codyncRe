@@ -13,7 +13,7 @@ flowchart LR
     SSH[Desktop SSH tunnel] -->|Forwarded loopback HTTP + SSE| Host
     Host -->|ACP over stdio| Agents[Coding agents]
     Host --> DB[(Local SQLite)]
-    Host -->|Sealed alert| Push[relay/ APNs Worker]
+    Host -->|Sealed alert| Push[relay/ APNs and FCM Worker]
     Push --> APNs[Apple Push Notification service]
     APNs --> Phone
 ```

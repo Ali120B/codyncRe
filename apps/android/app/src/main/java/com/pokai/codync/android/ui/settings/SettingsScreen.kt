@@ -3,31 +3,45 @@
 package com.pokai.codync.android.ui.settings
 
 import android.content.Intent
+import android.Manifest
 import android.net.Uri
 import android.os.Build
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -35,13 +49,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import com.google.firebase.FirebaseApp
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pokai.codync.android.BuildConfig
 import com.pokai.codync.android.AndroidAccountSession
 import com.pokai.codync.android.AndroidAccountState
-import com.pokai.codync.android.fake.FakeHostState
-import com.pokai.codync.android.fake.FakeTransport
 import com.pokai.codync.android.ui.AppPreferences
 import com.pokai.codync.android.ui.LargeHeader
 import com.pokai.codync.android.ui.SectionLabel
@@ -50,7 +67,10 @@ import com.pokai.codync.android.ui.relativeShort
 import com.pokai.codync.data.SessionStore
 import com.clerk.api.Clerk
 import com.pokai.codync.design.CodyncIcon
+import com.pokai.codync.design.CodyncSwitch
 import com.pokai.codync.design.FilterChip
+import com.pokai.codync.design.GlassIconButton
+import com.pokai.codync.design.PrimaryButton
 import com.pokai.codync.design.CodyncIcons
 import com.pokai.codync.design.DividerLine
 import com.pokai.codync.design.Pill
@@ -62,25 +82,71 @@ import com.pokai.codync.design.hasAgsGlass
 import com.pokai.codync.design.theme.CodyncTheme
 import com.pokai.codync.design.theme.CodyncType
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 @Composable
 fun SettingsScreen(
-    fake: FakeHostState,
     themeMode: ThemeMode,
     onThemeMode: (ThemeMode) -> Unit,
     prefs: AppPreferences,
     session: SessionStore,
     account: AndroidAccountSession,
+    active: Boolean = true,
     onOpenGlassLab: () -> Unit,
-    onOpenFakeHost: () -> Unit,
     onOpenPairing: () -> Unit = {},
     onOpenWorkbench: () -> Unit = {},
 ) {
     val colors = CodyncTheme.colors
     val context = LocalContext.current
+    var showAgents by remember { mutableStateOf(false) }
     val computers by session.computers().collectAsState(initial = emptyList())
-    val connection by session.connection().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
+    var pushEnabled by remember(prefs) { mutableStateOf(prefs.push) }
+    val pushPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        pushEnabled = granted
+        prefs.push = granted
+    }
+    val firebaseConfigured = remember { FirebaseApp.getApps(context).isNotEmpty() }
+    val scope = rememberCoroutineScope()
+    var hostWorkspaces by remember { mutableStateOf(prefs.workspaces.sorted()) }
+    val connected = connection.computer != null && connection.hello != null
+    LaunchedEffect(connected, active) {
+        if (!active || !connected) return@LaunchedEffect
+        session.call("workspaces", buildJsonObject {}).onSuccess { el ->
+            val list = runCatching { el.jsonObject["workspaces"]?.jsonArray?.map { it.jsonPrimitive.content } }.getOrNull()
+            if (list != null) {
+                hostWorkspaces = list
+                prefs.workspaces = list.toSet()
+            }
+        }
+    }
+
+    LaunchedEffect(firebaseConfigured, active, pushEnabled) {
+        if (firebaseConfigured && active && pushEnabled && Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            pushPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    fun setPushEnabled(enabled: Boolean) {
+        if (!enabled) {
+            pushEnabled = false
+            prefs.push = false
+        } else if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            pushPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            pushEnabled = true
+            prefs.push = true
+        }
+    }
+    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
         LargeHeader(
             title = "Settings",
             subtitle = "Codync ${BuildConfig.VERSION_NAME}",
@@ -90,7 +156,7 @@ fun SettingsScreen(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(bottom = 118.dp),
         ) {
-            item { AccountCard(account) }
+            item { AccountCard(account, active) }
 
             item {
                 SectionCard(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -159,10 +225,16 @@ fun SettingsScreen(
                 SectionCard(Modifier.padding(horizontal = 16.dp)) {
                     SettingsRow(
                         title = "Push delivery",
-                        subtitle = "FCM setup is required before this device can receive alerts while Codync is closed.",
+                        subtitle = when {
+                            !firebaseConfigured -> "Add this flavor's Codync Firebase config to enable encrypted alerts."
+                            !pushEnabled -> "Push alerts are turned off on this device."
+                            Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED -> "Allow notifications in Android settings to see alerts while Codync is closed."
+                            else -> "Host-sealed alerts use FCM; the relay also needs its Firebase service account configured."
+                        },
                         icon = CodyncIcons.Notifications,
                         showChevron = false,
-                        trailing = { Pill("Setup needed", fill = colors.warning.copy(alpha = 0.12f), color = colors.warning) },
+                        trailing = { CodyncSwitch(pushEnabled, onCheckedChange = ::setPushEnabled, enabled = firebaseConfigured) },
+                        onClick = { setPushEnabled(!pushEnabled) },
                     )
                 }
             }
@@ -208,6 +280,73 @@ fun SettingsScreen(
                 }
             }
 
+            item { SectionLabel("Workspaces", trailing = "${hostWorkspaces.size}") }
+            item {
+                SectionCard(Modifier.padding(horizontal = 16.dp)) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (hostWorkspaces.isEmpty()) {
+                            Text(if (connection.computer == null) "Connect to a computer to see its saved workspaces." else "No saved workspaces yet. Add a folder path below.", color = colors.secondary, style = CodyncType.footnote)
+                        } else {
+                            hostWorkspaces.sorted().forEach { path ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(path.substringAfterLast('/').ifBlank { path }, color = colors.text, style = CodyncType.body)
+                                        Text(path, color = colors.tertiary, style = CodyncType.caption, maxLines = 1)
+                                    }
+                                    GlassIconButton(CodyncIcons.Close, "Remove workspace", onClick = {
+                                        scope.launch {
+                                            session.call("removeWorkspace", buildJsonObject { put("path", path) })
+                                            hostWorkspaces = hostWorkspaces - path
+                                            prefs.workspaces = hostWorkspaces.toSet()
+                                        }
+                                    }, size = 30.dp, iconSize = 16.dp)
+                                }
+                            }
+                        }
+                        var newPath by remember { mutableStateOf("") }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BasicTextField(
+                                value = newPath,
+                                onValueChange = { newPath = it },
+                                modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(colors.surface).padding(10.dp),
+                                textStyle = TextStyle(color = colors.text, fontSize = 14.sp),
+                                cursorBrush = SolidColor(colors.text),
+                                singleLine = true,
+                                decorationBox = { inner -> if (newPath.isEmpty()) Text("Folder path", color = colors.tertiary, style = CodyncType.footnote) ; inner() },
+                            )
+                            PrimaryButton("Add", enabled = newPath.isNotBlank(), onClick = {
+                                val clean = newPath.trim()
+                                scope.launch {
+                                    session.call("addWorkspace", buildJsonObject { put("path", clean) }).onSuccess { el ->
+                                        val list = runCatching { el.jsonObject["workspaces"]?.jsonArray?.map { it.jsonPrimitive.content } }.getOrNull()
+                                        if (list != null) hostWorkspaces = list
+                                    }
+                                    if (!hostWorkspaces.contains(clean)) hostWorkspaces = hostWorkspaces + clean
+                                    prefs.workspaces = hostWorkspaces.toSet()
+                                    newPath = ""
+                                }
+                            })
+                        }
+                        if (connection.computer != null) {
+                            Text("Synced with this computer's saved workspaces.", color = colors.tertiary, style = CodyncType.caption)
+                        }
+                    }
+                }
+            }
+
+            item { SectionLabel("Agents") }
+            item {
+                SectionCard(Modifier.padding(horizontal = 16.dp)) {
+                    val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
+                    val backends = connection.hello?.backends.orEmpty()
+                    SettingsRow(
+                        title = "Agent setup",
+                        subtitle = if (backends.isEmpty()) "Connect to a computer to manage its agents." else "${backends.count { it.available }} of ${backends.size} agents installed",
+                        icon = CodyncIcons.Build,
+                        onClick = { showAgents = true },
+                    )
+                }
+            }
             item { SectionLabel("Support") }
             item {
                 SectionCard(Modifier.padding(horizontal = 16.dp)) {
@@ -253,31 +392,6 @@ fun SettingsScreen(
                 item {
                     SectionCard(Modifier.padding(horizontal = 16.dp)) {
                         SettingsRow(
-                            title = "Fake host",
-                            subtitle = fake.lastEvent,
-                            icon = CodyncIcons.Science,
-                            onClick = onOpenFakeHost,
-                            trailing = {
-                                Text(
-                                    when (fake.transport) {
-                                        FakeTransport.Direct -> "Direct"
-                                        FakeTransport.Relay -> "Relay"
-                                        FakeTransport.Offline -> "Offline"
-                                    },
-                                    color = colors.tertiary,
-                                    style = CodyncType.caption,
-                                )
-                            },
-                        )
-                        DividerLine(inset = 54.dp)
-                        SettingsRow(
-                            title = "Glass lab",
-                            subtitle = if (hasAgsGlass) "AGSL refraction · Android ${Build.VERSION.RELEASE}" else "Frosted fallback · Android ${Build.VERSION.RELEASE}",
-                            icon = CodyncIcons.Palette,
-                            onClick = onOpenGlassLab,
-                        )
-                        DividerLine(inset = 54.dp)
-                        SettingsRow(
                             title = "API level",
                             subtitle = "minSdk 31 · targetSdk 36 · ${Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"}",
                             icon = CodyncIcons.Phone,
@@ -294,14 +408,50 @@ fun SettingsScreen(
                 }
             }
         }
+        val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
+        val backends = connection.hello?.backends.orEmpty()
+        if (showAgents) {
+            Dialog(onDismissRequest = { showAgents = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+                Box(Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.82f).clip(RoundedCornerShape(26.dp)).background(colors.background)) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("Agents", color = colors.text, style = CodyncType.headline, modifier = Modifier.weight(1f))
+                            GlassIconButton(CodyncIcons.Close, "Close", onClick = { showAgents = false })
+                        }
+                        backends.forEach { backend ->
+                            SectionCard {
+                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(backend.name, color = colors.text, style = CodyncType.body)
+                                    Text(if (backend.available) "Installed" else backend.installHint.ifBlank { "Not installed" }, color = colors.tertiary, style = CodyncType.caption)
+                                    if (!backend.available) {
+                                        SecondaryButton("Set up on computer", onClick = {
+                                            scope.launch {
+                                                session.call("agentSetup", buildJsonObject {
+                                                    put("backend", backend.id)
+                                                    put("step", "install")
+                                                    put("method", "")
+                                                    put("cols", 80)
+                                                    put("rows", 24)
+                                                })
+                                            }
+                                        })
+                                        Text("Setup runs on the computer; view the terminal there.", color = colors.tertiary, style = CodyncType.caption)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun AccountCard(account: AndroidAccountSession) {
+private fun AccountCard(account: AndroidAccountSession, active: Boolean) {
     val state by account.state.collectAsState()
     if (state.configured) {
-        ConfiguredAccountCard(account, state)
+        ConfiguredAccountCard(account, state, active)
     } else {
         val colors = CodyncTheme.colors
         SectionCard(Modifier.padding(horizontal = 16.dp)) {
@@ -317,12 +467,13 @@ private fun AccountCard(account: AndroidAccountSession) {
 }
 
 @Composable
-private fun ConfiguredAccountCard(account: AndroidAccountSession, state: AndroidAccountState) {
+private fun ConfiguredAccountCard(account: AndroidAccountSession, state: AndroidAccountState, active: Boolean) {
     val colors = CodyncTheme.colors
     val scope = rememberCoroutineScope()
     val signedInUser by Clerk.userFlow.collectAsState(initial = null)
     val currentUser = signedInUser
-    LaunchedEffect(currentUser?.id) {
+    LaunchedEffect(active, currentUser?.id) {
+        if (!active) return@LaunchedEffect
         if (currentUser == null) account.clearAccount() else account.refresh()
     }
 

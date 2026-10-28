@@ -1,0 +1,4 @@
+<resources>
+    <string name="push_channel_name">Codync alerts</string>
+    <string name="push_channel_description">Encrypted updates when a bot needs you or finishes a task.</string>
+</resources>

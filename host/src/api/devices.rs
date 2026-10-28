@@ -28,7 +28,8 @@ impl Caller {
     }
 }
 
-/// Methods only this computer may call.
+/// Methods only this computer may call. Pairing and device/cloud administration are
+/// separately exposed to authorized control devices; host installation and local tools stay here.
 const LOCAL_ONLY: &[&str] = &[
     "hostUpdateStatus",
     "checkHostUpdate",
@@ -57,13 +58,6 @@ const LOCAL_ONLY: &[&str] = &[
     "connectorCall",
     "claimSign",
     "unclaim",
-    "devices",
-    "revokeDevice",
-    "accessRequests",
-    "decideAccessRequest",
-    "cloudStatus",
-    "setCloud",
-    "setApproval",
 ];
 const SCREEN: &[&str] = &["screenPrepare", "screenOffer", "screenClose", "screenTakeover"];
 

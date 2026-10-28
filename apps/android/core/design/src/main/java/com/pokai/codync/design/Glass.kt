@@ -41,14 +41,14 @@ import dev.chrisbanes.haze.hazeEffect
  */
 @Immutable
 data class GlassConfig(
-    val blurRadius: Dp = 20.dp,
-    val tintAlpha: Float = 0.52f,
-    val refractionStrength: Float = 0.78f,
-    val refractionHeight: Float = 0.26f,
-    val refractionDisplacement: Dp = 22.dp,
-    val specular: Float = 0.46f,
-    val noise: Float = 0.035f,
-    val quality: Float = 0.45f,
+    val blurRadius: Dp = 22.dp,
+    val tintAlpha: Float = 0.46f,
+    val refractionStrength: Float = 0.92f,
+    val refractionHeight: Float = 0.30f,
+    val refractionDisplacement: Dp = 26.dp,
+    val specular: Float = 0.62f,
+    val noise: Float = 0.022f,
+    val quality: Float = 0.52f,
 )
 
 val LocalGlassConfig = staticCompositionLocalOf { GlassConfig() }
@@ -119,7 +119,10 @@ fun GlassSurface(
                 .matchParentSize()
                 .background(
                     Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = if (colors.isDark) 0.055f else 0.20f),
+                        0f to Color.White.copy(
+                            alpha = if (colors.isDark) 0.035f + config.specular * 0.045f
+                            else 0.12f + config.specular * 0.18f,
+                        ),
                         0.5f to Color.Transparent,
                         1f to Color.Black.copy(alpha = if (colors.isDark) 0.10f else 0.03f),
                     ),
@@ -149,6 +152,7 @@ uniform float2 size;
 uniform float band;
 uniform float strength;
 uniform float displacement;
+uniform float specular;
 
 half4 main(float2 coord) {
     float2 edge = min(coord, size - coord);
@@ -164,7 +168,7 @@ half4 main(float2 coord) {
                  + tangent * warp * displacement * 0.32 * strength;
     half4 col = content.eval(coord + offset);
     float rim = pow(1.0 - t, 4.0);
-    col.rgb += rim * 0.13 * strength;
+    col.rgb += rim * specular * strength;
     return col;
 }
 """
@@ -180,6 +184,7 @@ private fun buildEdgeRefraction(
     shader.setFloatUniform("band", (config.refractionHeight.coerceIn(0.05f, 0.6f) * size.height).coerceAtLeast(12f * density))
     shader.setFloatUniform("strength", config.refractionStrength.coerceIn(0f, 1f))
     shader.setFloatUniform("displacement", config.refractionDisplacement.value * density)
+    shader.setFloatUniform("specular", config.specular.coerceIn(0f, 1f) * 0.28f)
     RenderEffect.createRuntimeShaderEffect(shader, "content")
 }.getOrNull()
 

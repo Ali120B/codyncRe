@@ -124,7 +124,7 @@ Codync/
 | session | Harness-owned ACP model context; distinct from stored chat history |
 | trace | Full conversation, including intermediate/tool events |
 | computer / host | User-facing paired environment / the daemon that serves it |
-| cloud / relay | Account + E2E service / context-dependent transport or APNs Worker; always name the directory when ambiguous |
+| cloud / relay | Account + E2E service / context-dependent transport or APNs/FCM push Worker; always name the directory when ambiguous |
 
 Use lowercase repository folders; PascalCase folders inside Swift targets. Swift files follow their main type (`UpperCamelCase.swift`), Rust uses `snake_case.rs` (a folder module is `name/mod.rs`), TypeScript uses `kebab-case.ts`, and React components use `PascalCase.tsx`. Prefer one main type per file; small related view siblings can share a plural file such as `ChatRows.swift`.
 

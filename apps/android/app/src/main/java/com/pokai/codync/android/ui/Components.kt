@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +30,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -37,6 +39,7 @@ import com.pokai.codync.design.CodyncIcons
 import com.pokai.codync.design.Symbol
 import com.pokai.codync.design.theme.CodyncTheme
 import com.pokai.codync.design.theme.CodyncType
+import com.pokai.codync.model.Bot
 
 @Composable
 fun SearchField(
@@ -45,13 +48,22 @@ fun SearchField(
     modifier: Modifier = Modifier,
     placeholder: String = "Search",
     autofocus: Boolean = false,
+    focusRequest: Int = 0,
     onSubmit: (() -> Unit)? = null,
     /** When set, the field is a button that opens the full search screen instead of typing inline. */
     onOpen: (() -> Unit)? = null,
 ) {
     val colors = CodyncTheme.colors
     val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(autofocus, focusRequest) {
+        if (autofocus && onOpen == null) {
+            androidx.compose.runtime.withFrameNanos { }
+            focusRequester.requestFocus()
+            keyboard?.show()
+        }
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -104,6 +116,31 @@ fun SearchField(
 }
 
 @Composable
+fun BotIdentityAvatar(bot: Bot, roster: List<Bot>, size: androidx.compose.ui.unit.Dp = 42.dp) {
+    if (bot.kind != "group") {
+        com.pokai.codync.design.CharacterAvatar(bot.name, bot.avatarColor, bot.avatarShape, size = size)
+        return
+    }
+    val members = bot.members.take(2).mapNotNull { memberId -> roster.firstOrNull { it.id == memberId } }
+    if (members.isEmpty()) {
+        com.pokai.codync.design.CharacterAvatar(bot.name, bot.avatarColor, bot.avatarShape, size = size)
+        return
+    }
+    val faceSize = size * 0.68f
+    Box(Modifier.width(size + 4.dp).height(size)) {
+        members.forEachIndexed { index, member ->
+            com.pokai.codync.design.CharacterAvatar(
+                name = member.name,
+                colorId = member.avatarColor,
+                shapeId = member.avatarShape,
+                size = faceSize,
+                modifier = Modifier.align(if (index == 0) Alignment.CenterStart else Alignment.CenterEnd),
+            )
+        }
+    }
+}
+
+@Composable
 fun LargeHeader(
     title: String,
     modifier: Modifier = Modifier,
@@ -119,6 +156,7 @@ fun LargeHeader(
         Column(Modifier.weight(1f)) {
             Text(title, color = CodyncTheme.colors.text, style = CodyncType.largeTitle)
             if (subtitle != null) {
+                Spacer(Modifier.height(2.dp))
                 Text(subtitle, color = CodyncTheme.colors.secondary, style = CodyncType.footnote)
             }
         }

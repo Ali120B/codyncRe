@@ -332,6 +332,8 @@ export interface Hello {
   cloud?: string | null
   /** Product analytics on this computer: on unless its owner turned it off. */
   analytics?: boolean
+  /** Saved workspace folders on this computer (synced to phones). */
+  workspaces?: string[]
 }
 
 /** Events only the desktop app knows about; the host records everything else from API calls. */

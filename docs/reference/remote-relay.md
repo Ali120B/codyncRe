@@ -16,7 +16,7 @@ Shared deterministic [vectors](fixtures/remote-relay-vectors.json) and their [ge
 | D6 | 帳號 → Computers → Bots：`AccountStore`（`[ComputerID: BotStore]`），`BotReference = accountId + computerId + botId`。 | 依帳號與電腦隔離狀態。 |
 | D7 | 共用 bearer token（`~/.codync/token`）**只接受 loopback 連線**（桌面 App 本機、SSH tunnel、statusline、MCP、TUI）。手機與其他遠端 client 一律走 E2E channel。 | 移除「一個 token 開所有手機」的舊模型；不留相容路徑。 |
 | D8 | SSH：桌面 App（`apps/desktop/src/main/ssh.ts`）以系統 OpenSSH `-L` 轉發到遠端 host 的 loopback API；遠端側看到的是 loopback 呼叫者，所以 SSH 帳號等同本機使用者權限（能讀 `~/.codync/token` 的人本來就有這權限）。 | 產品決策 6；重用 loopback API，不需要額外授權層。 |
-| D10 | **推播內容也加密**：host 以裝置註冊的 X25519 push key 封裝通知標題／內文（§6.7），APNs 只帶通用文字 + `mutable-content`，iOS Notification Service Extension 解開。Live Activity 只推狀態 enum，不推自由文字。 | 決策 2：Cloudflare（`relay/`）只看得到密文。 |
+| D10 | **推播內容也加密**：host 以裝置註冊的 X25519 push key 封裝通知標題／內文（§6.7）；APNs 只帶通用文字，FCM 只帶 data-only 密文，手機本機解開。Live Activity 只推狀態 enum，不推自由文字。 | 決策 2：Cloudflare（`relay/`）只看得到密文。 |
 
 **審查後的取捨（rev 2）**：
 - 撤權後的 DO 解封鎖以 **grantId** 判斷（新 grant 或本機配對的 null grant），不比較時間戳（見 §7.3）；比 `stateAt` 方案少一個跨時鐘欄位。
@@ -46,7 +46,7 @@ Shared deterministic [vectors](fixtures/remote-relay-vectors.json) and their [ge
 
 **Inner RPC 的 body 與事件 payload 逐位元組等於今日 HTTP／SSE 的 JSON**，不套用上述規則（例如 `termInput.data`、term `output.data` 維持標準 padded base64；screen SDP 維持原格式）。
 
-命名：`cloud` 一律指 Cloudflare 帳號／中繼服務的 base URL（QR `cloud=`、`hello.cloud`、`Computer.cloud`）；`relay` 一律指既有 APNs 推播 relay（`registerDevice.relay`、kv `relay_url`）。
+命名：`cloud` 一律指 Cloudflare 帳號／中繼服務的 base URL（QR `cloud=`、`hello.cloud`、`Computer.cloud`）；`relay` 一律指既有推播 relay（APNs／FCM，`registerDevice.relay`、kv `relay_url`）。
 
 ---
 
@@ -317,7 +317,7 @@ blob = epk(32) ‖ sig(64) ‖ ct
 
 v1 發出的 grant 一律 `["control","screen"]`。
 
-### 6.7 推播封裝（host → APNs → 手機）
+### 6.7 推播封裝（host → APNs／FCM → 手機）
 
 裝置在 `registerDevice` 帶 `pushKey`（§1）。host 對每個 ticket：
 ```
@@ -328,7 +328,7 @@ key  = HKDF-Expand(prk, "codync/push-key/v1", 32)
 ct   = ChaCha20-Poly1305(key, nonce = 12 × 0x00, plaintext = {"title","subtitle"?,"body"} JSON, aad = cidRaw)
 sealed = b64url(epk ‖ ct)
 ```
-送給 `relay/` 的 body：`alert` 為 Codync 與依 kind 選擇的通用說明句、`mutableContent: true`、`threadId = computerId:botId`、`category = done|needsInput|failed`、`data = {"botId","computerId","ctx":<SharedStore.Context.id>,"sealed"}`。Notification Service Extension 依 `ctx` 從共用 Keychain 取 push key、解開後替換 title／subtitle／body；解不開就保留通用文字。Live Activity 的 `contentState` 只含 `status` 與 `startedAt`（`activity` 固定為空字串），不含任何自由文字。向量 `push` 保留沒有 subtitle 的相容格式。通知呈現、票券更新、ActivityKit 時間與部署驗收見 [通知與 Live Activity 設計](../design/push-and-live-activity.md)。
+送給 `relay/` 的 body：`alert` 為 Codync 與依 kind 選擇的通用說明句、`mutableContent: true`、`threadId = computerId:botId`、`category = done|needsInput|failed`、`data = {"botId","computerId","ctx","sealed"}`。iOS 以 `platform: ios` 註冊 APNs token，透過 Notification Service Extension 解密；Android 以 `platform: android` 註冊 FCM token，接收 data-only 訊息後由 app service 本機解密並顯示。兩者皆使用裝置的 X25519 push key；解不開時只顯示通用文字。Live Activity 的 `contentState` 只含 `status` 與 `startedAt`（`activity` 固定為空字串），不含任何自由文字。向量 `push` 保留沒有 subtitle 的相容格式。通知呈現、票券更新、ActivityKit 時間與部署驗收見 [通知與 Live Activity 設計](../design/push-and-live-activity.md)。
 
 ---
 

@@ -1,7 +1,7 @@
 {
   "name": "codync-relay",
   "version": "1.0.0",
-  "description": "Codync APNs push relay (Cloudflare Worker)",
+  "description": "Codync APNs and FCM push relay (Cloudflare Worker)",
   "main": "src/index.ts",
   "scripts": {
     "deploy": "wrangler deploy",

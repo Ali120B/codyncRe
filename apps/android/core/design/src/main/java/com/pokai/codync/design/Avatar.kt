@@ -156,6 +156,8 @@ fun avatarPath(shape: String, w: Float, h: Float): Path {
     val cx = w / 2f
     val cy = h / 2f
     when (shape) {
+        // Kept for bots created by older Android builds; current choices match desktop.
+        "circle" -> path.addOval(Rect(w * 0.04f, h * 0.04f, w * 0.96f, h * 0.96f))
         "squircle" -> {
             val r = min(w, h) * 0.30f
             path.addRoundRect(RoundRect(Rect(w * 0.04f, h * 0.04f, w * 0.96f, h * 0.96f), CornerRadius(r, r)))

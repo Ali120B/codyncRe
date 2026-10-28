@@ -1,24 +1,34 @@
 # Codync relay
 
-Cloudflare Worker that holds the APNs key and forwards pushes for codync-host.
-The phone exchanges its APNs token for an AES-GCM **ticket** (`POST /register`);
-hosts only ever see tickets (`POST /push`). A ticket is a bearer capability: anyone holding it can ask this Worker to push
-to its device. Only the Worker can decrypt the raw APNs token. Do not log tickets.
+Cloudflare Worker that forwards APNs and FCM pushes for codync-host. Phones exchange their
+provider token for an AES-GCM **ticket** (`POST /register`); hosts only ever see tickets
+(`POST /push`). A ticket is a bearer capability: anyone holding it can ask this Worker to push
+to its device. Only the Worker can decrypt the raw provider token. Do not log tickets.
 
 ## Deploy
 
 ```bash
 npm install
-npx wrangler secret put APNS_TEAM_ID       # Apple Developer team ID
-npx wrangler secret put APNS_KEY_ID        # an APNs Auth Key (Keys → Apple Push Notifications service),
-                                           # not an App Store Connect API key — both are AuthKey_*.p8
-npx wrangler secret put APNS_SIGNING_KEY   # contents of the .p8 file
+npx wrangler login
+npx wrangler whoami                         # confirm this is your Codync Cloudflare account
+npm run deploy                              # creates codync-relay in this account
 openssl rand -base64 32 | npx wrangler secret put TICKET_KEY
-npm run deploy
+npx wrangler secret put FCM_SERVICE_ACCOUNT # paste the full Firebase service-account JSON when prompted
 ```
 
-It deploys as `codync-relay`. The iOS app points at `SharedStore.relayURL` in `CodyncKit`.
-Rotating `TICKET_KEY` invalidates every ticket; phones re-register on launch.
+The Android-only setup needs `TICKET_KEY` and `FCM_SERVICE_ACCOUNT`. Add the following secrets
+only if configuring iOS push: `APNS_TEAM_ID`, `APNS_KEY_ID`, and `APNS_SIGNING_KEY`.
+
+Android's Firebase config is flavor-specific at
+`apps/android/app/src/dev/google-services.json` and
+`apps/android/app/src/prod/google-services.json`. Keep those files out of git too. The Worker
+accepts Android registration tickets, then sends data-only FCM messages; the app decrypts the
+host-sealed alert before it posts a notification. Set `FCM_SERVICE_ACCOUNT` to the Codync Android
+Firebase service-account JSON; do not check in that credential.
+
+It deploys as `codync-relay`. In Ali120B's Cloudflare account, Android uses
+`https://codync-relay.codyncre.workers.dev`. Rotating `TICKET_KEY` invalidates every ticket;
+phones re-register when they connect to a host.
 
 ## Test
 

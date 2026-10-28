@@ -1,6 +1,6 @@
 # Notifications, Live Activities and Dynamic Island
 
-Updated: 2026-09-27. This describes the implemented notification contract and its delivery limits. Deployment and real-device acceptance are separate from local tests.
+Updated: 2026-10-25. This describes the implemented notification contract and its delivery limits. Deployment and real-device acceptance are separate from local checks.
 
 ## Experience
 
@@ -15,26 +15,29 @@ Updated: 2026-09-27. This describes the implemented notification contract and it
 | Failed (an error, or the turn stopped short: output/step limit, refusal) | Bot name, “Task failed”, failure summary; “Open conversation” action | Error state, then dismiss after 60 seconds |
 | No fresh update for 15 minutes | No synthetic failure alert | Update delayed; never infer completion |
 
-The encrypted title is limited to 80 characters and the body to 400 characters. The body is an excerpt of the agent's final answer, not a newly generated summary. System notification previews, text truncation, Focus, sounds and delivery timing remain controlled by iOS. There is no invented completion percentage or per-tool notification stream.
+The encrypted title is limited to 80 characters and the body to 400 characters. The body is an excerpt of the agent's final answer, not a newly generated summary. System notification previews, text truncation, Focus, sounds and delivery timing remain controlled by the operating system. Android receives a data-only FCM message, opens the host-sealed content locally and posts the notification; iOS uses APNs and its Notification Service Extension. Android has no Live Activity surface. There is no invented completion percentage or per-tool notification stream.
 
-Notification actions open the scoped conversation. Permission approval still requires the normal in-app permission card. An account mismatch does not navigate into another account. Notifications are grouped by computer plus bot. Muted and hidden bots do not alert. The existing host-wide suppression while an iOS event connection is open remains in place; independent foreground suppression for multiple phones is not implemented.
+Notification actions open the scoped conversation. Permission approval still requires the normal in-app permission card. An account mismatch does not navigate into another account. Notifications are grouped by computer plus bot. Muted and hidden bots do not alert. The host suppresses pushes while any recognized phone event connection is open.
 
-Use Settings → Notifications to switch push notifications off for this iPhone (the app calls `unregisterDevice`, so every computer drops its alert ticket; Live Activities are unaffected), and to request access or open the iOS notification settings. Per-bot notification preferences remain in the bot editor. State → Live Activity controls automatic activity creation and shows system authorization. Turning it off ends this phone's activities. State → Dynamic Island shows the same switch: iOS renders one activity in both places and offers no island-only opt-out. The expanded island centers the bot name and current step under the camera, between the avatar and the orb (both vertically centered), so no text reaches the island's 44 pt corners. Its bottom row shows the elapsed time (from `startedAt`, counted by the system) or, when the bot needs you, a Review button that opens the conversation.
+On Android, Settings → Push delivery controls FCM and requests the Android notification permission; disabling it unregisters this phone when its host is connected. Per-bot notification preferences remain in the bot editor. On iOS, Settings → Notifications controls APNs; State → Live Activity controls automatic activity creation and shows system authorization. Turning it off ends this phone's activities. State → Dynamic Island shows the same switch: iOS renders one activity in both places and offers no island-only opt-out. The expanded island centers the bot name and current step under the camera, between the avatar and the orb (both vertically centered), so no text reaches the island's 44 pt corners. Its bottom row shows the elapsed time (from `startedAt`, counted by the system) or, when the bot needs you, a Review button that opens the conversation.
 
 ## Responsibilities and privacy
 
 ```mermaid
 flowchart LR
-    H[Host: bot events and private summary] -->|sealed alert or status-only activity| W[relay/ APNs Worker]
+    H[Host: bot events and private summary] -->|sealed alert or status-only activity| W[relay/ push Worker]
     W --> A[Apple APNs]
     A --> N[iOS Notification Service Extension]
     N -->|decrypt locally| B[Notification banner]
+    W --> F[Firebase Cloud Messaging]
+    F --> D[Android Codync service]
+    D -->|decrypt locally| B
     A --> K[ActivityKit]
     K --> L[Lock Screen and Dynamic Island]
 ```
 
 - `host/` owns event meaning, device tickets, task state and notification encryption.
-- `relay/` holds the APNs signing key, opens opaque tickets and selects the APNs environment/topic. It has no notification decryption key.
+- `relay/` holds the APNs signing key and Android FCM service-account credential, opens opaque tickets and selects the provider destination. It has no notification decryption key.
 - `cloud/` handles accounts and the encrypted connection. It is a separate service from the APNs Worker; no new Durable Object or D1 table is needed for this change.
 - The notification extension decrypts the title, optional subtitle and body using the account context's shared Keychain key. This is local work and does not require a network fetch. [Apple notification content modification](https://developer.apple.com/documentation/usernotifications/modifying-content-in-newly-delivered-notifications)
 - The extension then turns the alert into a communication notification (`INSendMessageIntent`) so the banner shows the bot's avatar instead of the app icon. A group alert carries the speaking member (`from`, sealed with the text) and shows as a group conversation: the group's avatar and name, with the member as sender. The sealed alert carries `faces` (name, shape and color of the chat, its first two members and the speaker), so a bot created while the app was closed still gets its avatar; alerts from an older host fall back to the widget snapshot in the App Group, and a bot in neither keeps the plain banner. Needs the app's Communication Notifications entitlement and `NSUserActivityTypes: INSendMessageIntent`. [Apple communication notifications](https://developer.apple.com/documentation/usernotifications/implementing-communication-notifications)
@@ -44,7 +47,7 @@ Remote activity content contains only `status`, empty `activity`, and `startedAt
 
 ## Registration and lifecycle
 
-1. iOS registers its APNs token with `POST /register` using `kind: alert` and its build environment.
+1. iOS registers its APNs token with `POST /register` using `platform: ios`, `kind: alert` and its build environment. Android registers its FCM token using `platform: android` and `kind: alert`.
 2. The Worker returns an AES-GCM ticket. The phone sends it with its X25519 push public key and account context to `registerDevice` on the host.
 3. Registration atomically replaces previous alert tickets for that device identity. Delivery also selects only the latest stored ticket per device, so existing duplicate rows cannot fan out before that phone reconnects. Randomized tickets must not accumulate, retain obsolete keys or generate duplicate notifications.
 4. Sending a task starts an ActivityKit activity with `pushType: .token` in the local Sending state (Waiting for your computer when it goes to the mailbox); bot updates that aren't work yet don't end it. The phone registers each activity token using `kind: liveactivity`, then calls `registerActivity` for the bot.
@@ -59,9 +62,9 @@ An existing activity can receive background APNs updates. Automatically starting
 
 Alert kinds are `done`, `needsInput`, and `failed`.
 
-Hosts submit an event's alert requests in registration order to `POST /push-batch` as `{ "notifications": [<push request>, ...] }` (1–256 entries). The Worker decrypts the tickets and sends only the last request for each physical APNs destination, environment and token kind. It returns indexed statuses; superseded tickets and HTTP 410 results are forgotten by the host on its next push operation. Superseded identities also lose their older ticket rows so they cannot reappear on the next event. This requires no new database, no plaintext notification content, and no change to the ticket encryption scheme. Live Activity updates continue using `/push` because each activity has its own token.
+Hosts submit an event's alert requests in registration order to `POST /push-batch` as `{ "notifications": [<push request>, ...] }` (1–256 entries). The Worker decrypts the tickets and sends only the last request for each physical provider destination and token kind. It returns indexed statuses; superseded tickets and HTTP 410 results are forgotten by the host on its next push operation. Superseded identities also lose their older ticket rows so they cannot reappear on the next event. This requires no new database, no plaintext notification content, and no change to the ticket encryption scheme. Live Activity updates continue using `/push` because each activity has its own token.
 
- The public APNs alert always has title `Codync` and a useful fallback sentence. The encrypted payload carries the private fields. `mutable-content: 1` requests extension processing. The public routing fields are `botId`, `computerId`, and `ctx`; `thread-id` is `<computerId>:<botId>`.
+The public APNs alert always has title `Codync` and a useful fallback sentence. Android FCM is data-only and carries a generic fallback sentence alongside the encrypted fields. The encrypted payload carries the private fields. `mutable-content: 1` requests iOS extension processing. The routing fields are `botId`, `computerId`, and `ctx`; APNs `thread-id` is `<computerId>:<botId>`.
 
 Live Activity requests carry:
 
@@ -107,7 +110,7 @@ For a phone that still shows fallback text:
 
 ## Configuration and release checks
 
-The APNs Worker uses the existing secrets `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_SIGNING_KEY`, and `TICKET_KEY`; see the [relay deployment guide](../../relay/README.md). Keep `TICKET_KEY` stable across deployments. Rotating it invalidates every existing ticket. Tickets are bearer capabilities accepted by the Worker and must not be logged.
+The Worker uses `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_SIGNING_KEY`, `FCM_SERVICE_ACCOUNT`, and `TICKET_KEY`; see the [relay deployment guide](../../relay/README.md). Android builds also need the flavor's untracked `google-services.json`. Keep `TICKET_KEY` stable across deployments. Rotating it invalidates every existing ticket. Tickets are bearer capabilities accepted by the Worker and must not be logged.
 
 The app bundle is `com.pokai.Codync.ios`. App and notification extension share `group.com.pokai.Codync` and the expanded shared Keychain access group. `project.yml` embeds both extension targets and enables `NSSupportsLiveActivities`; no new entitlement is required by these changes. Confirm sandbox versus production against the signed provisioning profile, especially for distribution builds.
 

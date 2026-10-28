@@ -7,6 +7,7 @@ import android.os.Build
 import android.util.Base64
 import com.pokai.codync.crypto.Codec
 import com.pokai.codync.crypto.Keys
+import com.pokai.codync.crypto.PushCrypto
 import com.pokai.codync.transport.DirectChannelTransport
 import com.pokai.codync.transport.HostTransport
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
@@ -45,6 +46,35 @@ class DeviceIdentity(context: Context) {
 
     val privateKey: Ed25519PrivateKeyParameters
         get() = Keys.ed25519FromSeed(seed)
+
+    private val pushSeed: ByteArray
+        get() = synchronized(lock) {
+            val ciphertext = prefs.getString(KEY_PUSH_CIPHER, null)
+            val iv = prefs.getString(KEY_PUSH_IV, null)
+            if (ciphertext != null && iv != null) {
+                val decrypted = runCatching {
+                    val cipher = Cipher.getInstance(TRANSFORMATION)
+                    cipher.init(Cipher.DECRYPT_MODE, encryptionKey(), GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)))
+                    cipher.doFinal(Base64.decode(ciphertext, Base64.NO_WRAP))
+                }.getOrNull()?.takeIf { it.size == 32 }
+                if (decrypted != null) return@synchronized decrypted
+            }
+            val bytes = Keys.randomBytes(32)
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.ENCRYPT_MODE, encryptionKey())
+            val encrypted = cipher.doFinal(bytes)
+            prefs.edit()
+                .putString(KEY_PUSH_CIPHER, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .putString(KEY_PUSH_IV, Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                .apply()
+            bytes
+        }
+
+    val pushPublicKey: String
+        get() = Codec.b64(Keys.x25519Public(Keys.x25519FromSeed(pushSeed)))
+
+    fun openPush(sealed: String, computerId: String): ByteArray =
+        PushCrypto.open(sealed, computerId, pushSeed)
 
     val deviceName: String
         get() = prefs.getString(KEY_NAME, null)
@@ -86,6 +116,8 @@ class DeviceIdentity(context: Context) {
         private const val KEY_SEED_CIPHER = "ed25519_seed_ciphertext"
         private const val KEY_SEED_IV = "ed25519_seed_iv"
         private const val KEY_NAME = "device_name"
+        private const val KEY_PUSH_CIPHER = "push_key_ciphertext"
+        private const val KEY_PUSH_IV = "push_key_iv"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "codync.device.identity.aes.v1"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"

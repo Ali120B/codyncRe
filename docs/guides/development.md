@@ -80,7 +80,7 @@ Unlock the phone when required. Build, install, launch, and visual inspection ar
 | Desktop | `cd apps/desktop && npm ci && npm run typecheck && npm test` | Node and npm; CI uses Node 24 |
 | Cloud | `cd cloud && npm ci && npm test && npm run typecheck` | Node and npm; CI uses Node 24 |
 | Cloud integration | `cd cloud && env -u CODYNC_CLOUD npm run e2e` | Built host; see [Cloudflare testing](cloudflare-testing.md) |
-| APNs relay | `cd relay && npm ci && npm test && npm run typecheck` | Separate package from `cloud/` |
+| Push relay | `cd relay && npm ci && npm test && npm run typecheck` | APNs and FCM; separate package from `cloud/` |
 
 ### Pre-commit checks
 

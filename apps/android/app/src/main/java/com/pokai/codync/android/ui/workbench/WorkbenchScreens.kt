@@ -94,7 +94,9 @@ internal fun WorkbenchScaffold(
             HeaderIconButton(CodyncIcons.Back, "Back", onBack)
             Column(Modifier.weight(1f)) {
                 Text(title, color = colors.text, style = CodyncType.title)
-                Text(subtitle, color = colors.secondary, style = CodyncType.footnote)
+                if (subtitle.isNotBlank()) {
+                    Text(subtitle, color = colors.secondary, style = CodyncType.footnote)
+                }
             }
             trailing?.invoke()
         }

@@ -16,9 +16,9 @@ mod tool_tests {
     use crate::store::MemberSettings;
 
     #[test]
-    fn a_room_uses_its_switches_otherwise_the_bot_settings() {
+    fn a_room_adds_its_switches_to_the_bots_own_access() {
         assert_eq!(effective_tools(None, true, false), (true, false));
-        assert_eq!(effective_tools(Some(MemberSettings::default()), true, true), (false, false));
+        assert_eq!(effective_tools(Some(MemberSettings::default()), true, true), (true, true));
         assert_eq!(
             effective_tools(Some(MemberSettings { browser: true, computer: false }), false, false),
             (false, true)
@@ -33,7 +33,7 @@ pub(crate) fn effective_tools(
     computer: bool,
     browser: bool,
 ) -> (bool, bool) {
-    member.map_or((computer, browser), |m| (m.computer, m.browser))
+    member.map_or((computer, browser), |m| (computer || m.computer, browser || m.browser))
 }
 
 impl Actor {

@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -16,6 +15,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -30,39 +33,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.view.WindowCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.pokai.codync.android.fake.FakeHostState
 import com.pokai.codync.android.ui.AppPreferences
 import com.pokai.codync.android.ui.AppTab
 import com.pokai.codync.android.ui.BotLink
 import com.pokai.codync.android.ui.TabsScreen
 import com.pokai.codync.android.ui.ThemeMode
 import com.pokai.codync.android.ui.chat.LiveChatScreen
-import com.pokai.codync.android.ui.debug.FakeHostScreen
 import com.pokai.codync.android.ui.debug.GlassLabScreen
 import com.pokai.codync.android.ui.pairing.PairingScreen
 import com.pokai.codync.android.ui.search.CommandDeckScreen
 import com.pokai.codync.android.ui.workbench.BotDetailsScreen
+import com.pokai.codync.android.ui.workbench.LiveBotEditor
+import com.pokai.codync.android.ui.workbench.LiveExtensionsScreen
 import com.pokai.codync.android.ui.workbench.WorkbenchHomeScreen
+import com.pokai.codync.model.Bot
 import com.pokai.codync.transport.PairUrl
 import com.pokai.codync.design.GlassConfig
 import com.pokai.codync.design.LocalGlassConfig
 import com.pokai.codync.design.theme.CodyncTheme
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 private object Routes {
     const val Tabs = "tabs"
     const val Search = "search"
     const val GlassLab = "glass-lab"
-    const val FakeHost = "fake-host"
     const val Pairing = "pairing"
     const val Workbench = "workbench"
-    const val BotDetails = "bot-details/{botId}"
+    const val Extensions = "extensions"
+    const val TeamMap = "team-map"
+    const val NewBot = "new-bot"
+    const val BotDetails = "bot-details/{botId}?tab={tab}"
     const val Chat = "chat/{botId}/{chatId}?messageId={messageId}"
 
     fun chat(botId: String, chatId: String, messageId: String?): String {
@@ -70,7 +81,10 @@ private object Routes {
         return if (messageId.isNullOrBlank()) base else "$base?messageId=${Uri.encode(messageId)}"
     }
 
-    fun botDetails(botId: String) = "bot-details/${Uri.encode(botId)}"
+    fun botDetails(botId: String, tab: String? = null): String {
+        val route = "bot-details/${Uri.encode(botId)}"
+        return if (tab.isNullOrBlank()) route else "$route?tab=${Uri.encode(tab)}"
+    }
 }
 
 private val FastIn = tween<Float>(durationMillis = 140)
@@ -83,22 +97,24 @@ private val SearchSlide = tween<IntOffset>(durationMillis = 260)
 fun CodyncApp(
     pairingLink: String? = null,
     botLink: String? = null,
+    oauthLink: String? = null,
     onPairingLinkConsumed: () -> Unit = {},
     onBotLinkConsumed: () -> Unit = {},
+    onOAuthLinkConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val prefs = remember { AppPreferences(context) }
-    val hostSession = remember { AndroidHostSession(context) }
+    val application = context.applicationContext as CodyncApplication
+    val hostSession = application.hostSession
     val accountSession = remember { AndroidAccountSession(hostSession.identity, hostSession.store, BuildConfig.CLOUD_URL) }
     var themeMode by rememberSaveable { mutableStateOf(prefs.themeMode) }
-    var glassConfig by remember { mutableStateOf(GlassConfig()) }
-    var selectedTab by rememberSaveable { mutableStateOf(AppTab.Bots) }
+    var glassConfig by remember { mutableStateOf(prefs.glassConfig) }
+    var selectedTab by rememberSaveable { mutableStateOf(AppTab.Home) }
     val dark = when (themeMode) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
         ThemeMode.Dark -> true
     }
-    val fake = remember { FakeHostState() }
     val hazeState = rememberHazeState()
     val nav = rememberNavController()
     val configuration = LocalConfiguration.current
@@ -126,6 +142,21 @@ fun CodyncApp(
         onBotLinkConsumed()
     }
 
+    LaunchedEffect(oauthLink) {
+        val uri = oauthLink?.let(Uri::parse) ?: return@LaunchedEffect
+        if (uri.host != "oauth" || uri.scheme !in setOf("codync", "codync-dev")) return@LaunchedEffect
+        val state = uri.getQueryParameter("state")
+        if (!state.isNullOrBlank()) {
+            hostSession.store.call("connectorSignInFinish", buildJsonObject {
+                put("state", state)
+                uri.getQueryParameter("code")?.let { put("code", it) }
+                uri.getQueryParameter("error_description")?.let { put("error", it) }
+                    ?: uri.getQueryParameter("error")?.let { put("error", it) }
+            })
+        }
+        onOAuthLinkConsumed()
+    }
+
     fun applyTheme(mode: ThemeMode) {
         themeMode = mode
         prefs.themeMode = mode
@@ -136,6 +167,15 @@ fun CodyncApp(
                 ThemeMode.System -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
             },
         )
+    }
+
+    fun openChat(botId: String, chatId: String, messageId: String?) {
+        val current = nav.currentBackStackEntry
+        val sameChat = nav.currentDestination?.route == Routes.Chat &&
+            current?.arguments?.getString("botId") == botId &&
+            current.arguments?.getString("chatId") == chatId
+        if (sameChat && (messageId.isNullOrBlank() || current?.arguments?.getString("messageId") == messageId)) return
+        nav.navigate(Routes.chat(botId, chatId, messageId)) { launchSingleTop = true }
     }
 
     DisposableEffect(dark, configuration) {
@@ -172,7 +212,6 @@ fun CodyncApp(
                 ) {
                     composable(Routes.Tabs) {
                         TabsScreen(
-                            fake = fake,
                             session = hostSession.store,
                             account = accountSession,
                             hazeState = hazeState,
@@ -181,15 +220,14 @@ fun CodyncApp(
                             themeMode = themeMode,
                             onThemeMode = ::applyTheme,
                             prefs = prefs,
-                            onOpenChat = { botId, chatId, messageId ->
-                                nav.navigate(Routes.chat(botId, chatId, messageId))
-                            },
-                            onOpenSearch = { nav.navigate(Routes.Search) },
+                            onOpenChat = ::openChat,
                             onOpenGlassLab = { nav.navigate(Routes.GlassLab) },
-                            onOpenFakeHost = { nav.navigate(Routes.FakeHost) },
                             onOpenPairing = { nav.navigate(Routes.Pairing) },
                             onOpenWorkbench = { nav.navigate(Routes.Workbench) },
                             onOpenBotDetails = { id -> nav.navigate(Routes.botDetails(id)) },
+                            onCreateBot = { nav.navigate(Routes.NewBot) },
+                            onOpenTeamMap = { nav.navigate(Routes.TeamMap) },
+                            onOpenExtensions = { nav.navigate(Routes.Extensions) },
                         )
                     }
                     composable(
@@ -204,24 +242,24 @@ fun CodyncApp(
                             },
                         ),
                         enterTransition = {
-                            fadeIn(tween(165)) + slideInHorizontally(
-                                tween(195, easing = LinearOutSlowInEasing),
-                            ) { it / 5 }
+                            fadeIn(tween(170)) + slideInHorizontally(
+                                tween(260, easing = FastOutSlowInEasing),
+                            ) { it }
                         },
                         exitTransition = {
-                            fadeOut(tween(115)) + slideOutHorizontally(
-                                tween(150, easing = FastOutSlowInEasing),
-                            ) { -it / 24 }
+                            fadeOut(tween(150)) + slideOutHorizontally(
+                                tween(220, easing = FastOutSlowInEasing),
+                            ) { -it / 4 }
                         },
                         popEnterTransition = {
-                            fadeIn(tween(155)) + slideInHorizontally(
-                                tween(185, easing = LinearOutSlowInEasing),
-                            ) { -it / 14 }
+                            fadeIn(tween(180)) + slideInHorizontally(
+                                tween(240, easing = FastOutSlowInEasing),
+                            ) { -it / 3 }
                         },
                         popExitTransition = {
-                            fadeOut(tween(135)) + slideOutHorizontally(
-                                tween(175, easing = FastOutSlowInEasing),
-                            ) { it / 5 }
+                            fadeOut(tween(150)) + slideOutHorizontally(
+                                tween(220, easing = FastOutSlowInEasing),
+                            ) { it }
                         },
                     ) { entry ->
                         val botId = entry.arguments?.getString("botId").orEmpty()
@@ -233,54 +271,56 @@ fun CodyncApp(
                             hazeState = hazeState,
                             onBack = { nav.popBackStack() },
                             onOpenDetails = { id -> nav.navigate(Routes.botDetails(id)) },
-                            onOpenChat = { targetBot, targetChat -> nav.navigate(Routes.chat(targetBot, targetChat, null)) },
-                            onOpenThread = { targetBot, rootId -> nav.navigate(Routes.chat(targetBot, rootId, null)) },
+                            onOpenComputer = { id -> nav.navigate(Routes.botDetails(id, "Computer")) },
+                            onOpenChat = { targetBot, targetChat -> openChat(targetBot, targetChat, null) },
+                            onOpenThread = { targetBot, rootId -> openChat(targetBot, rootId, null) },
                         )
                     }
                     composable(
                         Routes.BotDetails,
-                        arguments = listOf(navArgument("botId") { type = NavType.StringType }),
+                        arguments = listOf(
+                            navArgument("botId") { type = NavType.StringType },
+                            navArgument("tab") { type = NavType.StringType; defaultValue = "Details" },
+                        ),
                         enterTransition = {
-                            fadeIn(tween(165)) + slideInHorizontally(
-                                tween(195, easing = LinearOutSlowInEasing),
-                            ) { it / 5 }
+                            fadeIn(tween(180)) + slideInHorizontally(
+                                tween(230, easing = FastOutSlowInEasing),
+                            ) { it }
                         },
                         exitTransition = {
-                            fadeOut(tween(115)) + slideOutHorizontally(
-                                tween(150, easing = FastOutSlowInEasing),
-                            ) { -it / 24 }
+                            fadeOut(tween(150)) + slideOutHorizontally(
+                                tween(190, easing = FastOutSlowInEasing),
+                            ) { -it / 4 }
                         },
                         popEnterTransition = {
-                            fadeIn(tween(155)) + slideInHorizontally(
-                                tween(185, easing = LinearOutSlowInEasing),
-                            ) { -it / 14 }
+                            fadeIn(tween(180)) + slideInHorizontally(
+                                tween(220, easing = FastOutSlowInEasing),
+                            ) { -it / 4 }
                         },
                         popExitTransition = {
-                            fadeOut(tween(135)) + slideOutHorizontally(
-                                tween(175, easing = FastOutSlowInEasing),
-                            ) { it / 5 }
+                            fadeOut(tween(150)) + slideOutHorizontally(
+                                tween(200, easing = FastOutSlowInEasing),
+                            ) { it }
                         },
                     ) { entry ->
                         val id = entry.arguments?.getString("botId").orEmpty()
                         BotDetailsScreen(
                             session = hostSession.store,
                             botId = id,
+                            initialTab = entry.arguments?.getString("tab") ?: "Details",
                             onBack = { nav.popBackStack() },
-                            onOpenChat = { botId, chatId -> nav.navigate(Routes.chat(botId, chatId, null)) },
+                            onOpenChat = { botId, chatId -> openChat(botId, chatId, null) },
+                            onOpenExtensions = { nav.navigate(Routes.Extensions) },
                         )
                     }
                     composable(Routes.GlassLab) {
                         GlassLabScreen(
                             config = glassConfig,
-                            onConfig = { glassConfig = it },
+                            onConfig = {
+                                glassConfig = it
+                                prefs.glassConfig = it
+                            },
                             onBack = { nav.popBackStack() },
-                        )
-                    }
-                    composable(Routes.FakeHost) {
-                        FakeHostScreen(
-                            fake = fake,
-                            onBack = { nav.popBackStack() },
-                            onOpenGlassLab = { nav.navigate(Routes.GlassLab) },
                         )
                     }
                     composable(Routes.Pairing) {
@@ -309,16 +349,21 @@ fun CodyncApp(
                         CommandDeckScreen(
                             session = hostSession.store,
                             onBack = { nav.popBackStack() },
-                            onOpenChat = { botId, chatId, messageId ->
-                                nav.navigate(Routes.chat(botId, chatId, messageId))
-                            },
+                            onOpenChat = ::openChat,
                             onOpenSettings = {
                                 selectedTab = AppTab.Settings
                                 nav.popBackStack(Routes.Tabs, inclusive = false)
                             },
+                            onOpenNeeds = {
+                                selectedTab = AppTab.Needs
+                                nav.popBackStack(Routes.Tabs, inclusive = false)
+                            },
+                            onCreateBot = { nav.navigate(Routes.NewBot) },
                             onOpenGlassLab = { nav.navigate(Routes.GlassLab) },
                             onOpenPairing = { nav.navigate(Routes.Pairing) },
                             onOpenWorkbench = { nav.navigate(Routes.Workbench) },
+                            onOpenExtensions = { nav.navigate(Routes.Extensions) },
+                            onOpenTeamMap = { nav.navigate(Routes.TeamMap) },
                         )
                     }
                     composable(Routes.Workbench) {
@@ -326,7 +371,33 @@ fun CodyncApp(
                             session = hostSession.store,
                             onBack = { nav.popBackStack() },
                             onOpenBotDetails = { id -> nav.navigate(Routes.botDetails(id)) },
+                            onOpenExtensions = { nav.navigate(Routes.Extensions) },
+                            onOpenTeamMap = { nav.navigate(Routes.TeamMap) },
                         )
+                    }
+                    composable(Routes.Extensions) {
+                        LiveExtensionsScreen(
+                            session = hostSession.store,
+                            onBack = { nav.popBackStack() },
+                        )
+                    }
+                    composable(Routes.TeamMap) {
+                        com.pokai.codync.android.ui.workbench.LiveTeamMapScreen(
+                            session = hostSession.store,
+                            onBack = { nav.popBackStack() },
+                            onOpenBotDetails = { id -> nav.navigate(Routes.botDetails(id)) },
+                        )
+                    }
+                    composable(Routes.NewBot) {
+                        Box(Modifier.fillMaxSize().background(CodyncTheme.colors.background)) {
+                            LiveBotEditor(
+                                session = hostSession.store,
+                                bot = Bot(id = "", name = "New bot", backend = ""),
+                                onCancel = { nav.popBackStack() },
+                                onSaved = { nav.popBackStack() },
+                                onDeleted = { nav.popBackStack() },
+                            )
+                        }
                     }
                 }
             }

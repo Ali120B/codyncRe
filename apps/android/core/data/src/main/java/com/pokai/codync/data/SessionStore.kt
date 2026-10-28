@@ -42,12 +42,19 @@ data class SessionSnapshot(
     val connection: ConnectionState = ConnectionState(),
     val computers: List<Computer> = emptyList(),
     val bots: List<Bot> = emptyList(),
+    val rosterLoaded: Boolean = false,
     val entriesByBot: Map<String, List<Entry>> = emptyMap(),
     val chatTitlesByBot: Map<String, Map<String, String>> = emptyMap(),
+    val pendingApprovals: List<Entry> = emptyList(),
     val accessRequests: List<AccessRequest> = emptyList(),
     val pairingMessage: String? = null,
     val actionError: String? = null,
 )
+
+data class BotLookup(val rosterLoaded: Boolean = false, val bot: Bot? = null)
+
+/** Identity-equal wrapper keeps Compose from structurally comparing a full transcript per delta. */
+class EntryTimeline(val entries: List<Entry>)
 
 /**
  * M1/M2 session mirror. Wraps a [HostTransport] and keeps roster/chat state for the UI.
@@ -69,32 +76,40 @@ class SessionStore(
 
     fun bot(botId: String): Flow<Bot?> = snapshot
         .map { state -> state.bots.firstOrNull { it.id == botId } }
-        .distinctUntilChanged()
+        .distinctUntilChanged { old, new -> old === new }
+        .flowOn(Dispatchers.Default)
 
-    fun bots(): Flow<List<Bot>> = snapshot.map { it.bots }.distinctUntilChanged()
+    fun botLookup(botId: String): Flow<BotLookup> = snapshot
+        .map { state -> BotLookup(state.rosterLoaded, state.bots.firstOrNull { it.id == botId }) }
+        .distinctUntilChanged { old, new -> old.rosterLoaded == new.rosterLoaded && old.bot === new.bot }
+        .flowOn(Dispatchers.Default)
 
-    fun computers(): Flow<List<Computer>> = snapshot.map { it.computers }.distinctUntilChanged()
+    fun bots(): Flow<List<Bot>> = snapshot
+        .map { it.bots }
+        .distinctUntilChanged { old, new -> old === new }
+        .flowOn(Dispatchers.Default)
+
+    fun computers(): Flow<List<Computer>> = snapshot
+        .map { it.computers }
+        .distinctUntilChanged { old, new -> old === new }
+        .flowOn(Dispatchers.Default)
 
     fun pairingMessage(): Flow<String?> = snapshot
         .map { it.pairingMessage }
         .distinctUntilChanged()
 
-    /** Pending approvals only; chat streaming must not recompose the Needs You screen. */
+    /** Maintained from permission events so chat token updates do not rescan every transcript. */
     fun approvalEntries(): Flow<List<Entry>> = snapshot
-        .map { state ->
-            state.entriesByBot.values.asSequence()
-                .flatMap { it.asSequence() }
-                .filter { it.kind == "permission" && it.data.status == "pending" }
-                .distinctBy(Entry::id)
-                .sortedByDescending(Entry::createdAt)
-                .toList()
-        }
-        .distinctUntilChanged()
+        .map { it.pendingApprovals }
+        .distinctUntilChanged { old, new -> old === new }
         .flowOn(Dispatchers.Default)
 
-    fun entries(botId: String): Flow<List<Entry>> = snapshot
+    fun entries(botId: String): Flow<EntryTimeline> = snapshot
         .map { state -> state.entriesByBot[botId].orEmpty() }
-        .distinctUntilChanged()
+        // State updates for other bots retain this list instance. Avoid a structural scan of a
+        // large transcript just to discover that the selected bot's entries did not change.
+        .distinctUntilChanged { old, new -> old === new }
+        .map(::EntryTimeline)
         .flowOn(Dispatchers.Default)
 
     fun entry(botId: String, entryId: String): Flow<Entry?> = if (entryId == "main" || entryId == "new") {
@@ -102,24 +117,26 @@ class SessionStore(
     } else {
         snapshot
             .map { state -> state.entriesByBot[botId].orEmpty().firstOrNull { it.id == entryId } }
-            .distinctUntilChanged()
+            .distinctUntilChanged { old, new -> old === new }
             .flowOn(Dispatchers.Default)
     }
 
     /** One visible conversation, filtered off the UI thread so stream deltas stay cheap. */
-    fun timelineEntries(botId: String, chatId: String): Flow<List<Entry>> = snapshot
-        .map { state ->
-            val entries = state.entriesByBot[botId].orEmpty()
+    fun timelineEntries(botId: String, chatId: String): Flow<EntryTimeline> = snapshot
+        .map { state -> state.entriesByBot[botId].orEmpty() }
+        // Bot status, connection and cloud updates should not refilter a transcript whose list
+        // reference did not change. In particular, streamed text in another bot must stay cheap.
+        .distinctUntilChanged { old, new -> old === new }
+        .map { entries ->
             when (chatId) {
-                "new" -> emptyList()
-                "main" -> entries.filter { it.threadId == null && it.data.chat != true }
-                else -> entries.asSequence()
+                "new" -> EntryTimeline(emptyList())
+                "main" -> EntryTimeline(entries.filter { it.threadId == null && it.data.chat != true })
+                else -> EntryTimeline(entries.asSequence()
                     .filter { it.threadId == chatId || (it.id == chatId && it.data.chat == true) }
-                    .sortedBy(Entry::seq)
-                    .toList()
+                    .toList())
             }
         }
-        .distinctUntilChanged()
+        .distinctUntilChanged { old, new -> old.entries === new.entries }
         .flowOn(Dispatchers.Default)
 
     fun chatTitles(botId: String): Flow<Map<String, String>> = snapshot
@@ -128,6 +145,11 @@ class SessionStore(
 
     fun connection(): Flow<ConnectionState> = snapshot
         .map { state -> state.connection }
+        .distinctUntilChanged()
+
+    /** Connection details for screens that do not render the per-event revision counter. */
+    fun connectionStatus(): Flow<ConnectionState> = snapshot
+        .map { state -> state.connection.copy(rev = 0) }
         .distinctUntilChanged()
 
     fun actionError(): Flow<String?> = snapshot
@@ -151,8 +173,10 @@ class SessionStore(
             it.copy(
                 connection = ConnectionState(computer = computer),
                 bots = bots,
+                rosterLoaded = true,
                 entriesByBot = entriesByBot,
                 chatTitlesByBot = chatTitlesByBot,
+                pendingApprovals = pendingApprovals(entriesByBot.values.asSequence().flatMap { it.asSequence() }),
             )
         }
         outbox?.let { queue ->
@@ -236,14 +260,17 @@ class SessionStore(
         if (expected != null && syncedComputerId != expected) return snapshot
         return when (event) {
         is HostEvent.Hello -> snapshot
-        is HostEvent.Bots -> snapshot.copy(bots = event.bots)
+        is HostEvent.Bots -> snapshot.copy(bots = event.bots, rosterLoaded = true)
         is HostEvent.BotUpsert -> snapshot.copy(
             bots = snapshot.bots.filterNot { it.id == event.bot.id } + event.bot,
+            rosterLoaded = true,
         )
         is HostEvent.BotDeleted -> snapshot.copy(
             bots = snapshot.bots.filterNot { it.id == event.id },
+            rosterLoaded = true,
             entriesByBot = snapshot.entriesByBot - event.id,
             chatTitlesByBot = snapshot.chatTitlesByBot - event.id,
+            pendingApprovals = snapshot.pendingApprovals.filterNot { it.botId == event.id },
         )
         is HostEvent.EntryUpsert -> {
             val botId = event.entry.botId
@@ -277,13 +304,28 @@ class SessionStore(
                 }
                 existing.toMutableList().apply { add(insertion, event.entry) }
             }
-            snapshot.copy(entriesByBot = snapshot.entriesByBot + (botId to next))
+            val approvals = updatePendingApproval(
+                current = snapshot.pendingApprovals,
+                previous = existing.getOrNull(index),
+                updated = event.entry,
+            ).takeUnless { existing.getOrNull(index)?.rev?.let { it > event.entry.rev } == true }
+                ?: snapshot.pendingApprovals
+            snapshot.copy(
+                entriesByBot = snapshot.entriesByBot + (botId to next),
+                pendingApprovals = approvals,
+            )
         }
         is HostEvent.EntriesDeleted -> {
             val existing = snapshot.entriesByBot[event.botId].orEmpty()
-            snapshot.copy(entriesByBot = snapshot.entriesByBot + (event.botId to existing.filterNot { it.id in event.ids }))
+            snapshot.copy(
+                entriesByBot = snapshot.entriesByBot + (event.botId to existing.filterNot { it.id in event.ids }),
+                pendingApprovals = snapshot.pendingApprovals.filterNot { it.botId == event.botId && it.id in event.ids },
+            )
         }
-        is HostEvent.Entries -> snapshot.copy(entriesByBot = snapshot.entriesByBot + (event.chatId to event.entries))
+        is HostEvent.Entries -> snapshot.copy(
+            entriesByBot = snapshot.entriesByBot + (event.chatId to event.entries),
+            pendingApprovals = mergeBotApprovals(snapshot.pendingApprovals, event.chatId, event.entries),
+        )
         is HostEvent.AccessRequests -> snapshot.copy(accessRequests = event.requests)
         is HostEvent.Rev -> snapshot.copy(connection = snapshot.connection.copy(rev = event.rev))
         is HostEvent.Error -> snapshot.copy(connection = snapshot.connection.copy(lastError = event.message))
@@ -292,6 +334,7 @@ class SessionStore(
             val remove = (current.filter { it.id == event.chatId || it.threadId == event.chatId }.map { it.id }).toSet()
             snapshot.copy(
                 entriesByBot = snapshot.entriesByBot + (event.botId to current.filterNot { it.id in remove }),
+                pendingApprovals = snapshot.pendingApprovals.filterNot { it.botId == event.botId && it.id in remove },
                 chatTitlesByBot = snapshot.chatTitlesByBot + (
                     event.botId to (snapshot.chatTitlesByBot[event.botId].orEmpty() - event.chatId)
                 ),
@@ -308,6 +351,35 @@ class SessionStore(
         -> snapshot
         }
     }
+
+    private fun pendingApprovals(entries: Sequence<Entry>): List<Entry> = entries
+        .filter { it.kind == "permission" && it.data.status == "pending" }
+        .distinctBy(Entry::id)
+        .sortedByDescending(Entry::createdAt)
+        .toList()
+
+    private fun updatePendingApproval(
+        current: List<Entry>,
+        previous: Entry?,
+        updated: Entry,
+    ): List<Entry> {
+        val shouldInclude = updated.kind == "permission" && updated.data.status == "pending"
+        val replacedId = previous?.id
+        val alreadyPresent = current.any { it.id == updated.id || (replacedId != null && it.id == replacedId) }
+        if (!shouldInclude && !alreadyPresent) return current
+        return current.asSequence()
+            .filterNot { it.id == updated.id || (replacedId != null && it.id == replacedId) }
+            .let { remaining -> if (shouldInclude) remaining + sequenceOf(updated) else remaining }
+            .distinctBy(Entry::id)
+            .sortedByDescending(Entry::createdAt)
+            .toList()
+    }
+
+    private fun mergeBotApprovals(current: List<Entry>, botId: String, entries: List<Entry>): List<Entry> =
+        (current.asSequence().filterNot { it.botId == botId } + pendingApprovals(entries.asSequence()))
+            .distinctBy(Entry::id)
+            .sortedByDescending(Entry::createdAt)
+            .toList()
 
     private fun List<Entry>.indexOfFirstFromSequence(sequence: Long, id: String): Int {
         val any = binarySearchBy(sequence) { it.seq }
@@ -356,8 +428,10 @@ class SessionStore(
                     connection = ConnectionState(computer = computer),
                     computers = (listOf(computer) + it.computers).distinctBy { c -> c.id },
                     bots = if (switching) emptyList() else it.bots,
+                    rosterLoaded = if (switching) false else it.rosterLoaded,
                     entriesByBot = if (switching) emptyMap() else it.entriesByBot,
                     chatTitlesByBot = if (switching) emptyMap() else it.chatTitlesByBot,
+                    pendingApprovals = if (switching) emptyList() else it.pendingApprovals,
                     accessRequests = if (switching) emptyList() else it.accessRequests,
                     actionError = null,
                 )
@@ -486,12 +560,16 @@ class SessionStore(
             put("chatId", chatId)
         }).map { Unit }
         if (result.isSuccess) {
-            val current = _snapshot.value.entriesByBot[botId].orEmpty()
-            val removed = (current.filter { it.id == chatId || it.threadId == chatId }.map(Entry::id)).toSet()
             _snapshot.update { state ->
+                val current = state.entriesByBot[botId].orEmpty()
+                val removed = current.asSequence()
+                    .filter { it.id == chatId || it.threadId == chatId }
+                    .map(Entry::id)
+                    .toSet()
                 val titles = state.chatTitlesByBot[botId].orEmpty() - chatId
                 state.copy(
                     entriesByBot = state.entriesByBot + (botId to current.filterNot { it.id in removed }),
+                    pendingApprovals = state.pendingApprovals.filterNot { it.botId == botId && it.id in removed },
                     chatTitlesByBot = state.chatTitlesByBot + (botId to titles),
                 )
             }
@@ -537,7 +615,11 @@ class SessionStore(
                     val previous = latest[entry.id]
                     if (previous == null || entry.rev >= previous.rev) latest[entry.id] = entry
                 }
-                state.copy(entriesByBot = state.entriesByBot + (botId to latest.values.sortedBy(Entry::seq)))
+                val entries = latest.values.sortedBy(Entry::seq)
+                state.copy(
+                    entriesByBot = state.entriesByBot + (botId to entries),
+                    pendingApprovals = mergeBotApprovals(state.pendingApprovals, botId, entries),
+                )
             }
         } finally {
             historyLoading.remove(botId)

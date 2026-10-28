@@ -12,7 +12,7 @@ See [side-by-side Dev and production apps](dev-app.md) for schemes, identifiers,
 | Account SDK | `apps/ios/App/AccountSession.swift` | Public Clerk configuration; development environment overrides are supported |
 | Host | `host/src/remote/cloud.rs` | `CODYNC_CLOUD=off` or stored disable wins; then `CODYNC_CLOUD_URL`, then the build's cloud (`CODYNC_ENV` at compile time) |
 | Cloud Worker / D1 / DO | `cloud/wrangler.toml` | Root production, `dev`, or `local` environment |
-| APNs Worker | `relay/wrangler.toml` | Separate deployment and secrets; see [relay README](../../relay/README.md) |
+| Push Worker (APNs + FCM) | `relay/wrangler.toml` | Separate deployment and secrets; see [relay README](../../relay/README.md) |
 
 The environment is chosen when building, never stored: the host compiles in its cloud from `CODYNC_ENV` (`main` → `https://api.codync.dev`, unset or anything else → `https://dev-api.codync.dev`, debug or release alike), and the only cloud setting a host saves is on/off (**Reach from anywhere**, `codync-host cloud --enable|--disable`). `CODYNC_CLOUD_URL` points a host at a cloud you're developing (https, or http to this computer). `npm run dist:<platform>:dev` / `dist:<platform>:main` build the bundled host for the app's environment, so the script name picks the environment of a whole desktop build ([desktop app](../architecture/desktop-app.md#development)); the release workflows set `CODYNC_ENV=main`.
 

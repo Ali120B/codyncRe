@@ -29,9 +29,11 @@ internal object RelaySocketRequest {
         val pathAndQuery = "/v1/relay/device/$computerId?$query"
         val authority = buildString {
             append(base.host.lowercase())
-            if (base.port >= 0 && base.port != 443 && base.port != 80) append(':').append(base.port)
+            val defaultPort = if (base.scheme == "https") 443 else 80
+            if (base.port >= 0 && base.port != defaultPort) append(':').append(base.port)
         }
-        val timestamp = System.currentTimeMillis() / 1000
+        // Codync-Sig timestamps are Unix milliseconds (the cloud's signature window is in ms).
+        val timestamp = System.currentTimeMillis()
         val nonce = Codec.b64(Keys.randomBytes(16))
         val signature = CodyncSig.header(
             deviceKey,

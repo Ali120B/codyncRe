@@ -91,7 +91,7 @@ class DirectChannelTransport(
         // Revisions belong to one host. Reusing another computer's revision would make the
         // host skip its entire catch-up and leave the roster empty.
         if (switchingComputers) sinceRev = 0
-        var lastError: Throwable? = null
+        val failures = mutableListOf<String>()
         for (url in computer.urls) {
             try {
                 val result = connectDirect(computer, url)
@@ -99,11 +99,11 @@ class DirectChannelTransport(
                     startReconnectLoop(computer)
                     return result
                 }
-                lastError = result.exceptionOrNull()
+                result.exceptionOrNull()?.message?.let { failures += "$url: $it" }
                 disconnectSocket()
             } catch (error: Throwable) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
-                lastError = error
+                failures += "$url: ${error.message ?: error::class.simpleName}"
                 disconnectSocket()
             }
         }
@@ -113,10 +113,13 @@ class DirectChannelTransport(
                 startReconnectLoop(computer)
                 return relay
             }
-            lastError = relay.exceptionOrNull() ?: lastError
+            relay.exceptionOrNull()?.message?.let { failures += "relay: $it" }
             disconnectSocket()
         }
-        val error = lastError ?: IOException("This computer has no direct network addresses")
+        val error = IOException(
+            failures.takeIf { it.isNotEmpty() }?.joinToString(" · ")
+                ?: "This computer has no direct network addresses",
+        )
         _state.value = ConnectionState(kind = TransportKind.Offline, computer = computer, lastError = error.message)
         _events.trySend(HostEvent.Error(error.message ?: "Can't reach the computer"))
         startReconnectLoop(computer)
@@ -330,7 +333,7 @@ class DirectChannelTransport(
                 put("m", method)
                 put("b", body)
             }.toString().toByteArray(Charsets.UTF_8))
-            val response = withTimeout(30_000) { answer.await() }
+            val response = withTimeout(timeoutFor(method)) { answer.await() }
             response["err"]?.let { err ->
                 val status = err.jsonObject["status"]?.jsonPrimitive?.content
                 val detail = err.jsonObject["message"]?.jsonPrimitive?.content ?: "Host call failed"
@@ -356,6 +359,17 @@ class DirectChannelTransport(
     }
 
     private fun nextRequestId(): Long = nextId.incrementAndGet().and(0xffff_ffffL).let { if (it == 0L) 1L else it }
+
+    private fun timeoutFor(method: String): Long = when (method) {
+        "agentAuthenticate" -> 660_000L
+        "agentSetup" -> 300_000L
+        "agentAuth", "setAgentEnv", "connectorVerify", "credentialUpdateConnector", "connectorRequestFinish" -> 120_000L
+        "marketConnectors", "marketSkills", "composioToolkits", "composioConnect", "composioConnectFields",
+        "composioConnection", "setComposioKey", "connectorInfo", "connectorSignIn", "connectorSignInFinish",
+        "installConnector", "importConnectors", "installSkill", "skillDetails", "credentialStatus",
+        "credentialLogins", "credentialSaveLogin", "credentialRemoveLogin", "credentialSetOnePassword" -> 60_000L
+        else -> 30_000L
+    }
 
     private suspend fun sendInner(message: ByteArray) {
         val ws = socket ?: error("Not connected to a computer")

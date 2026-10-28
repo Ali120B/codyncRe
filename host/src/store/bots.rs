@@ -156,6 +156,8 @@ impl Store {
                 "SELECT COUNT(*) FROM entries WHERE bot_id = ?1 {filter} AND
                    ((kind = 'agent' AND json_extract(data, '$.final') = 1) OR
                     (kind = 'permission' AND json_extract(data, '$.status') = 'pending')) AND
+                   json_extract(data, '$.routineId') IS NULL AND
+                   thread_id NOT IN (SELECT id FROM entries WHERE json_extract(data, '$.routineId') IS NOT NULL) AND
                    json_extract(data, '$.reactions') IS NULL AND
                    CASE WHEN thread_id IS NULL THEN rev > ?2 AND json_extract(data, '$.thread') IS NULL
                         ELSE rev > COALESCE((SELECT CAST(v AS INTEGER) FROM kv WHERE k = 'read.' || thread_id), ?2) END"

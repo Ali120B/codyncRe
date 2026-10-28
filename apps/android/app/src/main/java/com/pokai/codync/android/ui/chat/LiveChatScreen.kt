@@ -1,7 +1,20 @@
 package com.pokai.codync.android.ui.chat
 
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.shapes.RoundedRectangle
+import androidx.compose.foundation.layout.PaddingValues
 import android.Manifest
+import com.pokai.codync.android.ui.SearchField
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.speech.RecognizerIntent
@@ -10,6 +23,7 @@ import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -21,13 +35,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,32 +55,42 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pokai.codync.data.SessionStore
+import com.pokai.codync.data.EntryTimeline
+import com.pokai.codync.model.isChatVisible
+import com.pokai.codync.design.CharacterAvatar
+import com.pokai.codync.design.CodyncIcon
 import com.pokai.codync.design.CodyncIcons
 import com.pokai.codync.design.CodyncMenuAnchor
 import com.pokai.codync.design.CodyncMenuItem
@@ -78,9 +107,11 @@ import com.pokai.codync.model.Attachment
 import com.pokai.codync.model.WireJson
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -93,7 +124,7 @@ import java.io.InputStream
 import java.util.UUID
 
 @Composable
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
 fun LiveChatScreen(
     session: SessionStore,
     botId: String,
@@ -102,26 +133,29 @@ fun LiveChatScreen(
     hazeState: HazeState,
     onBack: () -> Unit,
     onOpenDetails: (String) -> Unit,
+    onOpenComputer: (String) -> Unit,
     onOpenChat: (String, String) -> Unit,
     onOpenThread: (String, String) -> Unit,
 ) {
     var showChats by remember(botId, chatId) { mutableStateOf(false) }
     val bot by session.bot(botId).collectAsState(initial = null)
+    val botRoster by session.bots().collectAsState(initial = emptyList())
     val rootEntry by session.entry(botId, chatId).collectAsState(initial = null)
-    val timelineEntries by session.timelineEntries(botId, chatId).collectAsState(initial = emptyList())
+    val timeline by session.timelineEntries(botId, chatId).collectAsState(initial = EntryTimeline(emptyList()))
     val chatListFlow = remember(showChats, botId) {
-        if (showChats) session.entries(botId) else flowOf(emptyList<Entry>())
+        if (showChats) session.entries(botId) else flowOf(EntryTimeline(emptyList()))
     }
-    val chatListEntries by chatListFlow.collectAsState(initial = emptyList())
-    val connection by session.connection().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
+    val chatListTimeline by chatListFlow.collectAsState(initial = EntryTimeline(emptyList()))
+    val chatListEntries = chatListTimeline.entries
+    val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
     val actionError by session.actionError().collectAsState(initial = null)
     val context = LocalContext.current
     val colors = CodyncTheme.colors
     val startingNewChat = chatId == "new"
     var loadedThread by remember(botId, chatId) { mutableStateOf<List<Entry>>(emptyList()) }
-    LaunchedEffect(botId, chatId, connection.kind) {
+    LaunchedEffect(botId, chatId, connection.kind, connection.computer?.id) {
+        loadedThread = emptyList()
         if (connection.kind == com.pokai.codync.transport.TransportKind.Offline) return@LaunchedEffect
-        session.loadChatTitles(botId)
         session.call("markRead", buildJsonObject {
             put("botId", botId)
             if (chatId.isNotBlank() && chatId != "main" && chatId != "new") put("threadId", chatId)
@@ -137,11 +171,31 @@ fun LiveChatScreen(
             }
         }
     }
+    LaunchedEffect(showChats, botId, connection.kind, connection.computer?.id) {
+        if (showChats && connection.kind != com.pokai.codync.transport.TransportKind.Offline) {
+            session.loadChatTitles(botId)
+        }
+    }
     val chatRoomMode = rootEntry?.data?.chat == true
     val threadMode = chatId.isNotBlank() && chatId != "main" && chatId != "new" && !chatRoomMode
     val chatTitles by session.chatTitles(botId).collectAsState(initial = emptyMap())
-    val entries = remember(timelineEntries, loadedThread) {
-        (timelineEntries + loadedThread).distinctBy { it.id }.sortedBy { it.seq }
+    val timelineWithThread by produceState(timeline, timeline, loadedThread) {
+        value = if (loadedThread.isEmpty()) {
+            timeline
+        } else {
+            EntryTimeline(withContext(Dispatchers.Default) {
+                mergeEntriesBySequence(timeline.entries, loadedThread)
+            })
+        }
+    }
+    val allEntries = timelineWithThread.entries
+    var showFind by remember(botId, chatId) { mutableStateOf(false) }
+    var findQuery by remember(botId, chatId) { mutableStateOf("") }
+    val entries by produceState(emptyList<Entry>(), allEntries) {
+        value = withContext(Dispatchers.Default) { allEntries.filter(Entry::isChatVisible) }
+    }
+    val visibleEntries = remember(entries, findQuery) {
+        if (findQuery.isBlank()) entries else entries.filter { (it.data.text ?: it.data.output ?: it.data.detail ?: "").contains(findQuery, ignoreCase = true) }
     }
     var draft by rememberSaveable(botId, chatId) { mutableStateOf("") }
     var retryNonce by rememberSaveable(botId, chatId) { mutableStateOf<String?>(null) }
@@ -150,8 +204,12 @@ fun LiveChatScreen(
     var sendError by remember(botId, chatId) { mutableStateOf<String?>(null) }
     var downloadTarget by remember(botId, chatId) { mutableStateOf<Attachment?>(null) }
     var contextMessage by remember(botId, chatId) { mutableStateOf<String?>(null) }
+    var traceTarget by remember(botId, chatId) { mutableStateOf<Entry?>(null) }
+    var chatMenuOpen by remember(botId, chatId) { mutableStateOf(false) }
+    var expandedThinking by remember(botId, chatId) { mutableStateOf(false) }
     var rewindTarget by remember(botId, chatId) { mutableStateOf<Entry?>(null) }
     var rewinding by remember(botId, chatId) { mutableStateOf(false) }
+    var rewindError by remember(botId, chatId) { mutableStateOf<String?>(null) }
     var deleteChatTarget by remember(botId, chatId) { mutableStateOf<String?>(null) }
     var pendingMessageJump by remember(botId, chatId, initialMessageId) { mutableStateOf(initialMessageId) }
     val listState = rememberLazyListState()
@@ -161,8 +219,17 @@ fun LiveChatScreen(
             layout.totalItemsCount == 0 || (layout.visibleItemsInfo.lastOrNull()?.index ?: 0) >= layout.totalItemsCount - 2
         }
     }
+    val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(imeBottom) {
+        if (imeBottom > 0 && nearLatest) {
+            listState.animateScrollToItem(finalListItemIndex.coerceAtLeast(0))
+        }
+    }
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    DisposableEffect(botId) {
+        scope.launch { session.call("setViewing", buildJsonObject { put("botId", botId) }) }
+        onDispose { scope.launch { session.call("setViewing", buildJsonObject { put("botId", "") }) } }
+    }
     var initialScrollDone by remember(botId, chatId) { mutableStateOf(false) }
     val finalListItemIndex = entries.lastIndex + if (threadMode && rootEntry != null) 1 else 0
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -203,13 +270,14 @@ fun LiveChatScreen(
             }
         }
     }
-    val chatRows = remember(showChats, chatListEntries, chatTitles) {
-        if (!showChats) emptyList() else {
-            val repliesByRoot = chatListEntries.asSequence()
+    val chatRows by produceState(emptyList<ChatListRow>(), showChats, chatListTimeline, chatTitles) {
+        value = if (!showChats) emptyList() else withContext(Dispatchers.Default) {
+            val visibleChatListEntries = chatListEntries.filter(Entry::isChatVisible)
+            val repliesByRoot = visibleChatListEntries.asSequence()
                 .filter { it.threadId != null }
                 .groupBy { it.threadId!! }
             buildList {
-                val main = chatListEntries.filter { it.threadId == null && it.data.chat != true }
+                val main = visibleChatListEntries.filter { it.threadId == null && it.data.chat != true }
                 if (main.isNotEmpty()) {
                     val firstUser = main.firstOrNull { it.kind == "user" }
                     add(ChatListRow(
@@ -219,7 +287,7 @@ fun LiveChatScreen(
                         preview = main.lastOrNull()?.data?.text.orEmpty(),
                     ))
                 }
-                chatListEntries.filter { it.threadId == null && it.data.chat == true }.forEach { root ->
+                visibleChatListEntries.filter { it.threadId == null && it.data.chat == true }.forEach { root ->
                     val rows = listOf(root) + repliesByRoot[root.id].orEmpty()
                     val fallback = root.data.text.orEmpty().replace('\n', ' ').take(64)
                     add(ChatListRow(
@@ -250,15 +318,23 @@ fun LiveChatScreen(
 
     LaunchedEffect(entries.lastOrNull()?.id) {
         if (entries.isNotEmpty()) {
-            delay(80)
+            val targetIndex = finalListItemIndex.coerceAtLeast(0)
             val total = listState.layoutInfo.totalItemsCount
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
             if (!initialScrollDone || total == 0) {
-                listState.scrollToItem(finalListItemIndex)
+                snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > targetIndex }
+                listState.scrollToItem(targetIndex)
                 initialScrollDone = true
             } else if (lastVisible >= total - 2) {
-                listState.animateScrollToItem(finalListItemIndex)
+                listState.animateScrollToItem(targetIndex)
             }
+        }
+    }
+
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    LaunchedEffect(imeVisible) {
+        if (imeVisible && entries.isNotEmpty()) {
+            listState.animateScrollToItem(finalListItemIndex.coerceAtLeast(0))
         }
     }
 
@@ -278,6 +354,25 @@ fun LiveChatScreen(
         return
     }
     val currentBot = bot ?: return
+    val activeLane = if (threadMode || chatRoomMode) chatId else null
+    val currentThinking = remember(allEntries, activeLane, currentBot.status) {
+        if (currentBot.status != "working") null
+        else {
+            var thought: String? = null
+            for (entry in allEntries.asReversed()) {
+                if (entry.threadId != activeLane) continue
+                if (entry.kind == "user" || (entry.kind == "agent" && entry.data.final == true)) break
+                if (entry.kind == "thought" && !entry.data.text.isNullOrBlank()) {
+                    thought = entry.data.text
+                    break
+                }
+            }
+            thought
+        }
+    }
+    LaunchedEffect(currentBot.status, currentThinking) {
+        if (currentBot.status != "working" || currentThinking == null) expandedThinking = false
+    }
     val slashQuery = draft.takeIf { it.matches(Regex("^/\\S*$")) }?.drop(1)?.lowercase()
     val offlineCommand = connection.kind == com.pokai.codync.transport.TransportKind.Offline &&
         draft.trim() in setOf("/fast", "/new")
@@ -305,42 +400,84 @@ fun LiveChatScreen(
     Column(
         Modifier
             .fillMaxSize()
+            .background(Color.Transparent)
             .hazeSource(hazeState)
+            .statusBarsPadding()
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
     ) {
+        val canStop = currentBot.status == "working"
+        val canSend = (draft.isNotBlank() || attachedFiles.isNotEmpty()) && !sending && (
+            connection.kind != com.pokai.codync.transport.TransportKind.Offline ||
+                (attachedFiles.isEmpty() && chatId != "new")
+            ) && !offlineCommand
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            GlassIconButton(CodyncIcons.Back, "Back", onClick = onBack)
-            Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                Text(
-                    currentBot.name,
-                    modifier = Modifier.clickable { onOpenDetails(currentBot.id) },
-                    color = colors.text,
-                    style = CodyncType.headline,
-                )
-                Text(
-                    buildString {
-                        when {
-                            startingNewChat -> append("New chat · ")
-                            chatRoomMode -> append("Chat · ")
-                            threadMode -> append("Thread · ")
-                        }
-                        append(
-                            when {
-                                connection.kind == com.pokai.codync.transport.TransportKind.Direct -> currentBot.activity.ifBlank { "Direct · ${connection.computer?.name ?: "computer"}" }
-                                connection.kind == com.pokai.codync.transport.TransportKind.Relay -> currentBot.activity.ifBlank { "Codync Cloud · ${connection.computer?.name ?: "computer"}" }
-                                else -> connection.lastError ?: "Reconnecting…"
+            ChatHeaderButton(CodyncIcons.Back, "Back", onBack)
+            GlassSurface(
+                state = hazeState,
+                shape = RoundedCornerShape(percent = 50),
+                modifier = Modifier.weight(1f).heightIn(min = 46.dp)
+                    .clickable { onOpenDetails(currentBot.id) },
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 5.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    if (currentBot.kind == "group") {
+                        ChatGroupAvatar(currentBot.members.mapNotNull { id -> botRoster.firstOrNull { it.id == id } })
+                    } else {
+                        CharacterAvatar(currentBot.name, currentBot.avatarColor, currentBot.avatarShape, size = 32.dp)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(currentBot.name, color = colors.text, style = CodyncType.body, maxLines = 1)
+                        Text(
+                            buildString {
+                                when {
+                                    startingNewChat -> append("New chat · ")
+                                    chatRoomMode -> append("Chat · ")
+                                    threadMode -> append("Thread · ")
+                                }
+                                append(when {
+                                    connection.kind == com.pokai.codync.transport.TransportKind.Direct -> currentBot.activity.ifBlank { "Direct · ${connection.computer?.name ?: "computer"}" }
+                                    connection.kind == com.pokai.codync.transport.TransportKind.Relay -> currentBot.activity.ifBlank { "Codync Cloud · ${connection.computer?.name ?: "computer"}" }
+                                    else -> connection.lastError ?: "Reconnecting…"
+                                })
                             },
+                            color = colors.secondary,
+                            style = CodyncType.caption,
+                            maxLines = 1,
                         )
-                    },
-                    color = colors.secondary,
-                    style = CodyncType.caption,
-                    maxLines = 1,
-                )
+                    }
+                }
             }
-            GlassIconButton(CodyncIcons.Chat, "Chats", onClick = { showChats = true })
+            // Model selector removed from header (space); change model via bot details.
+            ChatHeaderButton(CodyncIcons.Computer, "Computer", { onOpenComputer(currentBot.id) })
+            CodyncMenuAnchor(
+                expanded = chatMenuOpen,
+                onDismissRequest = { chatMenuOpen = false },
+                items = listOf(
+                    CodyncMenuItem("Chats", CodyncIcons.Chat, onClick = { showChats = true }),
+                    CodyncMenuItem("Find in chat", CodyncIcons.Search, onClick = { showFind = !showFind; if (!showFind) findQuery = "" }),
+                    CodyncMenuItem("New chat", CodyncIcons.AddComment, onClick = { onOpenChat(botId, "new") }),
+                    CodyncMenuItem(if (currentBot.kind == "group") "Group details" else "Bot details", CodyncIcons.Info, onClick = { onOpenDetails(currentBot.id) }),
+                    CodyncMenuItem("Copy conversation", CodyncIcons.Copy, onClick = {
+                        val conversation = allEntries
+                            .filter { it.kind == "user" || (it.kind == "agent" && it.data.final == true) }
+                            .sortedBy(Entry::seq)
+                            .mapNotNull { entry -> entry.data.text?.takeIf(String::isNotBlank)?.let { text ->
+                                (if (entry.kind == "user") "You" else currentBot.name) + ": " + text
+                            } }
+                            .joinToString("\n\n")
+                        if (conversation.isNotBlank()) {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Codync conversation", conversation))
+                        }
+                    }),
+                ),
+            ) {
+                ChatHeaderButton(CodyncIcons.More, "Chat actions", { chatMenuOpen = true })
+            }
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -362,39 +499,48 @@ fun LiveChatScreen(
                     }
                 }
             }
-            items(entries, key = { it.id }, contentType = { it.kind }) { entry ->
+            if (showFind) {
+                item(key = "find-bar") {
+                    SearchField(value = findQuery, onValueChange = { findQuery = it }, placeholder = "Find in chat", modifier = Modifier.padding(bottom = 4.dp))
+                }
+            }
+            items(visibleEntries, key = { it.id }, contentType = { it.kind }) { entry ->
                 val text = entry.data.text ?: entry.data.output ?: entry.data.detail ?: entry.data.heading.orEmpty()
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 when (entry.kind) {
-                    "user" -> CodyncMenuAnchor(
-                        modifier = Modifier.fillMaxWidth(),
-                        expanded = contextMessage == entry.id,
-                        onDismissRequest = { contextMessage = null },
-                        items = if (entry.data.status == "queued") emptyList() else buildList {
-                            if (!threadMode && !chatRoomMode && !startingNewChat) add(CodyncMenuItem(
-                                "Reply in thread", CodyncIcons.Chat,
-                                onClick = { contextMessage = null; onOpenThread(botId, entry.id) },
-                            ))
-                            add(CodyncMenuItem(
-                                "Rewind to before this turn", CodyncIcons.History,
-                                onClick = { contextMessage = null; rewindTarget = entry },
-                            ))
-                            quickReactions.forEach { emoji -> add(CodyncMenuItem(
-                                if (emoji in entry.data.reactions.orEmpty()) "Remove $emoji reaction" else "React $emoji",
-                                onClick = {
+                    "user" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                        CodyncMenuAnchor(
+                            modifier = Modifier.wrapContentWidth(),
+                            expanded = contextMessage == entry.id,
+                            onDismissRequest = { contextMessage = null },
+                            items = if (entry.data.status == "queued") emptyList() else buildList {
+                                add(CodyncMenuItem("Copy", CodyncIcons.Copy, onClick = {
                                     contextMessage = null
-                                    scope.launch { session.call("react", buildJsonObject {
-                                        put("entryId", entry.id)
-                                        put("emoji", emoji)
-                                    }) }
-                                },
-                            )) }
-                        },
-                    ) {
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Codync message", text))
+                                }))
+                                if (!threadMode && !startingNewChat && !(chatRoomMode && entry.id == chatId)) add(CodyncMenuItem(
+                                    "Reply in thread", CodyncIcons.Chat,
+                                    onClick = { contextMessage = null; onOpenThread(botId, entry.id) },
+                                ))
+                                add(CodyncMenuItem(
+                                    "Rewind to before this turn", CodyncIcons.History,
+                                    onClick = { contextMessage = null; rewindError = null; rewindTarget = entry },
+                                ))
+                                quickReactions.forEach { emoji -> add(CodyncMenuItem(
+                                    if (emoji in entry.data.reactions.orEmpty()) "Remove $emoji reaction" else "React $emoji",
+                                    onClick = {
+                                        contextMessage = null
+                                        scope.launch { session.call("react", buildJsonObject {
+                                            put("entryId", entry.id)
+                                            put("emoji", emoji)
+                                        }) }
+                                    },
+                                )) }
+                            },
+                        ) {
                             Column(
-                                Modifier
-                                    .fillMaxWidth(0.86f).clip(RoundedCornerShape(18.dp))
+                                Modifier.wrapContentWidth().clip(RoundedCornerShape(18.dp))
                                     .background(colors.bubbleUser)
                                     .combinedClickable(
                                         onClick = {},
@@ -414,44 +560,64 @@ fun LiveChatScreen(
                             }
                         }
                     }
-                    "agent" -> CodyncMenuAnchor(
-                        modifier = Modifier.fillMaxWidth(),
-                        expanded = contextMessage == entry.id,
-                        onDismissRequest = { contextMessage = null },
-                        items = if (entry.data.final == true) quickReactions.map { emoji ->
-                            CodyncMenuItem(
-                                if (emoji in entry.data.reactions.orEmpty()) "Remove $emoji reaction" else "React $emoji",
-                                onClick = {
-                                    contextMessage = null
-                                    scope.launch { session.call("react", buildJsonObject {
-                                        put("entryId", entry.id)
-                                        put("emoji", emoji)
-                                    }) }
-                                },
-                            )
-                        } else emptyList(),
+                    "agent" -> Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.spacedBy(5.dp),
                     ) {
-                        SectionCard {
+                        if (currentBot.kind == "group") {
+                            entry.data.author?.let { authorId -> botRoster.firstOrNull { it.id == authorId } }?.let { author ->
+                                Row(
+                                    Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                ) {
+                                    CharacterAvatar(author.name, author.avatarColor, author.avatarShape, size = 23.dp)
+                                    Text(author.name, color = colors.secondary, style = CodyncType.caption)
+                                }
+                            }
+                        }
+                        CodyncMenuAnchor(
+                            modifier = Modifier.fillMaxWidth(0.94f),
+                            expanded = contextMessage == entry.id,
+                            onDismissRequest = { contextMessage = null },
+                            items = if (entry.data.final == true) buildList {
+                                add(CodyncMenuItem("Copy", CodyncIcons.Copy, onClick = {
+                                    contextMessage = null
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    clipboard.setPrimaryClip(ClipData.newPlainText("Codync message", text))
+                                }))
+                                if (!threadMode && !startingNewChat && !(chatRoomMode && entry.id == chatId)) add(CodyncMenuItem(
+                                    if (entry.data.thread == null) "Reply in thread" else "${entry.data.thread?.count ?: 0} replies",
+                                    CodyncIcons.Chat,
+                                    onClick = { contextMessage = null; onOpenThread(botId, entry.id) },
+                                ))
+                                add(CodyncMenuItem("Show what it did", CodyncIcons.Build, onClick = {
+                                    contextMessage = null
+                                    traceTarget = entry
+                                }))
+                                quickReactions.forEach { emoji -> add(CodyncMenuItem(
+                                    if (emoji in entry.data.reactions.orEmpty()) "Remove $emoji reaction" else "React $emoji",
+                                    onClick = {
+                                        contextMessage = null
+                                        scope.launch { session.call("react", buildJsonObject {
+                                            put("entryId", entry.id)
+                                            put("emoji", emoji)
+                                        }) }
+                                    },
+                                )) }
+                            } else emptyList(),
+                        ) {
                             Column(
-                                Modifier
+                                Modifier.wrapContentWidth()
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(colors.surface)
                                     .combinedClickable(onClick = {}, onLongClick = {
                                         if (entry.data.final == true) contextMessage = entry.id
                                     })
                                     .padding(14.dp),
                             ) {
-                                val status = entry.data.status
-                                if (entry.data.final != true && status != null) {
-                                    Text(status, color = colors.tertiary, style = CodyncType.caption)
-                                }
-                                MarkdownText(text, colors.text)
-                                if (!threadMode && !chatRoomMode && !startingNewChat) {
-                                    Spacer(Modifier.height(8.dp))
-                                    val thread = entry.data.thread
-                                    SecondaryButton(
-                                        if (thread == null) "Reply in thread" else "${thread.count} replies",
-                                        onClick = { onOpenThread(botId, entry.id) },
-                                    )
-                                }
+                                MarkdownText(text, colors.text, renderMarkdown = entry.data.final == true)
                             }
                         }
                     }
@@ -473,7 +639,9 @@ fun LiveChatScreen(
                         }
                     }
                     "notice" -> Text(text, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), color = colors.tertiary, style = CodyncType.caption)
-                    else -> SectionCard {
+                    else -> if (entry.data.connectionRequest != null) {
+                        ConnectionRequestCard(entry = entry, session = session, scope = scope)
+                    } else SectionCard {
                         Column(Modifier.padding(12.dp)) {
                             Text(entry.data.title ?: entry.data.toolKind ?: entry.kind.replaceFirstChar { it.uppercase() }, color = colors.secondary, style = CodyncType.caption)
                             if (text.isNotBlank()) {
@@ -522,11 +690,66 @@ fun LiveChatScreen(
             }
             }
             if (entries.isNotEmpty() && !nearLatest) {
-                GlassIconButton(
-                    CodyncIcons.ArrowDown,
-                    "Jump to latest",
-                    onClick = { scope.launch { listState.animateScrollToItem(finalListItemIndex.coerceAtLeast(0)) } },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+                GlassSurface(
+                    state = hazeState,
+                    shape = CircleShape,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                    contentPadding = PaddingValues(2.dp),
+                ) {
+                    GlassIconButton(
+                        CodyncIcons.ArrowDown,
+                        "Jump to latest",
+                        onClick = { scope.launch { listState.animateScrollToItem(finalListItemIndex.coerceAtLeast(0)) } },
+                    )
+                }
+            }
+        }
+
+        if (currentBot.status == "working" || currentBot.status == "needsInput") {
+            GlassSurface(
+                state = hazeState,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            ) {
+                Row(
+                    Modifier.clickable(enabled = currentThinking != null) { expandedThinking = !expandedThinking },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                if (currentBot.status == "working") {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(15.dp),
+                        color = colors.secondary,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    CodyncIcon(CodyncIcons.Warning, tint = colors.warning, size = 16.dp)
+                }
+                Text(
+                    currentBot.activity.ifBlank { if (currentBot.status == "needsInput") "Needs your input" else "Working…" },
+                    modifier = Modifier.weight(1f),
+                    color = if (currentBot.status == "needsInput") colors.warning else colors.secondary,
+                    style = CodyncType.caption,
+                    maxLines = 1,
+                )
+                if (currentThinking != null) {
+                    CodyncIcon(
+                        if (expandedThinking) CodyncIcons.ChevronDown else CodyncIcons.ChevronRight,
+                        tint = colors.tertiary,
+                        size = 14.dp,
+                    )
+                }
+            }
+            }
+            if (expandedThinking && currentThinking != null) {
+                Text(
+                    currentThinking,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 40.dp, end = 18.dp, bottom = 5.dp),
+                    color = colors.tertiary,
+                    style = CodyncType.footnote,
                 )
             }
         }
@@ -570,24 +793,64 @@ fun LiveChatScreen(
             }
         }
 
+        if (currentBot.kind == "group") {
+            val at = draft.lastIndexOf('@')
+            val mentionQuery = if (at >= 0 && (at == 0 || draft.getOrElse(at - 1) { ' ' }.isWhitespace()) ) {
+                val q = draft.substring(at + 1)
+                if (!q.contains('\n') && q.length <= 24) q else null
+            } else null
+            if (mentionQuery != null) {
+                val members = botRoster.filter { currentBot.members.contains(it.id) }
+                val filtered = if (mentionQuery.isBlank()) members else members.filter { it.name.contains(mentionQuery, ignoreCase = true) }
+                Column(
+                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(14.dp)).background(colors.surface)
+                        .padding(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    if (mentionQuery.isBlank() || "all".contains(mentionQuery, ignoreCase = true)) {
+                        Text(
+                            "@all",
+                            color = colors.text,
+                            style = CodyncType.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable {
+                                val a = draft.lastIndexOf('@')
+                                draft = draft.substring(0, a) + "@all "
+                            }.padding(horizontal = 8.dp, vertical = 6.dp),
+                        )
+                    }
+                    filtered.forEach { member ->
+                        Text(
+                            "@${member.name}",
+                            color = colors.text,
+                            style = CodyncType.caption,
+                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable {
+                                val a = draft.lastIndexOf('@')
+                                draft = draft.substring(0, a) + "@${member.name} "
+                            }.padding(horizontal = 8.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+            }
+        }
+
         GlassSurface(
             state = hazeState,
-            shape = RoundedCornerShape(26.dp),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp),
+            shape = RoundedCornerShape(22.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 4.dp),
         ) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GlassIconButton(CodyncIcons.Add, "Attach files", onClick = { filePicker.launch("*/*") })
-                GlassIconButton(CodyncIcons.Mic, "Dictate message", onClick = { speechPermission.launch(Manifest.permission.RECORD_AUDIO) })
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                GlassIconButton(CodyncIcons.Add, "Attach files", onClick = { filePicker.launch("*/*") }, size = 34.dp, iconSize = 18.dp)
                 BasicTextField(
                     value = draft,
                     onValueChange = {
                         draft = it
                         retryNonce = null
                     },
-                    modifier = Modifier.weight(1f).padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 28.dp, max = 112.dp).padding(horizontal = 4.dp, vertical = 7.dp),
                     minLines = 1,
-                    maxLines = 5,
+                    maxLines = 4,
                     textStyle = TextStyle(color = colors.text, fontSize = 16.sp, fontFamily = CodyncType.body.fontFamily),
                     cursorBrush = SolidColor(colors.text),
                     decorationBox = { inner ->
@@ -601,9 +864,13 @@ fun LiveChatScreen(
                         }
                     },
                 )
-                PrimaryButton(
-                    text = if (sending) "Sending…" else "Send",
+                GlassIconButton(
+                    symbol = if (canStop) CodyncIcons.Stop else CodyncIcons.Send,
+                    contentDescription = if (canStop) "Stop ${currentBot.name}" else if (sending) "Sending message" else "Send message",
                     onClick = {
+                        if (canStop) {
+                            scope.launch { session.call("stop", buildJsonObject { put("botId", currentBot.id) }) }
+                        } else {
                         val message = draft.trim()
                         if (message.isNotEmpty() || attachedFiles.isNotEmpty()) {
                             if (currentBot.kind != "group" && attachedFiles.isEmpty() && message == "/fast" &&
@@ -640,19 +907,12 @@ fun LiveChatScreen(
                                 sending = false
                             }
                         }
+                        }
                     },
-                    enabled = (draft.isNotBlank() || attachedFiles.isNotEmpty()) && !sending && (
-                        connection.kind != com.pokai.codync.transport.TransportKind.Offline ||
-                            (attachedFiles.isEmpty() && chatId != "new")
-                        ) && !offlineCommand,
-                    leading = CodyncIcons.Send,
+                    enabled = if (canStop) connection.kind != com.pokai.codync.transport.TransportKind.Offline else canSend,
+                    size = 42.dp,
+                    iconSize = 20.dp,
                 )
-            }
-        }
-        if (currentBot.status == "working") {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${currentBot.name} is working", modifier = Modifier.weight(1f), color = colors.tertiary, style = CodyncType.caption)
-                SecondaryButton("Stop", onClick = { scope.launch { session.call("stop", buildJsonObject { put("botId", currentBot.id) }) } })
             }
         }
         actionError?.let { error ->
@@ -666,7 +926,12 @@ fun LiveChatScreen(
         AlertDialog(
             onDismissRequest = { if (!rewinding) rewindTarget = null },
             title = { Text("Rewind this turn?") },
-            text = { Text("Codync will restore the workspace to before this message and remove it and later messages in this conversation. This requires a saved file checkpoint.") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Codync will restore the workspace to before this message and remove it and later messages in this conversation. This requires a saved file checkpoint.")
+                    rewindError?.let { Text(it, color = colors.warning) }
+                }
+            },
             confirmButton = {
                 TextButton(
                     enabled = !rewinding,
@@ -679,6 +944,7 @@ fun LiveChatScreen(
                             })
                             rewinding = false
                             if (result.isSuccess) rewindTarget = null
+                            else rewindError = result.exceptionOrNull()?.message ?: "Couldn't rewind this turn."
                         }
                     },
                 ) { Text(if (rewinding) "Rewinding…" else "Rewind") }
@@ -689,19 +955,18 @@ fun LiveChatScreen(
         )
     }
     if (showChats) {
-        ModalBottomSheet(
+        Dialog(
             onDismissRequest = { showChats = false },
-            sheetState = sheetState,
-            containerColor = colors.background,
-            contentColor = colors.text,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            Column(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                Text(
-                    "Chats · ${currentBot.name}",
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp),
-                    color = colors.text,
-                    style = CodyncType.headline,
-                )
+            Column(
+                Modifier.fillMaxWidth(0.94f).heightIn(max = 680.dp)
+                    .clip(RoundedCornerShape(26.dp)).background(colors.surface).padding(vertical = 10.dp),
+            ) {
+                Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Chats · ${currentBot.name}", modifier = Modifier.weight(1f), color = colors.text, style = CodyncType.headline)
+                    GlassIconButton(CodyncIcons.Close, "Close chats", onClick = { showChats = false })
+                }
                 SectionCard(Modifier.padding(horizontal = 16.dp, vertical = 5.dp)) {
                     SettingsRow(
                         title = "New chat",
@@ -772,6 +1037,130 @@ fun LiveChatScreen(
             dismissButton = { TextButton(onClick = { deleteChatTarget = null }) { Text("Cancel") } },
         )
     }
+    traceTarget?.let { entry ->
+        WhatItDidDialog(
+            entry = entry,
+            entries = allEntries,
+            onDismiss = { traceTarget = null },
+        )
+    }
+}
+
+@Composable
+private fun ChatHeaderButton(
+    symbol: com.pokai.codync.design.Symbol,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    val colors = CodyncTheme.colors
+    Box(
+        Modifier.size(42.dp)
+            .shadow(9.dp, CircleShape)
+            .clip(CircleShape)
+            .background(colors.surface.copy(alpha = 0.88f))
+            .border(0.7.dp, colors.glassBorder, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        GlassIconButton(symbol, contentDescription, onClick, size = 42.dp, iconSize = 19.dp)
+    }
+}
+
+@Composable
+private fun ChatGroupAvatar(members: List<com.pokai.codync.model.Bot>) {
+    Box(Modifier.width(40.dp).height(38.dp)) {
+        members.take(2).forEachIndexed { index, member ->
+            CharacterAvatar(
+                name = member.name,
+                colorId = member.avatarColor,
+                shapeId = member.avatarShape,
+                size = 27.dp,
+                modifier = Modifier.align(if (index == 0) Alignment.CenterStart else Alignment.CenterEnd),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WhatItDidDialog(entry: Entry, entries: List<Entry>, onDismiss: () -> Unit) {
+    val colors = CodyncTheme.colors
+    val sameThread = entries.filter { it.threadId == entry.threadId }
+    val turnRows = if (entry.turn != 0L) {
+        sameThread.filter { it.turn == entry.turn && it.seq <= entry.seq }
+    } else {
+        val start = sameThread.lastOrNull { it.kind == "user" && it.seq <= entry.seq }?.seq ?: entry.seq
+        sameThread.filter { it.seq in start..entry.seq }
+    }
+    val details = turnRows.filter { it.kind in setOf("thought", "tool", "plan", "permission") || (it.kind == "agent" && it.data.final != true) }
+    var expanded by remember(entry.id) { mutableStateOf<Set<String>>(emptySet()) }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.82f)
+                .clip(RoundedCornerShape(26.dp)).background(colors.surface).padding(vertical = 10.dp),
+        ) {
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("What it did", color = colors.text, style = CodyncType.headline)
+                    Text("Work from this response stays hidden in the chat.", color = colors.tertiary, style = CodyncType.caption)
+                }
+                GlassIconButton(CodyncIcons.Close, "Close activity", onClick = onDismiss)
+            }
+            LazyColumn(
+                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                if (details.isEmpty()) item {
+                    Text("No tool calls or intermediate work were recorded for this response.", modifier = Modifier.padding(14.dp), color = colors.tertiary, style = CodyncType.footnote)
+                }
+                items(details, key = { it.id }) { row ->
+                    val isOpen = row.id in expanded
+                    val title = when (row.kind) {
+                        "thought" -> "Thinking"
+                        "tool" -> row.data.title ?: row.data.toolKind?.replaceFirstChar { it.uppercase() } ?: "Tool"
+                        "plan" -> "Plan"
+                        "permission" -> row.data.title ?: "Approval"
+                        else -> "Progress"
+                    }
+                    val subtitle = when {
+                        row.kind == "tool" -> row.data.status?.replaceFirstChar { it.uppercase() } ?: "In progress"
+                        row.kind == "plan" -> "${row.data.entries.orEmpty().count { it.status == "completed" }} of ${row.data.entries.orEmpty().size} steps complete"
+                        else -> "Tap to show details"
+                    }
+                    SectionCard {
+                        Column {
+                            SettingsRow(
+                                title = title,
+                                subtitle = subtitle,
+                                icon = when (row.kind) {
+                                    "thought" -> CodyncIcons.Memory
+                                    "plan" -> CodyncIcons.Done
+                                    "permission" -> CodyncIcons.Lock
+                                    else -> CodyncIcons.Build
+                                },
+                                trailing = { Text(if (isOpen) "−" else "+", color = colors.tertiary, style = CodyncType.title) },
+                                onClick = { expanded = if (isOpen) expanded - row.id else expanded + row.id },
+                            )
+                            if (isOpen) {
+                                Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    row.data.command?.takeIf(String::isNotBlank)?.let { Text(it, color = colors.secondary, style = CodyncType.mono) }
+                                    row.data.cwd?.takeIf(String::isNotBlank)?.let { Text("Workspace · $it", color = colors.tertiary, style = CodyncType.caption) }
+                                    row.data.text?.takeIf(String::isNotBlank)?.let { Text(it, color = colors.secondary, style = CodyncType.footnote) }
+                                    row.data.detail?.takeIf(String::isNotBlank)?.let { Text(it, color = colors.secondary, style = CodyncType.footnote) }
+                                    row.data.output?.takeIf(String::isNotBlank)?.let { Text(it, color = colors.secondary, style = CodyncType.mono) }
+                                    row.data.diffs.orEmpty().forEach { diff ->
+                                        Text("${diff.path}  +${diff.added}  −${diff.removed}", color = colors.secondary, style = CodyncType.caption)
+                                        if (diff.patch.isNotBlank()) Text(diff.patch, color = colors.tertiary, style = CodyncType.mono)
+                                    }
+                                    row.data.entries.orEmpty().forEach { item ->
+                                        Text("${if (item.status == "completed") "✓" else "○"} ${item.content}", color = colors.secondary, style = CodyncType.footnote)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 private data class ChatListRow(val id: String, val title: String, val at: Long, val preview: String)
@@ -802,16 +1191,18 @@ private suspend fun sendWithFiles(
     text: String,
     files: List<PendingFile>,
     clientNonce: String,
-): Result<Entry?> = runCatching {
-    val uploadIds = mutableListOf<String>()
-    files.forEach { file ->
-        val id = UUID.randomUUID().toString()
-        context.contentResolver.openInputStream(file.uri)?.use { input ->
-            uploadFile(session, botId, id, file.name, input)
-        } ?: error("Couldn't open ${file.name}")
-        uploadIds += id
+): Result<Entry?> = withContext(Dispatchers.IO) {
+    runCatching {
+        val uploadIds = mutableListOf<String>()
+        files.forEach { file ->
+            val id = UUID.randomUUID().toString()
+            context.contentResolver.openInputStream(file.uri)?.use { input ->
+                uploadFile(session, botId, id, file.name, input)
+            } ?: error("Couldn't open ${file.name}")
+            uploadIds += id
+        }
+        session.send(botId, chatId, text, uploadIds, clientNonce).getOrThrow()
     }
-    session.send(botId, chatId, text, uploadIds, clientNonce).getOrThrow()
 }
 
 private suspend fun uploadFile(
@@ -871,24 +1262,51 @@ private suspend fun downloadFile(
     file: Attachment,
     destination: Uri,
 ) {
-    val output = context.contentResolver.openOutputStream(destination, "w") ?: error("Couldn't open the destination")
-    output.use { sink ->
-        var offset = 0L
-        var size: Long? = null
-        while (size == null || offset < size) {
-            val response = session.call("readUpload", buildJsonObject {
-                put("botId", botId)
-                put("uploadId", file.id)
-                put("offset", offset)
-            }).getOrThrow().jsonObject
-            size = response["size"]?.jsonPrimitive?.longOrNull ?: error("Host returned an invalid file size")
-            val encoded = response["data"]?.jsonPrimitive?.contentOrNull.orEmpty()
-            val bytes = if (encoded.isEmpty()) ByteArray(0) else Base64.decode(encoded, Base64.DEFAULT)
-            if (bytes.isEmpty()) break
-            sink.write(bytes)
-            offset += bytes.size
-            require(offset <= size) { "The downloaded file is larger than the host reported" }
+    withContext(Dispatchers.IO) {
+        val output = context.contentResolver.openOutputStream(destination, "w") ?: error("Couldn't open the destination")
+        output.use { sink ->
+            var offset = 0L
+            var size: Long? = null
+            while (size == null || offset < size) {
+                val response = session.call("readUpload", buildJsonObject {
+                    put("botId", botId)
+                    put("uploadId", file.id)
+                    put("offset", offset)
+                }).getOrThrow().jsonObject
+                size = response["size"]?.jsonPrimitive?.longOrNull ?: error("Host returned an invalid file size")
+                val encoded = response["data"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                val bytes = if (encoded.isEmpty()) ByteArray(0) else Base64.decode(encoded, Base64.DEFAULT)
+                if (bytes.isEmpty()) break
+                sink.write(bytes)
+                offset += bytes.size
+                require(offset <= size) { "The downloaded file is larger than the host reported" }
+            }
+            require(offset == size) { "The download ended early (${offset} of $size bytes)" }
         }
-        require(offset == size) { "The download ended early (${offset} of $size bytes)" }
     }
+}
+
+/** Merge the live cache with the complete thread response without sorting every streamed delta. */
+private fun mergeEntriesBySequence(left: List<Entry>, right: List<Entry>): List<Entry> {
+    val merged = ArrayList<Entry>(left.size + right.size)
+    val positions = HashMap<String, Int>(left.size + right.size)
+    fun append(entry: Entry) {
+        val existingIndex = positions[entry.id]
+        if (existingIndex == null) {
+            positions[entry.id] = merged.size
+            merged += entry
+        } else if (merged[existingIndex].rev < entry.rev) {
+            merged[existingIndex] = entry
+        }
+    }
+
+    var leftIndex = 0
+    var rightIndex = 0
+    while (leftIndex < left.size && rightIndex < right.size) {
+        if (left[leftIndex].seq <= right[rightIndex].seq) append(left[leftIndex++])
+        else append(right[rightIndex++])
+    }
+    while (leftIndex < left.size) append(left[leftIndex++])
+    while (rightIndex < right.size) append(right[rightIndex++])
+    return merged
 }

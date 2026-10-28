@@ -32,10 +32,16 @@ fun MarkdownText(
     source: String,
     color: Color,
     modifier: Modifier = Modifier,
+    renderMarkdown: Boolean = true,
 ) {
     val colors = CodyncTheme.colors
-    val blocks = remember(source) { splitMarkdownBlocks(source) }
+    val blocks = remember(source, renderMarkdown) {
+        if (renderMarkdown) splitMarkdownBlocks(source) else emptyList()
+    }
     Column(modifier) {
+        if (!renderMarkdown) {
+            Text(source, color = color, style = CodyncType.body)
+        }
         blocks.forEach { block ->
             when (block) {
                 is MdBlock.Code -> {

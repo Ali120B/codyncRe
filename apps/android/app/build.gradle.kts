@@ -8,14 +8,20 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-val releaseStore = System.getenv("CODYNC_KEYSTORE_FILE")
-val releaseStorePassword = System.getenv("CODYNC_KEYSTORE_PASSWORD")
-val releaseKeyAlias = System.getenv("CODYNC_KEY_ALIAS")
-val releaseKeyPassword = System.getenv("CODYNC_KEY_PASSWORD")
-// local.properties is gitignored; the publishable key is public but environment-specific.
+// Firebase project configuration is supplied per environment and intentionally stays out of git.
+if (listOf("google-services.json", "src/dev/google-services.json", "src/prod/google-services.json")
+        .any { file(it).exists() }) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
+// local.properties is gitignored; signing + clerk config are environment-specific.
 val localProperties = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
+val releaseStore = System.getenv("CODYNC_KEYSTORE_FILE") ?: localProperties.getProperty("releaseStore")
+val releaseStorePassword = System.getenv("CODYNC_KEYSTORE_PASSWORD") ?: localProperties.getProperty("releaseStorePassword")
+val releaseKeyAlias = System.getenv("CODYNC_KEY_ALIAS") ?: localProperties.getProperty("releaseKeyAlias")
+val releaseKeyPassword = System.getenv("CODYNC_KEY_PASSWORD") ?: localProperties.getProperty("releaseKeyPassword")
 val clerkPublishableKey = (
     providers.gradleProperty("clerkPublishableKey").orNull
         ?: System.getenv("CLERK_PUBLISHABLE_KEY")
@@ -32,8 +38,8 @@ android {
         applicationId = "com.pokai.Codync.android"
         minSdk = 31
         targetSdk = 36
-        versionCode = 7
-        versionName = "3.1.0"
+        versionCode = 22
+        versionName = "3.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "CLOUD_URL", "\"https://api.codync.dev\"")
@@ -120,6 +126,8 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.kyant.backdrop)
+    implementation(libs.kyant.shapes)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.clerk.android.api)
     implementation(libs.androidx.navigation.compose)
@@ -135,6 +143,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation(libs.kotlinx.serialization.json)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     testImplementation(libs.junit)
 

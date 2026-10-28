@@ -1,5 +1,5 @@
-//! Push via the Codync relay (it holds the APNs key; the host only holds opaque
-//! per-device tickets the relay issued to the phone).
+//! Push via the Codync relay (it holds APNs/FCM credentials; the host only holds
+//! opaque per-device tickets the relay issued to the phone).
 //!
 //! Alerts cover completion, input requests, and failures;
 //! none are sent while the phone app is connected (it's in the foreground).
@@ -107,14 +107,14 @@ fn faces(hub: &Hub, bot: &BotConfig, from: Option<&str>) -> Vec<Value> {
 /// `bot` is the chat the alert opens; `from` is the member bot speaking when that chat is a group.
 pub fn notify(hub: &Hub, bot: &BotConfig, from: Option<&str>, title: &str, body: &str, kind: AlertKind) {
     purge_dead_tickets(hub);
-    if bot.notify == Some(false) || bot.hidden || hub.ios_connected() {
+    if bot.notify == Some(false) || bot.hidden || hub.is_viewing(&bot.id) {
         return;
     }
     if throttled((bot.id.clone(), kind), Duration::from_secs(5)) {
         return;
     }
     let Some(relay) = relay_url(hub) else { return };
-    // The relay and APNs only see a generic line; the real one is sealed to each device (§6.7).
+    // The relay and push providers only see a generic line; the real one is sealed to each device (§6.7).
     let generic = match kind {
         AlertKind::NeedsInput => "A bot needs your response. Open Codync to review.",
         AlertKind::Done => "Your task is complete. Open Codync to read the result.",
