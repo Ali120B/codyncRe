@@ -22,13 +22,9 @@ Your coding agents, as teammates you can message.
 
 Windows: x64 installer · Linux: AppImage (x86_64 + arm64) · macOS: not published by this fork yet — [all downloads](https://github.com/Ali120B/codyncRe/releases/latest)
 
-[![App Store](https://img.shields.io/badge/App_Store-iOS-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/codync/id6760984418)
-[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/KBAX3Qznxh)
 [![Release](https://img.shields.io/github/v/release/Ali120B/codyncRe?color=black)](https://github.com/Ali120B/codyncRe/releases/latest)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 <br>
-![iOS](https://img.shields.io/badge/iOS-18+-black?logo=apple)
-![macOS](https://img.shields.io/badge/macOS-14+-black?logo=apple)
 ![Windows](https://img.shields.io/badge/Windows-x64-black?logo=windows&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-black?logo=linux&logoColor=white)
 ![Rust](https://img.shields.io/badge/host-Rust-B7410E?logo=rust)
@@ -39,7 +35,6 @@ Windows: x64 installer · Linux: AppImage (x86_64 + arm64) · macOS: not publish
 
 <img src="docs/screenshots/desktop-macos.png" width="760" alt="Codync desktop app on macOS: four bots in the sidebar and the welcome screen with no bot selected">
 
-<a href="https://apps.apple.com/app/codync/id6760984418"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" height="54" alt="Download on the App Store"></a>
 
 </div>
 
@@ -114,11 +109,8 @@ Add `sh -s -- --host-only` for servers and headless machines. Re-run it to upgra
 
 **Windows** — [download codync-windows-x64.exe](https://github.com/Ali120B/codyncRe/releases/latest/download/codync-windows-x64.exe) and run it. It installs for your user and starts the host at sign-in. The installer isn't code-signed yet, so SmartScreen asks you to confirm it once (**More info → Run anyway**). Not on Windows yet: remote screen, on-device speech and the Claude Code status line hook. Details: [desktop app](docs/architecture/desktop-app.md#platform-notes).
 
-**macOS** — this fork doesn't publish Mac builds yet: they wait on Apple signing. Add the Apple signing secrets and set the `MAC_SIGNING` repository variable to publish them, or build from source below (same code as upstream's Mac app).
 
-**iPhone** — [get Codync on the App Store](https://apps.apple.com/app/codync/id6760984418) (iOS 18+, free), then scan the QR code from **Pair iPhone…** in the desktop app or `codync-host pair`.
 
-> **Why the iPhone app can be a version behind:** every iPhone release goes through Apple's App Review first, which usually takes a day or more, so the App Store version can trail the host release. Your computer accounts for that: an update that needs a newer iPhone app waits until that version is in the App Store, then installs.
 
 **Linux** — the host, plus the desktop app:
 
@@ -251,7 +243,7 @@ Clients and the host each name the oldest version of the other they still work w
 ## Contact
 
 - Email: [kevin@codync.dev](mailto:kevin@codync.dev)
-- Questions and bug reports: [GitHub Issues](https://github.com/Ali120B/codyncRe/issues) or [Discord](https://discord.gg/KBAX3Qznxh)
+- Questions and bug reports: [GitHub Issues](https://github.com/Ali120B/codyncRe/issues)
 - Security issues: report privately as described in [SECURITY.md](SECURITY.md) (GitHub private reporting or email)
 - Community rules: [Code of Conduct](CODE_OF_CONDUCT.md)
 
