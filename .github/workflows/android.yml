@@ -78,9 +78,7 @@ jobs:
       - name: Locate APK
         run: find . -name "*.apk" -print
       - name: Upload APK to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
-          echo "Uploading $APK"
-          gh release upload "${GITHUB_REF_NAME}" "$APK" --clobber
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/prod/release/*.apk
+          token: ${{ secrets.GITHUB_TOKEN }}
