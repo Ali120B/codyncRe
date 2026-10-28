@@ -65,20 +65,13 @@ jobs:
         run: yes | sdkmanager --licenses && sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
       - name: Prepare keystore
-        env:
-          CODYNC_KEYSTORE_FILE: ${{ secrets.CODYNC_KEYSTORE_FILE }}
         run: |
-          if [ -n "$CODYNC_KEYSTORE_FILE" ] && echo "$CODYNC_KEYSTORE_FILE" | base64 --decode > codync-release.jks 2>/dev/null && keytool -list -keystore codync-release.jks -storepass "${{ secrets.CODYNC_KEYSTORE_PASSWORD || 'codync-release' }}" >/dev/null 2>&1; then
-            echo "Using provided keystore"
-          else
-            rm -f codync-release.jks
-            keytool -genkeypair -v -keystore codync-release.jks -alias codync -keyalg RSA -keysize 2048 -validity 10000 -storepass codync-release -keypass codync-release -dname "CN=codync,OU=codync,O=codync,L=Sharjah,ST=Sharjah,C=AE"
-          fi
+          keytool -genkeypair -v -keystore codync-release.jks -alias codync -keyalg RSA -keysize 2048 -validity 10000 -storepass codync-release -keypass codync-release -dname "CN=codync,OU=codync,O=codync,L=Sharjah,ST=Sharjah,C=AE"
       - name: Assemble prod release
         env:
-          CODYNC_KEYSTORE_PASSWORD: ${{ secrets.CODYNC_KEYSTORE_PASSWORD || 'codync-release' }}
-          CODYNC_KEY_ALIAS: ${{ secrets.CODYNC_KEY_ALIAS || 'codync' }}
-          CODYNC_KEY_PASSWORD: ${{ secrets.CODYNC_KEY_PASSWORD || 'codync-release' }}
+          CODYNC_KEYSTORE_PASSWORD: codync-release
+          CODYNC_KEY_ALIAS: codync
+          CODYNC_KEY_PASSWORD: codync-release
         run: |
           export CODYNC_KEYSTORE_FILE="$(pwd)/codync-release.jks"
           ./gradlew :app:assembleProdRelease
