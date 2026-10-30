@@ -233,7 +233,7 @@ fun SettingsScreen(
                         },
                         icon = CodyncIcons.Notifications,
                         showChevron = false,
-                        trailing = { CodyncSwitch(pushEnabled, onCheckedChange = ::setPushEnabled, enabled = firebaseConfigured) },
+                        trailing = { CodyncSwitch(pushEnabled, onCheckedChange = ::setPushEnabled, enabled = true) },
                         onClick = { setPushEnabled(!pushEnabled) },
                     )
                 }

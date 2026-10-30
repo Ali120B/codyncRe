@@ -11,7 +11,7 @@ class AppPreferences(context: Context) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     var themeMode: ThemeMode
-        get() = ThemeMode.entries.getOrElse(prefs.getInt(KEY_THEME, ThemeMode.System.ordinal)) { ThemeMode.System }
+        get() = ThemeMode.entries.getOrElse(prefs.getInt(KEY_THEME, ThemeMode.Dark.ordinal)) { ThemeMode.Dark }
         set(value) {
             prefs.edit().putInt(KEY_THEME, value.ordinal).apply()
         }
