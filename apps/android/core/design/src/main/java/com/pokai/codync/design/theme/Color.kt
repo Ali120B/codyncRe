@@ -14,6 +14,8 @@ data class CodyncColors(
     val surface: Color,
     val bubbleAgent: Color,
     val bubbleUser: Color,
+    /** Outgoing chat bubbles only; unlike [bubbleUser] this never tints buttons or switches. */
+    val bubbleSent: Color,
     val border: Color,
     val text: Color,
     val secondary: Color,
@@ -37,9 +39,11 @@ data class CodyncColors(
 val LightCodyncColors = CodyncColors(
     background = Color(0xFFFFFFFF),
     surface = Color(0xFFF4F4F4),
-    bubbleAgent = Color(0xFFF0F0F0),
+    bubbleAgent = Color(0xFFF4F4F4),
     bubbleUser = Color(0xFFE2E2E2),
-    border = Color(0xFFE6E6E6),
+    // WhatsApp-style outgoing tint keeps sent and received bubbles distinct at a glance.
+    bubbleSent = Color(0xFFDCF6D0),
+    border = Color(0xFFE3E3E3),
     text = Color(0xFF141414),
     secondary = Color(0xFF6B6B6B),
     tertiary = Color(0xFF767676),
@@ -64,6 +68,7 @@ val DarkCodyncColors = CodyncColors(
     surface = Color(0xFF141414),
     bubbleAgent = Color(0xFF1C1C1C),
     bubbleUser = Color(0xFF363636),
+    bubbleSent = Color(0xFF1F4A38),
     border = Color(0xFF262626),
     text = Color(0xFFF2F2F2),
     secondary = Color(0xFF9A9A9A),

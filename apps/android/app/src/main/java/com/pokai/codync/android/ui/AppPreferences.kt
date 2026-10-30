@@ -64,6 +64,12 @@ class AppPreferences(context: Context) {
                 .apply()
         }
 
+    var welcomeSeen: Boolean
+        get() = prefs.getBoolean(KEY_WELCOME_SEEN, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_WELCOME_SEEN, value).apply()
+        }
+
     var haptics: Boolean
         get() = prefs.getBoolean(KEY_HAPTICS, true)
         set(value) {
@@ -79,6 +85,7 @@ class AppPreferences(context: Context) {
     companion object {
         private const val PREFS = "codync_prefs"
         private const val KEY_THEME = "theme_mode"
+        private const val KEY_WELCOME_SEEN = "welcome_seen"
         private const val KEY_PUSH = "push"
         private const val KEY_REPLIES = "replies"
         private const val KEY_NEEDS = "needs_you"

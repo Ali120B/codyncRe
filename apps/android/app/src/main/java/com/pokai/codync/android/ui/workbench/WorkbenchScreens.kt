@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -76,11 +77,6 @@ internal fun WorkbenchScaffold(
     content: @Composable () -> Unit,
 ) {
     val colors = CodyncTheme.colors
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(16)
-        shown = true
-    }
     Column(
         Modifier
             .fillMaxSize()
@@ -100,12 +96,9 @@ internal fun WorkbenchScaffold(
             }
             trailing?.invoke()
         }
-        AnimatedVisibility(
-            visible = shown,
-            enter = fadeIn() + slideInVertically { it / 16 },
-            exit = fadeOut(),
-            modifier = Modifier.weight(1f),
-        ) { content() }
+        // The navigation transition already animates the page; the page contents must arrive
+        // fully rendered instead of fading in item by item.
+        Box(Modifier.weight(1f)) { content() }
     }
 }
 
@@ -356,7 +349,8 @@ private fun Field(label: String, value: String, singleLine: Boolean = true, onCh
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(colors.surface)
+            .background(colors.background)
+            .border(0.7.dp, colors.border, RoundedCornerShape(12.dp))
             .padding(12.dp)
             .then(if (!singleLine) Modifier.height(88.dp) else Modifier),
     )

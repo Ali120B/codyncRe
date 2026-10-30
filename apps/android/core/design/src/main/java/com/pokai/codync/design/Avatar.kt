@@ -4,10 +4,17 @@ import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint as AndroidPaint
 import android.graphics.Region
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,16 +64,44 @@ fun CharacterAvatar(
     val colors = CodyncTheme.colors
     val ink = if (colors.isDark) Color(0xFFF2F2F2) else Color(0xFF141414)
     val dots = remember(shapeId, size) { buildDotGrid(shapeId, size.value) }
+    // Read inside the draw scope below so motion invalidates drawing, not composition.
+    val phase: State<Float> = rememberAvatarPhase(mood)
 
     Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
             val px = this.size.minDimension
             if (statusRing != null) {
-                drawPath(avatarPath(shapeId, px, px), statusRing.copy(alpha = 0.22f), style = Stroke(width = px * 0.08f))
+                val ringPulse = if (mood == AvatarMood.Working) 0.18f + 0.10f * sin(phase.value) else 0.22f
+                drawPath(avatarPath(shapeId, px, px), statusRing.copy(alpha = ringPulse), style = Stroke(width = px * 0.08f))
             }
-            drawDottedCharacter(dots = dots, sizePx = px, fill = fill, ink = ink, mood = mood)
+            drawDottedCharacter(dots = dots, sizePx = px, fill = fill, ink = ink, mood = mood, phase = phase.value)
         }
     }
+}
+
+/**
+ * Working bots look around and shimmer, like the desktop characters. Idle bots breathe slowly;
+ * bots waiting on you pulse. The value is read at draw time by [CharacterAvatar].
+ */
+@Composable
+private fun rememberAvatarPhase(mood: AvatarMood): State<Float> {
+    val motion = rememberInfiniteTransition(label = "avatar-motion")
+    return motion.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = when (mood) {
+                    AvatarMood.Working -> 2800
+                    AvatarMood.NeedsInput -> 4200
+                    AvatarMood.Idle -> 7200
+                },
+                easing = LinearEasing,
+            ),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "avatar-phase",
+    )
 }
 
 private data class Dot(val row: Int, val col: Int, val nx: Float, val ny: Float)
@@ -102,6 +137,7 @@ private fun DrawScope.drawDottedCharacter(
     fill: Color,
     ink: Color,
     mood: AvatarMood,
+    phase: Float,
 ) {
     val cells = when {
         sizePx < 18f * density -> 7
@@ -120,15 +156,23 @@ private fun DrawScope.drawDottedCharacter(
         else -> listOf(2, 3)
     }
     val half = sizePx / 2f
-    val yaw = when (mood) {
+    val baseYaw = when (mood) {
         AvatarMood.Working -> 0.4f
         AvatarMood.NeedsInput -> -0.2f
         AvatarMood.Idle -> -0.7f
     }
+    // Working characters sweep their gaze left and right; waiting ones drift; idle breathes.
+    val look = when (mood) {
+        AvatarMood.Working -> sin(phase) * 0.85f + sin(phase * 0.37f) * 0.15f
+        AvatarMood.NeedsInput -> sin(phase * 0.8f) * 0.35f
+        AvatarMood.Idle -> sin(phase * 0.5f) * 0.12f
+    }
+    val yaw = baseYaw + look
     val lx = sin(yaw.toDouble()).toFloat() * 0.8f
     val ly = 0.55f
     val lz = cos(yaw.toDouble()).toFloat() * 0.5f + 0.6f
     val ll = hypot3(lx, ly, lz)
+    val shimmer = if (mood == AvatarMood.Working) 0.12f else 0f
 
     for (d in dots) {
         if (d.col in eyeColumns && d.row in eyeRows) continue
@@ -142,6 +186,10 @@ private fun DrawScope.drawDottedCharacter(
         if (mood == AvatarMood.NeedsInput) {
             val ripple = 0.5f + 0.5f * sin(hypot(u.toDouble(), v.toDouble()) * 9.0).toFloat()
             shade *= 0.6f + 0.4f * ripple
+        }
+        if (shimmer > 0f) {
+            // A travelling highlight gives the working face its moving colour.
+            shade = (shade + shimmer * sin(phase * 2f + d.nx * 5.2f + d.ny * 3.1f)).coerceIn(0.08f, 1f)
         }
         val radius = step * 0.42f * (0.55f + 0.45f * shade)
         val inkA = if (cells < 13) 0.4f + 0.4f * shade else 0.2f + 0.4f * min(1f, shade / 0.7f)

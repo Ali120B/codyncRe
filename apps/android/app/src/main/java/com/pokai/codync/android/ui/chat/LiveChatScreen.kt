@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -89,6 +90,7 @@ import androidx.compose.ui.unit.sp
 import com.pokai.codync.data.SessionStore
 import com.pokai.codync.data.EntryTimeline
 import com.pokai.codync.model.isChatVisible
+import com.pokai.codync.android.ui.avatarMoodFor
 import com.pokai.codync.design.CharacterAvatar
 import com.pokai.codync.design.CodyncIcon
 import com.pokai.codync.design.CodyncIcons
@@ -423,7 +425,13 @@ fun LiveChatScreen(
                     if (currentBot.kind == "group") {
                         ChatGroupAvatar(currentBot.members.mapNotNull { id -> botRoster.firstOrNull { it.id == id } })
                     } else {
-                        CharacterAvatar(currentBot.name, currentBot.avatarColor, currentBot.avatarShape, size = 32.dp)
+                        CharacterAvatar(
+                            currentBot.name,
+                            currentBot.avatarColor,
+                            currentBot.avatarShape,
+                            size = 32.dp,
+                            mood = avatarMoodFor(currentBot.status),
+                        )
                     }
                     Column(Modifier.weight(1f)) {
                         Text(currentBot.name, color = colors.text, style = CodyncType.body, maxLines = 1)
@@ -481,7 +489,7 @@ fun LiveChatScreen(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
             val threadRoot = rootEntry
             if (threadMode && threadRoot != null) {
@@ -500,9 +508,24 @@ fun LiveChatScreen(
                     SearchField(value = findQuery, onValueChange = { findQuery = it }, placeholder = "Find in chat", modifier = Modifier.padding(bottom = 4.dp))
                 }
             }
-            items(visibleEntries, key = { it.id }, contentType = { it.kind }) { entry ->
+            itemsIndexed(
+                items = visibleEntries,
+                key = { _, entry -> entry.id },
+                contentType = { _, entry -> entry.kind },
+            ) { index, entry ->
                 val text = entry.data.text ?: entry.data.output ?: entry.data.detail ?: entry.data.heading.orEmpty()
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val previous = visibleEntries.getOrNull(index - 1)
+                // WhatsApp-style grouping: a small gap inside one voice, a clear break when the
+                // speaker or message kind changes.
+                val newVoice = previous != null && (
+                    previous.kind != entry.kind ||
+                        previous.data.author != entry.data.author ||
+                        entry.kind == "user"
+                    )
+                Column(
+                    modifier = Modifier.padding(top = if (newVoice) 12.dp else 0.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                 when (entry.kind) {
                     "user" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
                         CodyncMenuAnchor(
@@ -536,8 +559,9 @@ fun LiveChatScreen(
                             },
                         ) {
                             Column(
-                                Modifier.wrapContentWidth().clip(RoundedCornerShape(18.dp))
-                                    .background(colors.bubbleUser)
+                                Modifier.wrapContentWidth()
+                                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 6.dp, bottomEnd = 18.dp, bottomStart = 18.dp))
+                                    .background(colors.bubbleSent)
                                     .combinedClickable(
                                         onClick = {},
                                         onLongClick = { contextMessage = entry.id },
@@ -568,7 +592,13 @@ fun LiveChatScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                                 ) {
-                                    CharacterAvatar(author.name, author.avatarColor, author.avatarShape, size = 23.dp)
+                                    CharacterAvatar(
+                                        author.name,
+                                        author.avatarColor,
+                                        author.avatarShape,
+                                        size = 23.dp,
+                                        mood = avatarMoodFor(author.status),
+                                    )
                                     Text(author.name, color = colors.secondary, style = CodyncType.caption)
                                 }
                             }
@@ -604,10 +634,12 @@ fun LiveChatScreen(
                                 )) }
                             } else emptyList(),
                         ) {
+                            val agentShape = RoundedCornerShape(topStart = 6.dp, topEnd = 18.dp, bottomEnd = 18.dp, bottomStart = 18.dp)
                             Column(
                                 Modifier.wrapContentWidth()
-                                    .clip(RoundedCornerShape(18.dp))
-                                    .background(colors.surface)
+                                    .clip(agentShape)
+                                    .background(colors.bubbleAgent)
+                                    .border(0.6.dp, colors.border.copy(alpha = 0.8f), agentShape)
                                     .combinedClickable(onClick = {}, onLongClick = {
                                         if (entry.data.final == true) contextMessage = entry.id
                                     })

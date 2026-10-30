@@ -1,7 +1,12 @@
 package com.pokai.codync.android
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -36,6 +41,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -51,6 +57,7 @@ import com.pokai.codync.android.ui.AppTab
 import com.pokai.codync.android.ui.BotLink
 import com.pokai.codync.android.ui.TabsScreen
 import com.pokai.codync.android.ui.ThemeMode
+import com.pokai.codync.android.ui.WelcomeScreen
 import com.pokai.codync.android.ui.chat.LiveChatScreen
 import com.pokai.codync.android.ui.debug.GlassLabScreen
 import com.pokai.codync.android.ui.pairing.PairingScreen
@@ -62,14 +69,17 @@ import com.pokai.codync.android.ui.workbench.LiveExtensionsScreen
 import com.pokai.codync.android.ui.workbench.WorkbenchHomeScreen
 import com.pokai.codync.model.Bot
 import com.pokai.codync.transport.PairUrl
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.pokai.codync.design.GlassConfig
 import com.pokai.codync.design.LocalGlassConfig
+import com.pokai.codync.design.ProvideGlassMenuHost
 import com.pokai.codync.design.theme.CodyncTheme
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 private object Routes {
+    const val Welcome = "welcome"
     const val Tabs = "tabs"
     const val Search = "search"
     const val GlassLab = "glass-lab"
@@ -122,6 +132,8 @@ fun CodyncApp(
     var themeMode by rememberSaveable { mutableStateOf(prefs.themeMode) }
     var glassConfig by remember { mutableStateOf(prefs.glassConfig) }
     var selectedTab by rememberSaveable { mutableStateOf(AppTab.Home) }
+    // Upgrade path: installs that already paired a computer skip the first-run screen.
+    val firstRun = remember { !prefs.welcomeSeen && !application.hasExistingSetup() }
     val dark = when (themeMode) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
@@ -145,7 +157,9 @@ fun CodyncApp(
     var foreground by remember {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
     }
-    var viewingBot by remember { mutableStateOf<String?>(null) }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -167,14 +181,22 @@ fun CodyncApp(
 
     LaunchedEffect(surface) { AppPresence.surface(context, surface) }
 
-    // The host may only suppress pushes for the exact chat this phone is actively showing.
-    // Leaving the chat, switching tabs or backgrounding the app clears the viewing state.
-    LaunchedEffect(foreground, surface) {
-        val next = if (foreground && surface.startsWith("chat:")) surface.substringAfterLast(':') else null
-        if (next != viewingBot) {
-            hostSession.store.setViewing(next)
-            viewingBot = next
+    LaunchedEffect(firstRun) {
+        if (!firstRun && !prefs.welcomeSeen) prefs.welcomeSeen = true
+    }
+
+    LaunchedEffect(Unit) {
+        // Ask once, up front: Android 13+ silently drops every notification without this grant.
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+        // A killed process never cleared its last "viewing" report; the host queue must not
+        // keep suppressing alerts for that old chat.
+        hostSession.store.setViewing(null)
     }
 
     LaunchedEffect(pairingLink) {
@@ -263,9 +285,11 @@ fun CodyncApp(
                     .fillMaxSize()
                     .background(CodyncTheme.colors.background),
             ) {
+                val menuBackdrop = rememberLayerBackdrop()
+                ProvideGlassMenuHost(backdrop = menuBackdrop) {
                 NavHost(
                     navController = nav,
-                    startDestination = Routes.Tabs,
+                    startDestination = if (firstRun) Routes.Welcome else Routes.Tabs,
                     modifier = Modifier.fillMaxSize(),
                     enterTransition = {
                         fadeIn(FastIn) + slideInHorizontally(FastSlide) { it / 14 }
@@ -276,6 +300,16 @@ fun CodyncApp(
                         fadeOut(FastOut) + slideOutHorizontally(FastSlide) { it / 14 }
                     },
                 ) {
+                    composable(Routes.Welcome) {
+                        WelcomeScreen(
+                            onContinue = {
+                                prefs.welcomeSeen = true
+                                nav.navigate(Routes.Tabs) {
+                                    popUpTo(Routes.Welcome) { inclusive = true }
+                                }
+                            },
+                        )
+                    }
                     composable(Routes.Tabs) {
                         TabsScreen(
                             session = hostSession.store,
@@ -496,6 +530,7 @@ fun CodyncApp(
                             },
                         )
                     }
+                }
                 }
             }
         }

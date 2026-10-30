@@ -5,13 +5,19 @@ import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -24,13 +30,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.pokai.codync.data.SessionStore
+import com.pokai.codync.design.CodyncIcon
+import com.pokai.codync.design.CodyncIcons
 import com.pokai.codync.design.SecondaryButton
 import com.pokai.codync.design.theme.CodyncTheme
 import com.pokai.codync.design.theme.CodyncType
@@ -165,20 +178,74 @@ private fun ChatImage(session: SessionStore, source: ChatImageSource, name: Stri
     }
 
     if (viewing && bitmap != null) {
-        Dialog(
-            onDismissRequest = { viewing = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Box(
-                Modifier.fillMaxSize().background(Color.Black).clickable { viewing = false },
-                contentAlignment = Alignment.Center,
+        ChatImageViewer(bitmap = bitmap!!, name = name, onClose = { viewing = false })
+    }
+}
+
+/** Full-screen viewer for received and sent images, with pinch zoom and double-tap zoom. */
+@Composable
+private fun ChatImageViewer(bitmap: ImageBitmap, name: String, onClose: () -> Unit) {
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val transform = rememberTransformableState { zoomChange, panChange, _ ->
+        val next = (scale * zoomChange).coerceIn(1f, 5f)
+        scale = next
+        offset = if (next > 1f) offset + panChange else Offset.Zero
+    }
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { if (scale <= 1.01f) onClose() },
+                            onDoubleTap = {
+                                scale = if (scale > 1.01f) 1f else 2.5f
+                                offset = Offset.Zero
+                            },
+                        )
+                    }
+                    .transformable(transform)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        translationX = offset.x
+                        translationY = offset.y
+                    },
+            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopStart)
+                    .padding(horizontal = 14.dp, vertical = 34.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Image(
-                    bitmap = bitmap!!,
-                    contentDescription = name,
-                    modifier = Modifier.fillMaxSize().padding(16.dp),
-                    contentScale = ContentScale.Fit,
+                Text(
+                    name,
+                    color = Color.White,
+                    style = CodyncType.footnote,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                Box(
+                    Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.18f))
+                        .clickable(onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CodyncIcon(CodyncIcons.Close, tint = Color.White, size = 19.dp, contentDescription = "Close image")
+                }
             }
         }
     }

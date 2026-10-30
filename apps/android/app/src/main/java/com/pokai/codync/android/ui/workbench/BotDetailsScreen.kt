@@ -167,6 +167,7 @@ private fun BotDetailsPanel(
                                 shapeId = member.avatarShape,
                                 modifier = Modifier.align(Alignment.CenterStart).offset(x = (index * avatarOverlap).dp),
                                 size = 46.dp,
+                                mood = com.pokai.codync.android.ui.avatarMoodFor(current.status),
                             )
                         }
                     }
@@ -176,6 +177,7 @@ private fun BotDetailsPanel(
                         colorId = current.avatarColor,
                         shapeId = current.avatarShape,
                         size = 58.dp,
+                        mood = com.pokai.codync.android.ui.avatarMoodFor(current.status),
                     )
                 }
                 Text(current.name, color = colors.text, style = CodyncType.title)

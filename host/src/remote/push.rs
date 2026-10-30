@@ -107,7 +107,11 @@ fn faces(hub: &Hub, bot: &BotConfig, from: Option<&str>) -> Vec<Value> {
 /// `bot` is the chat the alert opens; `from` is the member bot speaking when that chat is a group.
 pub fn notify(hub: &Hub, bot: &BotConfig, from: Option<&str>, title: &str, body: &str, kind: AlertKind) {
     purge_dead_tickets(hub);
-    if bot.notify == Some(false) || bot.hidden || hub.is_viewing(&bot.id) {
+    // Do not drop alerts for a chat the phone last reported as open: a killed app never
+    // clears that report, and the phone's own FCM service already suppresses alerts while
+    // the exact chat is on screen in the foreground. The room-level `notify` switch and
+    // hidden bots still opt out.
+    if bot.notify == Some(false) || bot.hidden {
         return;
     }
     if throttled((bot.id.clone(), kind), Duration::from_secs(5)) {

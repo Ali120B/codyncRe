@@ -1,6 +1,7 @@
 package com.pokai.codync.android.ui.roster
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -436,7 +437,12 @@ private fun GroupField(
             maxLines = if (singleLine) 1 else 8,
             textStyle = TextStyle(color = colors.text, fontSize = 15.sp, fontFamily = CodyncType.body.fontFamily),
             cursorBrush = SolidColor(colors.text),
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(colors.surface).padding(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.surface)
+                .border(0.7.dp, colors.border, RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             decorationBox = { inner ->
                 Box {
                     if (value.isBlank()) Text(placeholder, color = colors.tertiary, style = CodyncType.body)

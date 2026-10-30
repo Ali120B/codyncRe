@@ -9,6 +9,11 @@ class CodyncApplication : Application() {
         AndroidHostSession(applicationContext)
     }
 
+    /** True when this install already paired a computer, i.e. it is not a fresh install. */
+    fun hasExistingSetup(): Boolean =
+        getSharedPreferences("codync_host_session", MODE_PRIVATE)
+            .getString("paired_computers", null)?.isNotBlank() == true
+
     override fun onCreate() {
         super.onCreate()
         AppPresence.clear(this)

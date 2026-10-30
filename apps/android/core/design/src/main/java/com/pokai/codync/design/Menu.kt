@@ -261,15 +261,15 @@ fun CodyncMenuAnchor(
     offset: DpOffset = DpOffset(0.dp, 4.dp),
     content: @Composable () -> Unit,
 ) {
-    Box(modifier) {
-        content()
-        CodyncMenu(
-            expanded = expanded,
-            onDismissRequest = onDismissRequest,
-            items = items,
-            offset = offset,
-        )
-    }
+    GlassMenuAnchorContent(
+        expanded = expanded,
+        onDismissRequest = onDismissRequest,
+        items = items,
+        offset = offset,
+        modifier = modifier,
+        fallback = { CodyncMenu(expanded, onDismissRequest, items, offset = offset) },
+        content = content,
+    )
 }
 
 @Composable

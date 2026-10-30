@@ -7,6 +7,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.pokai.codync.data.SessionStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,9 @@ class AndroidPushManager(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val token = MutableStateFlow(hostPrefs.getString(KEY_TOKEN, null))
     private val enabled = MutableStateFlow(appPrefs.getBoolean(KEY_PUSH_ENABLED, true))
+    // A registration can land while a host is still starting up or the relay is briefly down.
+    // Re-register periodically instead of waiting for the socket to change state again.
+    private val retry = MutableStateFlow(0)
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { preferences, key ->
         when {
             preferences === hostPrefs && key == KEY_TOKEN -> token.value = hostPrefs.getString(KEY_TOKEN, null)
@@ -60,14 +64,21 @@ class AndroidPushManager(
         }.distinctUntilChanged()
 
         scope.launch {
-            combine(targets, token, enabled) { current, fcmToken, notificationsEnabled ->
-                SyncRequest(current, fcmToken, notificationsEnabled)
+            while (true) {
+                delay(REGISTER_RETRY_MS)
+                retry.value += 1
+            }
+        }
+
+        scope.launch {
+            combine(targets, token, enabled, retry) { current, fcmToken, notificationsEnabled, attempt ->
+                SyncRequest(current, fcmToken, notificationsEnabled, attempt)
             }.distinctUntilChanged().collect { request ->
+                val ticket = if (request.enabled && request.token != null) runCatching { relayTicket(request.token) }.getOrNull() else null
                 request.targets.forEach { (computerId, target) ->
                     // Each host owns its own ticket and must know when this phone is reachable.
-                    if (target.connected && request.enabled && request.token != null) {
+                    if (target.connected && request.enabled && ticket != null) {
                         runCatching {
-                            val ticket = relayTicket(request.token)
                             store.callOn(computerId, "registerDevice", buildJsonObject {
                                 put("ticket", ticket)
                                 put("relay", RELAY_URL)
@@ -79,7 +90,7 @@ class AndroidPushManager(
                             if (failure is CancellationException) throw failure
                             android.util.Log.w(TAG, "Couldn't register push on $computerId", failure)
                         }
-                    } else if (!request.enabled) {
+                    } else if (target.connected && !request.enabled) {
                         store.callOn(computerId, "unregisterDevice", buildJsonObject {}).onFailure {
                             android.util.Log.w(TAG, "Couldn't unregister push on $computerId", it)
                         }
@@ -123,6 +134,7 @@ class AndroidPushManager(
         val targets: Map<String, Target>,
         val token: String?,
         val enabled: Boolean,
+        val attempt: Int = 0,
     )
 
     companion object {
@@ -132,6 +144,7 @@ class AndroidPushManager(
         private const val APP_PREFS = "codync_prefs"
         private const val KEY_TOKEN = "fcm_token"
         private const val KEY_PUSH_ENABLED = "push"
+        private const val REGISTER_RETRY_MS = 60 * 1000L
 
         fun saveUpdatedToken(context: Context, token: String) {
             context.applicationContext.getSharedPreferences(HOST_PREFS, Context.MODE_PRIVATE)

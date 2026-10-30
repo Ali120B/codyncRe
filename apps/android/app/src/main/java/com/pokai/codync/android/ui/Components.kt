@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.pokai.codync.design.AvatarMood
 import com.pokai.codync.design.CodyncIcon
 import com.pokai.codync.design.CodyncIcons
 import com.pokai.codync.design.Symbol
@@ -117,13 +118,14 @@ fun SearchField(
 
 @Composable
 fun BotIdentityAvatar(bot: Bot, roster: List<Bot>, size: androidx.compose.ui.unit.Dp = 42.dp) {
+    val mood = avatarMoodFor(bot.status)
     if (bot.kind != "group") {
-        com.pokai.codync.design.CharacterAvatar(bot.name, bot.avatarColor, bot.avatarShape, size = size)
+        com.pokai.codync.design.CharacterAvatar(bot.name, bot.avatarColor, bot.avatarShape, size = size, mood = mood)
         return
     }
     val members = bot.members.take(2).mapNotNull { memberId -> roster.firstOrNull { it.id == memberId } }
     if (members.isEmpty()) {
-        com.pokai.codync.design.CharacterAvatar(bot.name, bot.avatarColor, bot.avatarShape, size = size)
+        com.pokai.codync.design.CharacterAvatar(bot.name, bot.avatarColor, bot.avatarShape, size = size, mood = mood)
         return
     }
     val faceSize = size * 0.68f
@@ -134,10 +136,17 @@ fun BotIdentityAvatar(bot: Bot, roster: List<Bot>, size: androidx.compose.ui.uni
                 colorId = member.avatarColor,
                 shapeId = member.avatarShape,
                 size = faceSize,
+                mood = mood,
                 modifier = Modifier.align(if (index == 0) Alignment.CenterStart else Alignment.CenterEnd),
             )
         }
     }
+}
+
+fun avatarMoodFor(status: String?): AvatarMood = when (status) {
+    "working" -> AvatarMood.Working
+    "needsInput", "error" -> AvatarMood.NeedsInput
+    else -> AvatarMood.Idle
 }
 
 @Composable

@@ -9,7 +9,10 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.shapes.RoundedRectangle
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -212,6 +215,12 @@ private fun BottomNav(
     // Follow the finger — no waiting for settledPage.
     val pagePos = pagerState.currentPage + pagerState.currentPageOffsetFraction
     val nearest = pagePos.roundToInt().coerceIn(0, AppTab.entries.lastIndex)
+    // A soft spring makes the selection pill settle instead of snapping with the pager.
+    val pillPos by animateFloatAsState(
+        targetValue = pagePos,
+        animationSpec = spring(dampingRatio = 0.78f, stiffness = 520f),
+        label = "nav-pill",
+    )
 
     Box(
         modifier
@@ -238,7 +247,7 @@ private fun BottomNav(
             val pillInset = 5.dp
             val pillWidth = tabWidth - pillInset * 2
             val pillOffsetPx = with(density) {
-                (tabWidth * pagePos + pillInset).roundToPx()
+                (tabWidth * pillPos + pillInset).roundToPx()
             }
 
             Box(
@@ -274,6 +283,7 @@ private fun BottomNav(
                     key(item) {
                         val selected = index == nearest
                         val interaction = remember { MutableInteractionSource() }
+                        val pressed by interaction.collectIsPressedAsState()
                         // Soft weight toward the nearest page while swiping.
                         val proximity = (1f - kotlin.math.abs(pagePos - index)).coerceIn(0f, 1f)
                         val tint = androidx.compose.ui.graphics.lerp(colors.tertiary, colors.text, proximity)
@@ -293,7 +303,7 @@ private fun BottomNav(
                                         } else onReselect(item)
                                     },
                                 )
-                                .scale(1f + 0.04f * proximity),
+                                .scale(if (pressed) 0.90f else 1f + 0.04f * proximity),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
                         ) {

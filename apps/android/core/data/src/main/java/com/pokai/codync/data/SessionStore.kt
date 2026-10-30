@@ -264,8 +264,9 @@ class SessionStore(
     }
 
     /**
-     * Tells the host whether this device is actively looking at a chat, so pushes can be
-     * suppressed only for what is actually on screen. A null bot clears every computer.
+     * Tells the host whether this device is actively looking at a chat. Android no longer uses
+     * this for alert suppression (the FCM service decides based on the live activity), but the
+     * call stays for parity with the iPhone client. A null bot clears every computer.
      */
     suspend fun setViewing(botId: String?) {
         if (botId == null) {

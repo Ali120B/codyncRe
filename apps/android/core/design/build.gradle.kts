@@ -36,7 +36,10 @@ dependencies {
     api(libs.androidx.compose.material3)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.activity.compose)
     api(libs.haze)
+    api(libs.kyant.backdrop)
+    api(libs.kyant.shapes)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
