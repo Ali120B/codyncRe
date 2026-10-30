@@ -80,6 +80,7 @@ fun LiveBotEditor(
     session: SessionStore,
     bot: Bot,
     initialSection: String = "Overview",
+    initialComputerId: String? = null,
     onCancel: () -> Unit,
     onSaved: () -> Unit,
     onDeleted: () -> Unit,
@@ -88,7 +89,27 @@ fun LiveBotEditor(
     val scope = rememberCoroutineScope()
     val creatingBot = bot.id.isBlank()
     val allBots by session.bots().collectAsState(initial = emptyList())
-    val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
+    val computers by session.computers().collectAsState(initial = emptyList())
+    var targetComputerId by remember(bot.id) {
+        mutableStateOf(
+            if (creatingBot) initialComputerId ?: session.activeComputerId().orEmpty()
+            else session.computerIdForBot(bot.id).orEmpty(),
+        )
+    }
+    LaunchedEffect(computers, creatingBot, bot.id) {
+        val known = computers.any { it.id == targetComputerId }
+        if (!known) {
+            targetComputerId = if (creatingBot) {
+                initialComputerId ?: session.activeComputerId() ?: computers.firstOrNull()?.id.orEmpty()
+            } else {
+                session.computerIdForBot(bot.id) ?: computers.firstOrNull()?.id.orEmpty()
+            }
+        }
+    }
+    val targetComputer = computers.firstOrNull { it.id == targetComputerId }
+    val connection by session.connectionForComputer(targetComputerId).collectAsState(
+        initial = com.pokai.codync.transport.ConnectionState(computer = targetComputer),
+    )
     val backends = connection.hello?.backends.orEmpty()
     val isGroup = bot.kind == "group"
     var name by remember(bot.id) { mutableStateOf(if (creatingBot) "" else bot.name) }
@@ -127,6 +148,7 @@ fun LiveBotEditor(
     var confirmGroupDeleteForMemberRemoval by remember(bot.id) { mutableStateOf(false) }
     var roleId by remember(bot.id) { mutableStateOf("") }
     var roleMenuOpen by remember(bot.id) { mutableStateOf(false) }
+    var computerMenuOpen by remember(bot.id) { mutableStateOf(false) }
     var workspacePickerOpen by remember(bot.id) { mutableStateOf(false) }
     var settingsQuery by remember(bot.id) { mutableStateOf("") }
     var expandedSection by remember(bot.id) { mutableStateOf(initialSection) }
@@ -174,32 +196,32 @@ fun LiveBotEditor(
         }
     }
 
-    LaunchedEffect(creatingBot, backends) {
+    LaunchedEffect(creatingBot, backends, targetComputerId) {
         if (creatingBot && backend.isBlank()) {
             backend = backends.firstOrNull { it.available && it.curated == true }?.id
                 ?: backends.firstOrNull { it.available }?.id.orEmpty()
         }
     }
 
-    LaunchedEffect(backend, connection.hello?.hostId) {
+    LaunchedEffect(backend, targetComputerId, connection.hello?.hostId) {
         modelCatalog = null
         modelError = null
-        if (isGroup || backend.isBlank() || backend == "custom" || connection.hello == null) return@LaunchedEffect
+        if (isGroup || backend.isBlank() || backend == "custom" || connection.hello == null || targetComputerId.isBlank()) return@LaunchedEffect
         modelLoading = true
-        session.call("agentModels", buildJsonObject { put("backend", backend) })
+        session.callOn(targetComputerId, "agentModels", buildJsonObject { put("backend", backend) })
             .onSuccess { modelCatalog = runCatching { it.jsonObject }.getOrNull() }
             .onFailure { modelError = it.message ?: "Couldn't load the agent's models" }
         modelLoading = false
     }
 
-    LaunchedEffect(bot.id, connection.hello?.hostId) {
-        if (connection.hello == null || isGroup) return@LaunchedEffect
-        session.call("connectors", buildJsonObject {}).onSuccess { response ->
+    LaunchedEffect(bot.id, targetComputerId, connection.hello?.hostId) {
+        if (connection.hello == null || isGroup || targetComputerId.isBlank()) return@LaunchedEffect
+        session.callOn(targetComputerId, "connectors", buildJsonObject {}).onSuccess { response ->
             val items = response.jsonObject["items"]?.jsonArray?.mapNotNull { runCatching { it.jsonObject }.getOrNull() }.orEmpty()
             installedConnectors = items
             if (creatingBot) enabledConnectors = items.mapNotNull { it.editorText("id") }.toSet()
         }.onFailure { error = it.message ?: "Couldn't load installed connectors" }
-        session.call("skills", buildJsonObject {}).onSuccess { response ->
+        session.callOn(targetComputerId, "skills", buildJsonObject {}).onSuccess { response ->
             val items = response.jsonObject["items"]?.jsonArray?.mapNotNull { runCatching { it.jsonObject }.getOrNull() }.orEmpty()
             installedSkills = items
             if (creatingBot) enabledSkills = items.mapNotNull { it.editorText("id") }.toSet()
@@ -254,7 +276,11 @@ fun LiveBotEditor(
                     }
                 }
             }
-            val result = session.call(if (creatingBot) "createBot" else "updateBot", patch)
+            val result = if (targetComputerId.isBlank()) {
+                Result.failure(IllegalStateException("Choose a computer for this bot"))
+            } else {
+                session.callOn(targetComputerId, if (creatingBot) "createBot" else "updateBot", patch)
+            }
             saving = false
             if (result.isSuccess) onSaved()
             else error = result.exceptionOrNull()?.message ?: "The host rejected these changes"
@@ -290,7 +316,11 @@ fun LiveBotEditor(
             isGroup -> "Edit group"
             else -> "Edit bot"
         },
-        subtitle = if (isGroup) "Members, room tools and instructions" else "Name, model, workspace and tools",
+        subtitle = when {
+            creatingBot -> targetComputer?.let { "Creating on ${it.name}" } ?: "Choose a computer"
+            isGroup -> "Members, room tools and instructions"
+            else -> targetComputer?.let { "${it.name} · name, model, workspace and tools" } ?: "Name, model, workspace and tools"
+        },
         onBack = onCancel,
     ) {
         Column(Modifier.fillMaxSize().navigationBarsPadding()) {
@@ -330,6 +360,44 @@ fun LiveBotEditor(
                                 Text("Tap the avatar to shuffle its look. Choose a role, then edit anything below.", color = colors.tertiary, style = CodyncType.caption)
                             }
                             Field("Name", name, singleLine = true) { name = it }
+                            Text("Computer", color = colors.tertiary, style = CodyncType.caption)
+                            CodyncMenuAnchor(
+                                expanded = computerMenuOpen,
+                                onDismissRequest = { computerMenuOpen = false },
+                                items = computers.map { host ->
+                                    CodyncMenuItem(
+                                        label = host.name,
+                                        symbol = if (host.id == targetComputerId) CodyncIcons.Done else CodyncIcons.Computer,
+                                        onClick = {
+                                            computerMenuOpen = false
+                                            if (host.id != targetComputerId) {
+                                                targetComputerId = host.id
+                                                backend = ""
+                                                command = ""
+                                                model = ""
+                                                modelOptions = emptyMap()
+                                                workspace = ""
+                                                installedConnectors = emptyList()
+                                                installedSkills = emptyList()
+                                                enabledConnectors = emptySet()
+                                                enabledSkills = emptySet()
+                                            }
+                                        },
+                                    )
+                                },
+                            ) {
+                                SettingsRow(
+                                    title = targetComputer?.name ?: "No computer paired",
+                                    subtitle = when {
+                                        targetComputer == null -> "Pair a computer before creating a bot"
+                                        connection.kind == com.pokai.codync.transport.TransportKind.Offline -> "Offline · the editor reconnects before saving"
+                                        else -> "This bot will live on this computer"
+                                    },
+                                    icon = CodyncIcons.Computer,
+                                    onClick = { if (computers.size > 1) computerMenuOpen = true },
+                                    showChevron = computers.size > 1,
+                                )
+                            }
                             Text("Starting role", color = colors.tertiary, style = CodyncType.caption)
                             CodyncMenuAnchor(
                                 expanded = roleMenuOpen,
@@ -820,6 +888,7 @@ fun LiveBotEditor(
     if (workspacePickerOpen) {
         HostFolderPickerDialog(
             session = session,
+            computerId = targetComputerId,
             initialPath = connection.hello?.home,
             onDismiss = { workspacePickerOpen = false },
             onSelect = { workspace = it; workspacePickerOpen = false },
@@ -845,7 +914,7 @@ fun LiveBotEditor(
                     onClick = {
                         scope.launch {
                             saving = true
-                            val result = session.call("deleteBot", buildJsonObject { put("botId", bot.id) })
+                            val result = session.callOn(targetComputerId, "deleteBot", buildJsonObject { put("botId", bot.id) })
                             saving = false
                             confirmDelete = false
                             if (result.isSuccess) onDeleted()
@@ -871,7 +940,7 @@ fun LiveBotEditor(
                     onClick = {
                         scope.launch {
                             saving = true
-                            val result = session.call("deleteBot", buildJsonObject { put("botId", bot.id) })
+                            val result = session.callOn(targetComputerId, "deleteBot", buildJsonObject { put("botId", bot.id) })
                             saving = false
                             confirmGroupDeleteForMemberRemoval = false
                             if (result.isSuccess) onDeleted()

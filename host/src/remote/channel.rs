@@ -201,7 +201,9 @@ pub async fn run(hub: Arc<Hub>, t: Transport, kind: ChannelKind) {
     }
     let _ = ch.tx.send(ToDevice::Close(code, reason)).await;
     let hub = ch.hub.clone();
+    let channel_key = ch.key.clone();
     drop(ch);
+    hub.clear_viewing(&channel_key);
     let _ = writer.await;
     // Only now, with the answer and the `4100` handed to the transport: a relay publishes the
     // new ACL (offer gone) behind them on the same socket, so the pairing link isn't cut first.

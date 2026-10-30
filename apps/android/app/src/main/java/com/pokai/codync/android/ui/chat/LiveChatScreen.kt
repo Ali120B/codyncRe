@@ -147,7 +147,7 @@ fun LiveChatScreen(
     }
     val chatListTimeline by chatListFlow.collectAsState(initial = EntryTimeline(emptyList()))
     val chatListEntries = chatListTimeline.entries
-    val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
+    val connection by session.connectionForBot(botId).collectAsState(initial = com.pokai.codync.transport.ConnectionState())
     val actionError by session.actionError().collectAsState(initial = null)
     val context = LocalContext.current
     val colors = CodyncTheme.colors
@@ -202,7 +202,7 @@ fun LiveChatScreen(
     var attachedFiles by remember(botId, chatId) { mutableStateOf<List<PendingFile>>(emptyList()) }
     var sending by remember(botId, chatId) { mutableStateOf(false) }
     var sendError by remember(botId, chatId) { mutableStateOf<String?>(null) }
-    var downloadTarget by remember(botId, chatId) { mutableStateOf<Attachment?>(null) }
+    var downloadTarget by remember(botId, chatId) { mutableStateOf<ChatDownload?>(null) }
     var contextMessage by remember(botId, chatId) { mutableStateOf<String?>(null) }
     var traceTarget by remember(botId, chatId) { mutableStateOf<Entry?>(null) }
     var chatMenuOpen by remember(botId, chatId) { mutableStateOf(false) }
@@ -220,10 +220,6 @@ fun LiveChatScreen(
         }
     }
     val scope = rememberCoroutineScope()
-    DisposableEffect(botId) {
-        scope.launch { session.call("setViewing", buildJsonObject { put("botId", botId) }) }
-        onDispose { scope.launch { session.call("setViewing", buildJsonObject { put("botId", "") }) } }
-    }
     var initialScrollDone by remember(botId, chatId) { mutableStateOf(false) }
     val finalListItemIndex = entries.lastIndex + if (threadMode && rootEntry != null) 1 else 0
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
@@ -651,15 +647,15 @@ fun LiveChatScreen(
                         }
                     }
                 }
-                entry.data.attachments.orEmpty().forEach { attachment ->
-                    SecondaryButton(
-                        text = "Save ${attachment.name}",
-                        onClick = {
-                            downloadTarget = attachment
-                            saveAttachment.launch(attachment.name)
-                        },
-                    )
-                }
+                ChatFiles(
+                    session = session,
+                    entry = entry,
+                    botId = botId,
+                    onDownload = { download ->
+                        downloadTarget = download
+                        saveAttachment.launch(download.name)
+                    },
+                )
                 if (entry.data.reactions.orEmpty().isNotEmpty()) {
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -1259,7 +1255,7 @@ private suspend fun downloadFile(
     session: SessionStore,
     context: android.content.Context,
     botId: String,
-    file: Attachment,
+    file: ChatDownload,
     destination: Uri,
 ) {
     withContext(Dispatchers.IO) {
@@ -1268,11 +1264,19 @@ private suspend fun downloadFile(
             var offset = 0L
             var size: Long? = null
             while (size == null || offset < size) {
-                val response = session.call("readUpload", buildJsonObject {
-                    put("botId", botId)
-                    put("uploadId", file.id)
-                    put("offset", offset)
-                }).getOrThrow().jsonObject
+                val response = if (file.uploadId != null) {
+                    session.call("readUpload", buildJsonObject {
+                        put("botId", botId)
+                        put("uploadId", file.uploadId)
+                        put("offset", offset)
+                    }).getOrThrow().jsonObject
+                } else {
+                    session.call("readFile", buildJsonObject {
+                        put("entryId", requireNotNull(file.entryId) { "This file has no message" })
+                        put("fileId", requireNotNull(file.fileId) { "This file has no identifier" })
+                        put("offset", offset)
+                    }).getOrThrow().jsonObject
+                }
                 size = response["size"]?.jsonPrimitive?.longOrNull ?: error("Host returned an invalid file size")
                 val encoded = response["data"]?.jsonPrimitive?.contentOrNull.orEmpty()
                 val bytes = if (encoded.isEmpty()) ByteArray(0) else Base64.decode(encoded, Base64.DEFAULT)

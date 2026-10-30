@@ -96,7 +96,8 @@ fun TabsScreen(
     onOpenPairing: () -> Unit = {},
     onOpenWorkbench: () -> Unit = {},
     onOpenBotDetails: (String) -> Unit = {},
-    onCreateBot: () -> Unit = {},
+    onCreateBot: (String?) -> Unit = {},
+    onCreateGroup: (String?) -> Unit = {},
     onOpenTeamMap: () -> Unit = {},
     onOpenExtensions: () -> Unit = {},
 ) {
@@ -140,10 +141,12 @@ fun TabsScreen(
             when (AppTab.entries[page]) {
                 AppTab.Home -> LiveBotsScreen(
                     session = session,
+                    hazeState = hazeState,
                     onOpenChat = { botId, chatId -> onOpenChat(botId, chatId, null) },
                     onOpenBotDetails = onOpenBotDetails,
                     onPair = onOpenPairing,
                     onCreateBot = onCreateBot,
+                    onCreateGroup = onCreateGroup,
                 )
                 AppTab.Search -> CommandDeckScreen(
                     session = session,
@@ -154,7 +157,7 @@ fun TabsScreen(
                     onOpenChat = onOpenChat,
                     onOpenSettings = { onTab(AppTab.Settings) },
                     onOpenNeeds = { onTab(AppTab.Needs) },
-                    onCreateBot = onCreateBot,
+                    onCreateBot = { onCreateBot(null) },
                     onOpenGlassLab = onOpenGlassLab,
                     onOpenPairing = onOpenPairing,
                     onOpenWorkbench = onOpenWorkbench,

@@ -1,25 +1,33 @@
 package com.pokai.codync.design
 
+import android.graphics.Paint
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.core.content.res.ResourcesCompat
 import com.pokai.codync.design.theme.Inter
 
 /**
@@ -170,7 +178,24 @@ fun CodyncIcon(
     contentDescription: String? = null,
 ) {
     val density = LocalDensity.current
-    val sp = with(density) { size.toSp() }
+    val context = LocalContext.current
+    val typeface = remember(context) {
+        ResourcesCompat.getFont(context, R.font.material_symbols_rounded)
+    }
+    val px = with(density) { size.toPx() }
+    // Material Symbols' visible art is designed inside a 24dp box whose glyph band is
+    // 120..880 in a 960-unit em. Compose's text layout reserves the font's full ascent and
+    // leaves the art sitting high and small; drawing it on a Canvas with this baseline centers
+    // the designed box exactly and keeps every glyph optically aligned.
+    val paint = remember(typeface, px, tint) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.typeface = typeface
+            textSize = px
+            color = tint.toArgb()
+            textAlign = Paint.Align.LEFT
+            isSubpixelText = true
+        }
+    }
     Box(
         modifier = modifier
             .size(size)
@@ -179,19 +204,13 @@ fun CodyncIcon(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = symbol.char,
-            color = tint,
-            style = TextStyle(
-                fontFamily = SymbolFont,
-                fontSize = sp,
-                lineHeight = sp,
-                textAlign = TextAlign.Center,
-                letterSpacing = 0.sp,
-            ),
-            maxLines = 1,
-            softWrap = false,
-        )
+        Canvas(Modifier.fillMaxSize()) {
+            drawIntoCanvas { canvas ->
+                val width = paint.measureText(symbol.char)
+                val baseline = this.size.height / 2f + (500f / 960f) * paint.textSize
+                canvas.nativeCanvas.drawText(symbol.char, (this.size.width - width) / 2f, baseline, paint)
+            }
+        }
     }
 }
 

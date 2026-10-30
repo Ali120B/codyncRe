@@ -77,15 +77,30 @@ pub struct Hub {
     pub screen: Arc<Screen>,
     /// Per-bot headless browsers (see `browser`).
     pub browser: crate::browser::Browser,
-    /// The bot whose chat is currently open on a connected phone, if any.
-    pub viewing: Mutex<Option<String>>,
+    /// Device key -> bot whose chat that device currently reports as open, if any.
+    pub viewing: Mutex<HashMap<String, String>>,
     /// Setup terminals (installs, sign-ins).
     pub terms: Arc<crate::agent::term::Terms>,
 }
 
 impl Hub {
+    /// True when any connected device is actively looking at this bot's chat. A backgrounded
+    /// phone clears its entry, so pushes still arrive while the app is away.
     pub fn is_viewing(&self, bot: &str) -> bool {
-        self.viewing.locked().as_deref() == Some(bot)
+        self.viewing.locked().values().any(|current| current == bot)
+    }
+
+    pub fn set_viewing(&self, device: &str, bot: &str) {
+        let mut viewing = self.viewing.locked();
+        if bot.is_empty() {
+            viewing.remove(device);
+        } else {
+            viewing.insert(device.to_owned(), bot.to_owned());
+        }
+    }
+
+    pub fn clear_viewing(&self, device: &str) {
+        self.viewing.locked().remove(device);
     }
     pub fn busy(&self) -> bool {
         self.runtime.locked().values().any(|r| matches!(r.status, BotStatus::Working | BotStatus::NeedsInput))
@@ -120,7 +135,7 @@ impl Hub {
             screen,
             browser: crate::browser::Browser::default(),
             terms: Arc::default(),
-            viewing: Mutex::new(None),
+            viewing: Mutex::default(),
         })
     }
 

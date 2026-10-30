@@ -50,6 +50,7 @@ internal fun HostFolderPickerDialog(
     initialPath: String?,
     onDismiss: () -> Unit,
     onSelect: (String) -> Unit,
+    computerId: String? = null,
 ) {
     val colors = CodyncTheme.colors
     var path by remember(initialPath) { mutableStateOf(initialPath) }
@@ -63,7 +64,9 @@ internal fun HostFolderPickerDialog(
         loading = true
         error = null
         listing = null
-        session.call("listDirs", buildJsonObject { path?.let { put("path", it) } })
+        val request = if (computerId.isNullOrBlank()) session.call("listDirs", buildJsonObject { path?.let { put("path", it) } })
+        else session.callOn(computerId, "listDirs", buildJsonObject { path?.let { put("path", it) } })
+        request
             .onSuccess { response -> listing = runCatching { response.jsonObject }.getOrNull() }
             .onFailure { error = it.message ?: "Couldn't browse folders on the computer." }
         loading = false

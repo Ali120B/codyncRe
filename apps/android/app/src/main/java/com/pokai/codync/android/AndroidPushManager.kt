@@ -24,7 +24,7 @@ import kotlinx.serialization.json.put
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Registers this install's FCM destination with every host as it is connected. */
+/** Registers this install's FCM destination with every connected host, independently. */
 class AndroidPushManager(
     context: Context,
     private val store: SessionStore,
@@ -53,40 +53,37 @@ class AndroidPushManager(
                 }
         }
 
-        val target = store.snapshot.map { state ->
-            val connection = state.connection
-            val computer = connection.computer
-            Target(
-                computerId = computer?.id,
-                connected = computer != null && connection.kind != com.pokai.codync.transport.TransportKind.Offline && connection.hello != null,
-            )
+        val targets = store.snapshot.map { state ->
+            state.connections.mapValues { (computerId, connection) ->
+                Target(computerId, connection.kind != com.pokai.codync.transport.TransportKind.Offline && connection.hello != null)
+            }
         }.distinctUntilChanged()
 
         scope.launch {
-            combine(target, token, enabled) { current, fcmToken, notificationsEnabled ->
+            combine(targets, token, enabled) { current, fcmToken, notificationsEnabled ->
                 SyncRequest(current, fcmToken, notificationsEnabled)
             }.distinctUntilChanged().collect { request ->
-                val computerId = request.target.computerId ?: return@collect
-                if (!request.target.connected) return@collect
-                if (!request.enabled) {
-                    store.call("unregisterDevice", buildJsonObject {}).onFailure {
-                        android.util.Log.w(TAG, "Couldn't unregister push on $computerId", it)
+                request.targets.forEach { (computerId, target) ->
+                    // Each host owns its own ticket and must know when this phone is reachable.
+                    if (target.connected && request.enabled && request.token != null) {
+                        runCatching {
+                            val ticket = relayTicket(request.token)
+                            store.callOn(computerId, "registerDevice", buildJsonObject {
+                                put("ticket", ticket)
+                                put("relay", RELAY_URL)
+                                put("name", identity.deviceName)
+                                put("pushKey", identity.pushPublicKey)
+                                put("ctx", "android-local")
+                            }).getOrThrow()
+                        }.onFailure { failure ->
+                            if (failure is CancellationException) throw failure
+                            android.util.Log.w(TAG, "Couldn't register push on $computerId", failure)
+                        }
+                    } else if (!request.enabled) {
+                        store.callOn(computerId, "unregisterDevice", buildJsonObject {}).onFailure {
+                            android.util.Log.w(TAG, "Couldn't unregister push on $computerId", it)
+                        }
                     }
-                    return@collect
-                }
-                val fcmToken = request.token ?: return@collect
-                runCatching {
-                    val ticket = relayTicket(fcmToken)
-                    store.call("registerDevice", buildJsonObject {
-                        put("ticket", ticket)
-                        put("relay", RELAY_URL)
-                        put("name", identity.deviceName)
-                        put("pushKey", identity.pushPublicKey)
-                        put("ctx", "android-local")
-                    }).getOrThrow()
-                }.onFailure { failure ->
-                    if (failure is CancellationException) throw failure
-                    android.util.Log.w(TAG, "Couldn't register push on $computerId", failure)
                 }
             }
         }
@@ -121,8 +118,12 @@ class AndroidPushManager(
         }
     }
 
-    private data class Target(val computerId: String?, val connected: Boolean)
-    private data class SyncRequest(val target: Target, val token: String?, val enabled: Boolean)
+    private data class Target(val computerId: String, val connected: Boolean)
+    private data class SyncRequest(
+        val targets: Map<String, Target>,
+        val token: String?,
+        val enabled: Boolean,
+    )
 
     companion object {
         private const val TAG = "CodyncPush"

@@ -410,7 +410,7 @@ function ChatSplitView() {
         </div>
         <div style={font('title2', 'semibold')}>{connecting ? 'Connecting to your computers…' : 'Your coding agents, as teammates.'}</div>
         <div style={{ color: 'var(--secondary)', textAlign: 'center', maxWidth: 420 }}>{connecting ? 'Your bots will appear once connected. Manage computers to see connection progress.' : 'Pick a bot, or create one for each kind of work and point it at a project.'}</div>
-        <Button onClick={() => compose()} disabled={!onlineStores.length}>
+        <Button onClick={createBot} disabled={!onlineStores.length}>
           New Bot
         </Button>
       </div>

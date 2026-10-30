@@ -1,5 +1,8 @@
 package com.pokai.codync.design
 
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Paint as AndroidPaint
 import android.graphics.Region
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -15,6 +18,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -215,4 +219,83 @@ fun StatusDot(color: Color, size: Dp = 7.dp, modifier: Modifier = Modifier) {
     Canvas(modifier.size(size)) {
         drawCircle(color)
     }
+}
+
+/**
+ * A bitmap twin of [CharacterAvatar] for places Compose cannot draw: Android notifications,
+ * the app switcher and other system surfaces. Uses the same shape, palette and dot grid.
+ */
+fun characterAvatarBitmap(
+    colorId: String,
+    shapeId: String,
+    sizePx: Int,
+    mood: AvatarMood = AvatarMood.Idle,
+    background: Boolean = true,
+): Bitmap {
+    val size = sizePx.coerceAtLeast(16)
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = AndroidCanvas(bitmap)
+    val fill = AvatarPalette.color(colorId).toArgb()
+    val ink = 0xFF141414.toInt()
+    if (background) {
+        canvas.drawCircle(
+            size / 2f,
+            size / 2f,
+            size / 2f,
+            AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { color = 0xFFF7F7F7.toInt() },
+        )
+    }
+    val dots = buildDotGrid(shapeId, size.toFloat())
+    val cells = when {
+        size < 18f -> 7
+        size < 28f -> 9
+        else -> 13
+    }
+    val step = size.toFloat() / cells
+    val eyeColumns = when (cells) {
+        7 -> listOf(2, 4)
+        9 -> listOf(3, 6)
+        else -> listOf(4, 8)
+    }
+    val eyeRows = when (cells) {
+        13 -> listOf(4, 5, 6)
+        9 -> listOf(3, 4)
+        else -> listOf(2, 3)
+    }
+    val half = size / 2f
+    val yaw = when (mood) {
+        AvatarMood.Working -> 0.4f
+        AvatarMood.NeedsInput -> -0.2f
+        AvatarMood.Idle -> -0.7f
+    }
+    val lx = sin(yaw.toDouble()).toFloat() * 0.8f
+    val ly = 0.55f
+    val lz = cos(yaw.toDouble()).toFloat() * 0.5f + 0.6f
+    val ll = hypot3(lx, ly, lz)
+    val dotPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply { style = AndroidPaint.Style.FILL }
+    for (d in dots) {
+        if (d.col in eyeColumns && d.row in eyeRows) continue
+        val x = d.nx * size
+        val y = d.ny * size
+        val u = (x - half) / half
+        val v = (half - y) / half
+        val z = sqrt(max(0.2f, 1f - u * u - v * v))
+        val nl = hypot3(u, v, z)
+        var shade = 0.3f + 0.7f * max(0f, (u * lx + v * ly + z * lz) / (nl * ll))
+        if (mood == AvatarMood.NeedsInput) {
+            val ripple = 0.5f + 0.5f * sin(hypot(u.toDouble(), v.toDouble()) * 9.0).toFloat()
+            shade *= 0.6f + 0.4f * ripple
+        }
+        val radius = step * 0.42f * (0.55f + 0.45f * shade)
+        val inkAlpha = if (cells < 13) 0.4f + 0.4f * shade else 0.2f + 0.4f * min(1f, shade / 0.7f)
+        dotPaint.color = ink
+        dotPaint.alpha = (inkAlpha.coerceIn(0f, 1f) * 255).toInt()
+        canvas.drawCircle(x, y, radius, dotPaint)
+        if (shade > 0.6f) {
+            dotPaint.color = fill
+            dotPaint.alpha = (((shade - 0.6f) / 0.4f).coerceIn(0f, 1f) * 255).toInt()
+            canvas.drawCircle(x, y, radius, dotPaint)
+        }
+    }
+    return bitmap
 }

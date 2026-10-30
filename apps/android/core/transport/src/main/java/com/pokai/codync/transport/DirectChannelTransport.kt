@@ -76,16 +76,22 @@ class DirectChannelTransport(
     @Volatile private var reconnectJob: Job? = null
     @Volatile private var targetComputer: Computer? = null
     @Volatile private var deliberatelyDisconnected = true
+    /** Invalidates callbacks from a socket that has been replaced or torn down. */
+    @Volatile private var generation = 0L
+    /** Invalidates an in-flight connect after another computer is chosen or disconnected. */
+    @Volatile private var connectRequest = 0L
 
     override suspend fun pair(offer: PairOffer, deviceName: String): Result<Computer> =
         runCatching { DirectPairingClient.pair(offer, deviceKey, deviceName) }
 
     override suspend fun connect(computer: Computer): Result<Hello> {
         val switchingComputers = targetComputer?.id != computer.id
+        connectRequest += 1
+        val request = connectRequest
         deliberatelyDisconnected = false
         targetComputer = computer
         reconnectJob?.cancel()
-        disconnect()
+        disconnectSocket()
         deliberatelyDisconnected = false
         targetComputer = computer
         // Revisions belong to one host. Reusing another computer's revision would make the
@@ -93,29 +99,34 @@ class DirectChannelTransport(
         if (switchingComputers) sinceRev = 0
         val failures = mutableListOf<String>()
         for (url in computer.urls) {
+            if (request != connectRequest) return Result.failure(IOException("Connection superseded"))
+            val gen = generation
             try {
-                val result = connectDirect(computer, url)
+                val result = connectDirect(computer, url, gen)
                 if (result.isSuccess) {
                     startReconnectLoop(computer)
                     return result
                 }
                 result.exceptionOrNull()?.message?.let { failures += "$url: $it" }
-                disconnectSocket()
+                if (gen == generation) disconnectSocket()
             } catch (error: Throwable) {
                 if (error is kotlinx.coroutines.CancellationException) throw error
                 failures += "$url: ${error.message ?: error::class.simpleName}"
-                disconnectSocket()
+                if (gen == generation) disconnectSocket()
             }
         }
         computer.cloud?.let { cloud ->
-            val relay = connectRelay(computer, cloud)
+            if (request != connectRequest) return Result.failure(IOException("Connection superseded"))
+            val gen = generation
+            val relay = connectRelay(computer, cloud, gen)
             if (relay.isSuccess) {
                 startReconnectLoop(computer)
                 return relay
             }
             relay.exceptionOrNull()?.message?.let { failures += "relay: $it" }
-            disconnectSocket()
+            if (gen == generation) disconnectSocket()
         }
+        if (request != connectRequest) return Result.failure(IOException("Connection superseded"))
         val error = IOException(
             failures.takeIf { it.isNotEmpty() }?.joinToString(" · ")
                 ?: "This computer has no direct network addresses",
@@ -126,17 +137,17 @@ class DirectChannelTransport(
         return Result.failure(error)
     }
 
-    private suspend fun connectDirect(computer: Computer, baseUrl: String): Result<Hello> {
+    private suspend fun connectDirect(computer: Computer, baseUrl: String, gen: Long): Result<Hello> {
         val opened = ChannelListener()
         val webSocket = client.newWebSocket(Request.Builder().url(channelUrl(baseUrl)).build(), opened)
-        return connectOnSocket(computer, opened, webSocket, waitForRelayPresence = false)
+        return connectOnSocket(computer, opened, webSocket, waitForRelayPresence = false, gen = gen)
     }
 
-    private suspend fun connectRelay(computer: Computer, cloud: String): Result<Hello> {
+    private suspend fun connectRelay(computer: Computer, cloud: String, gen: Long): Result<Hello> {
         val opened = ChannelListener()
         val request = RelaySocketRequest.device(computer.id, cloud, deviceKey)
         val webSocket = client.newWebSocket(request, opened)
-        return connectOnSocket(computer, opened, webSocket, waitForRelayPresence = true)
+        return connectOnSocket(computer, opened, webSocket, waitForRelayPresence = true, gen = gen)
     }
 
     private suspend fun connectOnSocket(
@@ -144,11 +155,13 @@ class DirectChannelTransport(
         opened: ChannelListener,
         webSocket: WebSocket,
         waitForRelayPresence: Boolean,
+        gen: Long,
     ): Result<Hello> {
         listener = opened
         socket = webSocket
         try {
             opened.awaitOpen()
+            check(gen == generation) { "Connection superseded" }
             if (waitForRelayPresence) {
                 val online = withTimeout(12_000) {
                     while (true) {
@@ -162,6 +175,7 @@ class DirectChannelTransport(
                 }
                 check(online) { "The computer is offline on the Codync relay" }
             }
+            check(gen == generation) { "Connection superseded" }
             val handshake = ChannelHandshake(computer, deviceKey)
             val hello = buildJsonObject {
                 put("t", "hello")
@@ -182,6 +196,7 @@ class DirectChannelTransport(
                 }
                 error("Missing host handshake")
             }
+            check(gen == generation) { "Connection superseded" }
             val channelKeys = handshake.finish(
                 Codec.unb64n(welcome.string("ek") ?: error("Missing host ephemeral key"), 32),
                 Codec.unb64n(welcome.string("sig") ?: error("Missing host signature"), 64),
@@ -190,7 +205,7 @@ class DirectChannelTransport(
             outboundCounter = 0
             inboundCounter = 0
             val generationSocket = webSocket
-            reader = scope.launch { readLoop(opened, generationSocket, channelKeys) }
+            reader = scope.launch { readLoop(opened, generationSocket, channelKeys, gen) }
             if (waitForRelayPresence) {
                 heartbeat = scope.launch {
                     while (socket === generationSocket) {
@@ -205,6 +220,7 @@ class DirectChannelTransport(
             require(hostHello.computerId == null || hostHello.computerId == computer.id) {
                 "The host identified itself as another computer"
             }
+            check(gen == generation) { "Connection superseded" }
             val resumeFromRev = sinceRev
             sinceRev = hostHello.rev
             _state.value = ConnectionState(
@@ -225,6 +241,7 @@ class DirectChannelTransport(
     }
 
     override suspend fun disconnect() {
+        connectRequest += 1
         deliberatelyDisconnected = true
         targetComputer = null
         reconnectJob?.cancel()
@@ -233,14 +250,16 @@ class DirectChannelTransport(
     }
 
     private suspend fun disconnectSocket() {
+        generation += 1
         heartbeat?.cancel()
         heartbeat = null
         reader?.cancel()
         reader = null
-        socket?.close(1000, "disconnect")
+        val closing = socket
         socket = null
         listener = null
         keys = null
+        closing?.close(1000, "disconnect")
         sendLock.withLock {
             outboundCounter = 0
             inboundCounter = 0
@@ -254,34 +273,38 @@ class DirectChannelTransport(
         if (deliberatelyDisconnected || reconnectJob?.isActive == true) return
         reconnectJob = scope.launch {
             var backoff = 1_000L
-            while (!deliberatelyDisconnected && targetComputer?.id == computer.id) {
+            val request = connectRequest
+            while (!deliberatelyDisconnected && targetComputer?.id == computer.id && request == connectRequest) {
                 if (_state.value.kind == TransportKind.Direct || _state.value.kind == TransportKind.Relay) {
                     delay(1_000)
                     continue
                 }
                 delay(backoff)
-                if (deliberatelyDisconnected || targetComputer?.id != computer.id) break
+                if (deliberatelyDisconnected || targetComputer?.id != computer.id || request != connectRequest) break
                 var connected = false
                 var retryError: Throwable? = null
                 for (url in computer.urls) {
-                    val result = connectDirect(computer, url)
+                    if (request != connectRequest) break
+                    val gen = generation
+                    val result = connectDirect(computer, url, gen)
                     if (result.isSuccess) {
                         connected = true
                         backoff = 1_000L
                         break
                     }
                     retryError = result.exceptionOrNull()
-                    disconnectSocket()
+                    if (gen == generation) disconnectSocket()
                 }
                 val cloud = computer.cloud
-                if (!connected && !cloud.isNullOrBlank()) {
-                    val result = connectRelay(computer, cloud)
+                if (!connected && request == connectRequest && !cloud.isNullOrBlank()) {
+                    val gen = generation
+                    val result = connectRelay(computer, cloud, gen)
                     if (result.isSuccess) {
                         connected = true
                         backoff = 1_000L
                     } else {
                         retryError = result.exceptionOrNull() ?: retryError
-                        disconnectSocket()
+                        if (gen == generation) disconnectSocket()
                     }
                 }
                 if (!connected) {
@@ -392,7 +415,7 @@ class DirectChannelTransport(
         }
     }
 
-    private suspend fun readLoop(opened: ChannelListener, ws: WebSocket, channelKeys: ChannelKeys) {
+    private suspend fun readLoop(opened: ChannelListener, ws: WebSocket, channelKeys: ChannelKeys, gen: Long) {
         var joined = ByteArrayOutputStream()
         try {
             while (true) {
@@ -422,7 +445,7 @@ class DirectChannelTransport(
             }
         } catch (error: Throwable) {
             if (error is kotlinx.coroutines.CancellationException) throw error
-            if (socket === ws) {
+            if (socket === ws && gen == generation) {
                 val message = error.message ?: "Host connection ended"
                 _state.update { it.copy(kind = TransportKind.Offline, lastError = message) }
                 _events.trySend(HostEvent.Error(message))

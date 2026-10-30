@@ -11,6 +11,7 @@ class CodyncApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppPresence.clear(this)
         // Without the private project config the app remains usable; push registers once the
         // Codync Firebase project config is installed for this flavor.
         FirebaseApp.initializeApp(this)

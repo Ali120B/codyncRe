@@ -37,9 +37,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.pokai.codync.android.ui.AppPreferences
@@ -50,6 +54,7 @@ import com.pokai.codync.android.ui.ThemeMode
 import com.pokai.codync.android.ui.chat.LiveChatScreen
 import com.pokai.codync.android.ui.debug.GlassLabScreen
 import com.pokai.codync.android.ui.pairing.PairingScreen
+import com.pokai.codync.android.ui.roster.NewGroupScreen
 import com.pokai.codync.android.ui.search.CommandDeckScreen
 import com.pokai.codync.android.ui.workbench.BotDetailsScreen
 import com.pokai.codync.android.ui.workbench.LiveBotEditor
@@ -72,9 +77,16 @@ private object Routes {
     const val Workbench = "workbench"
     const val Extensions = "extensions"
     const val TeamMap = "team-map"
-    const val NewBot = "new-bot"
+    const val NewBot = "new-bot?computerId={computerId}"
+    const val NewGroup = "new-group?computerId={computerId}"
     const val BotDetails = "bot-details/{botId}?tab={tab}"
     const val Chat = "chat/{botId}/{chatId}?messageId={messageId}"
+
+    fun newBot(computerId: String?): String =
+        if (computerId.isNullOrBlank()) "new-bot" else "new-bot?computerId=${Uri.encode(computerId)}"
+
+    fun newGroup(computerId: String?): String =
+        if (computerId.isNullOrBlank()) "new-group" else "new-group?computerId=${Uri.encode(computerId)}"
 
     fun chat(botId: String, chatId: String, messageId: String?): String {
         val base = "chat/${Uri.encode(botId)}/${Uri.encode(chatId)}"
@@ -118,6 +130,52 @@ fun CodyncApp(
     val hazeState = rememberHazeState()
     val nav = rememberNavController()
     val configuration = LocalConfiguration.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val botComputers by hostSession.store.botComputers().collectAsState(initial = emptyMap())
+    val backStackEntry by nav.currentBackStackEntryAsState()
+    val route = backStackEntry?.destination?.route
+    val surface = when {
+        route == Routes.Chat -> {
+            val chatBotId = backStackEntry?.arguments?.getString("botId").orEmpty()
+            AppPresence.chat(botComputers[chatBotId], chatBotId)
+        }
+        route == Routes.Tabs && selectedTab == AppTab.Home -> AppPresence.HOME
+        else -> AppPresence.OTHER
+    }
+    var foreground by remember {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+    }
+    var viewingBot by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    foreground = true
+                    AppPresence.foreground(context, true)
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    foreground = false
+                    AppPresence.foreground(context, false)
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(surface) { AppPresence.surface(context, surface) }
+
+    // The host may only suppress pushes for the exact chat this phone is actively showing.
+    // Leaving the chat, switching tabs or backgrounding the app clears the viewing state.
+    LaunchedEffect(foreground, surface) {
+        val next = if (foreground && surface.startsWith("chat:")) surface.substringAfterLast(':') else null
+        if (next != viewingBot) {
+            hostSession.store.setViewing(next)
+            viewingBot = next
+        }
+    }
 
     LaunchedEffect(pairingLink) {
         if (!pairingLink.isNullOrBlank() && PairUrl.parse(pairingLink) != null) {
@@ -132,7 +190,8 @@ fun CodyncApp(
             // The notification may arrive before this phone has paired with that computer.
             nav.navigate(Routes.Pairing) { launchSingleTop = true }
         } else {
-            if (hostSession.store.snapshot.value.connection.computer?.id != computer.id) {
+            hostSession.store.selectComputer(computer.id)
+            if (hostSession.store.snapshot.value.connections[computer.id]?.hello == null) {
                 hostSession.store.connect(computer)
             }
             nav.navigate(Routes.chat(link.botId, link.chatId ?: "main", link.messageId)) {
@@ -170,12 +229,19 @@ fun CodyncApp(
     }
 
     fun openChat(botId: String, chatId: String, messageId: String?) {
+        // Legacy screens that still read the aggregate connection follow the bot being opened.
+        hostSession.store.computerIdForBot(botId)?.let(hostSession.store::selectComputer)
         val current = nav.currentBackStackEntry
         val sameChat = nav.currentDestination?.route == Routes.Chat &&
             current?.arguments?.getString("botId") == botId &&
             current.arguments?.getString("chatId") == chatId
         if (sameChat && (messageId.isNullOrBlank() || current?.arguments?.getString("messageId") == messageId)) return
         nav.navigate(Routes.chat(botId, chatId, messageId)) { launchSingleTop = true }
+    }
+
+    fun openBotDetails(botId: String, tab: String? = null) {
+        hostSession.store.computerIdForBot(botId)?.let(hostSession.store::selectComputer)
+        nav.navigate(Routes.botDetails(botId, tab))
     }
 
     DisposableEffect(dark, configuration) {
@@ -224,8 +290,9 @@ fun CodyncApp(
                             onOpenGlassLab = { nav.navigate(Routes.GlassLab) },
                             onOpenPairing = { nav.navigate(Routes.Pairing) },
                             onOpenWorkbench = { nav.navigate(Routes.Workbench) },
-                            onOpenBotDetails = { id -> nav.navigate(Routes.botDetails(id)) },
-                            onCreateBot = { nav.navigate(Routes.NewBot) },
+                            onOpenBotDetails = { id -> openBotDetails(id) },
+                            onCreateBot = { computerId -> nav.navigate(Routes.newBot(computerId)) },
+                            onCreateGroup = { computerId -> nav.navigate(Routes.newGroup(computerId)) },
                             onOpenTeamMap = { nav.navigate(Routes.TeamMap) },
                             onOpenExtensions = { nav.navigate(Routes.Extensions) },
                         )
@@ -270,8 +337,8 @@ fun CodyncApp(
                             initialMessageId = entry.arguments?.getString("messageId"),
                             hazeState = hazeState,
                             onBack = { nav.popBackStack() },
-                            onOpenDetails = { id -> nav.navigate(Routes.botDetails(id)) },
-                            onOpenComputer = { id -> nav.navigate(Routes.botDetails(id, "Computer")) },
+                            onOpenDetails = { id -> openBotDetails(id) },
+                            onOpenComputer = { id -> openBotDetails(id, "Computer") },
                             onOpenChat = { targetBot, targetChat -> openChat(targetBot, targetChat, null) },
                             onOpenThread = { targetBot, rootId -> openChat(targetBot, rootId, null) },
                         )
@@ -358,7 +425,7 @@ fun CodyncApp(
                                 selectedTab = AppTab.Needs
                                 nav.popBackStack(Routes.Tabs, inclusive = false)
                             },
-                            onCreateBot = { nav.navigate(Routes.NewBot) },
+                            onCreateBot = { nav.navigate(Routes.newBot(null)) },
                             onOpenGlassLab = { nav.navigate(Routes.GlassLab) },
                             onOpenPairing = { nav.navigate(Routes.Pairing) },
                             onOpenWorkbench = { nav.navigate(Routes.Workbench) },
@@ -370,7 +437,7 @@ fun CodyncApp(
                         WorkbenchHomeScreen(
                             session = hostSession.store,
                             onBack = { nav.popBackStack() },
-                            onOpenBotDetails = { id -> nav.navigate(Routes.botDetails(id)) },
+                            onOpenBotDetails = { id -> openBotDetails(id) },
                             onOpenExtensions = { nav.navigate(Routes.Extensions) },
                             onOpenTeamMap = { nav.navigate(Routes.TeamMap) },
                         )
@@ -385,19 +452,49 @@ fun CodyncApp(
                         com.pokai.codync.android.ui.workbench.LiveTeamMapScreen(
                             session = hostSession.store,
                             onBack = { nav.popBackStack() },
-                            onOpenBotDetails = { id -> nav.navigate(Routes.botDetails(id)) },
+                            onOpenBotDetails = { id -> openBotDetails(id) },
                         )
                     }
-                    composable(Routes.NewBot) {
+                    composable(
+                        Routes.NewBot,
+                        arguments = listOf(
+                            navArgument("computerId") {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                    ) { entry ->
                         Box(Modifier.fillMaxSize().background(CodyncTheme.colors.background)) {
                             LiveBotEditor(
                                 session = hostSession.store,
                                 bot = Bot(id = "", name = "New bot", backend = ""),
+                                initialComputerId = entry.arguments?.getString("computerId"),
                                 onCancel = { nav.popBackStack() },
                                 onSaved = { nav.popBackStack() },
                                 onDeleted = { nav.popBackStack() },
                             )
                         }
+                    }
+                    composable(
+                        Routes.NewGroup,
+                        arguments = listOf(
+                            navArgument("computerId") {
+                                type = NavType.StringType
+                                nullable = true
+                                defaultValue = null
+                            },
+                        ),
+                    ) { entry ->
+                        NewGroupScreen(
+                            session = hostSession.store,
+                            initialComputerId = entry.arguments?.getString("computerId"),
+                            onCancel = { nav.popBackStack() },
+                            onCreated = { botId, chatId ->
+                                nav.popBackStack()
+                                openChat(botId, chatId, null)
+                            },
+                        )
                     }
                 }
             }

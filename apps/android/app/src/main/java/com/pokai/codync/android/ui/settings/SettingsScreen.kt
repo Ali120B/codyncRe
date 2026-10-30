@@ -106,6 +106,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showAgents by remember { mutableStateOf(false) }
     val computers by session.computers().collectAsState(initial = emptyList())
+    val connections by session.computerConnections().collectAsState(initial = emptyMap())
     val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
     var pushEnabled by remember(prefs) { mutableStateOf(prefs.push) }
     val pushPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -181,34 +182,33 @@ fun SettingsScreen(
                     DividerLine(inset = 54.dp)
                     computers.forEachIndexed { index, computer ->
                         if (index > 0) DividerLine(inset = 54.dp)
-                        val selected = connection.computer?.id == computer.id
+                        // Every paired computer keeps its own socket, so each row shows its own state.
+                        val state = connections[computer.id]
+                        val online = state?.hello != null
                         SettingsRow(
                             title = computer.name,
-                            subtitle = if (selected) listOfNotNull(
-                                connection.hello?.os,
-                                connection.hello?.version,
-                                connection.connectedAt?.let(::relativeShort),
-                            ).joinToString(" · ").ifBlank { "Selected computer" } else "Paired with this device",
+                            subtitle = if (online) listOfNotNull(
+                                state?.hello?.os,
+                                state?.hello?.version,
+                                state?.connectedAt?.let(::relativeShort),
+                            ).joinToString(" · ").ifBlank { "Connected" } else "Paired with this device",
                             icon = CodyncIcons.Computer,
-                            onClick = { if (!selected) session.connect(computer) },
-                            showChevron = !selected,
+                            showChevron = false,
                             trailing = {
-                                if (!selected) {
-                                    Pill("Paired", fill = colors.surface, color = colors.secondary)
-                                } else Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     StatusDot(
-                                        color = when (connection.kind) {
-                                            com.pokai.codync.transport.TransportKind.Direct -> colors.added
+                                        color = when (state?.kind) {
+                                            com.pokai.codync.transport.TransportKind.Direct,
                                             com.pokai.codync.transport.TransportKind.Relay -> colors.added
-                                            com.pokai.codync.transport.TransportKind.Offline -> colors.tertiary
+                                            else -> colors.tertiary
                                         },
                                     )
                                     Spacer(Modifier.width(5.dp))
                                     Text(
-                                        when (connection.kind) {
+                                        when (state?.kind) {
                                             com.pokai.codync.transport.TransportKind.Direct -> "Direct"
                                             com.pokai.codync.transport.TransportKind.Relay -> "Relay"
-                                            com.pokai.codync.transport.TransportKind.Offline -> "Offline"
+                                            else -> "Offline"
                                         },
                                         color = colors.tertiary,
                                         style = CodyncType.caption,

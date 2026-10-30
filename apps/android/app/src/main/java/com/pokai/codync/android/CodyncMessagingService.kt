@@ -30,6 +30,13 @@ class CodyncMessagingService : FirebaseMessagingService() {
 
         val computerId = data["computerId"]
         val botId = data["botId"]
+        val appPrefs = getSharedPreferences(AppPresence.PREFS, MODE_PRIVATE)
+        // Suppress only while the app is actually on screen and the user can already see it:
+        // Home (all bots) or this exact chat. Background chats and every other page still alert.
+        if (appPrefs.getBoolean(AppPresence.KEY_FOREGROUND, false)) {
+            val surface = appPrefs.getString(AppPresence.KEY_SURFACE, AppPresence.OTHER)
+            if (surface == AppPresence.HOME || surface == AppPresence.chat(computerId, botId)) return
+        }
         val alert = if (!computerId.isNullOrBlank() && !data["sealed"].isNullOrBlank()) {
             runCatching {
                 val plain = DeviceIdentity(applicationContext).openPush(data.getValue("sealed"), computerId)
@@ -54,7 +61,7 @@ class CodyncMessagingService : FirebaseMessagingService() {
             openApp,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL)
+        val builder = NotificationCompat.Builder(this, ALERT_CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_codync)
             .setContentTitle(title)
             .setContentText(body)
@@ -63,7 +70,8 @@ class CodyncMessagingService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .build()
+        NotificationIcon.render(alert)?.let(builder::setLargeIcon)
+        val notification = builder.build()
         runCatching {
             NotificationManagerCompat.from(this).notify(("$computerId:$botId").hashCode(), notification)
         }

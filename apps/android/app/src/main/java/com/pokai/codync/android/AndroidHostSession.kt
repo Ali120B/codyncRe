@@ -6,10 +6,9 @@ import com.pokai.codync.model.Computer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
@@ -29,43 +28,50 @@ class AndroidHostSession(context: Context) {
         private set
 
     init {
-        store = SessionStore(identity.transport(), onComputerSelected = { computer, switching ->
-            saveComputer(computer)
-            if (switching) {
-                val cached = withContext(Dispatchers.IO) { cache.load(computer.id) }
-                store.restoreCache(computer, cached.bots, cached.entriesByBot, cached.chatTitlesByBot)
-            }
-        }, outbox = cache)
+        store = SessionStore(
+            createTransport = { identity.transport() },
+            outbox = cache,
+            onComputerSaved = ::saveComputer,
+        )
         pushManager = AndroidPushManager(context.applicationContext, store, identity)
 
         val computers = loadComputers()
         scope.launch {
-            computers.firstOrNull()?.let { computer ->
+            // Cached transcripts make every paired computer readable before its socket is up.
+            computers.forEach { computer ->
                 val cached = withContext(Dispatchers.IO) { cache.load(computer.id) }
                 store.restoreCache(computer, cached.bots, cached.entriesByBot, cached.chatTitlesByBot)
             }
             store.restoreComputers(computers)
         }
         scope.launch {
-            store.snapshot
-                .mapNotNull { state ->
-                    state.connection.computer?.takeIf { state.connection.hello != null }?.let {
-                        CacheWrite(it.id, state.bots, state.entriesByBot, state.chatTitlesByBot)
+            val jobs = HashMap<String, Job>()
+            val written = HashMap<String, CachedHostData>()
+            store.sessions.collect { lanes ->
+                jobs.keys.retainAll(lanes.keys)
+                written.keys.retainAll(lanes.keys)
+                lanes.forEach { (computerId, lane) ->
+                    if (jobs.containsKey(computerId)) return@forEach
+                    jobs[computerId] = scope.launch {
+                        var last: CachedHostData? = null
+                        lane.snapshot.debounce(350).collect { state ->
+                            if (state.connection.hello == null) return@collect
+                            val data = CachedHostData(state.bots, state.entriesByBot, state.chatTitlesByBot)
+                            val previous = last
+                            // Connection/revision ticks reuse the durable collections. Avoid
+                            // rewriting an unchanged transcript or resetting the write timer.
+                            if (previous != null &&
+                                previous.bots === data.bots &&
+                                previous.entriesByBot === data.entriesByBot &&
+                                previous.chatTitlesByBot === data.chatTitlesByBot
+                            ) return@collect
+                            last = data
+                            written[computerId] = data
+                            withContext(Dispatchers.IO) { cache.save(computerId, data) }
+                        }
                     }
                 }
-                // Connection/revision updates keep the durable collections by reference. Avoid
-                // a deep equality walk over the cached transcript or resetting the write timer
-                // for host events that do not change cached data.
-                .distinctUntilChanged { old, new ->
-                    old.bots === new.bots &&
-                        old.entriesByBot === new.entriesByBot &&
-                        old.chatTitlesByBot === new.chatTitlesByBot
-                }
-                .debounce(350)
-                .collect { write ->
-                    val cached = CachedHostData(write.bots, write.entriesByBot, write.chatTitlesByBot)
-                    withContext(Dispatchers.IO) { cache.save(write.computerId, cached) }
-                }
+            }
         }
     }
 
@@ -84,13 +90,6 @@ class AndroidHostSession(context: Context) {
         }
         return listOfNotNull(legacy)
     }
-
-    private data class CacheWrite(
-        val computerId: String,
-        val bots: List<com.pokai.codync.model.Bot>,
-        val entriesByBot: Map<String, List<com.pokai.codync.model.Entry>>,
-        val chatTitlesByBot: Map<String, Map<String, String>>,
-    )
 
     companion object {
         private const val KEY_COMPUTERS = "paired_computers"

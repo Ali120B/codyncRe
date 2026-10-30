@@ -58,7 +58,7 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
         }
         "setViewing" => {
             let bot = b["botId"].as_str().unwrap_or("");
-            *hub.viewing.locked() = if (bot.is_empty()) { None } else { Some(bot.to_owned()) };
+            hub.set_viewing(caller.device_key(), bot);
             json!({"ok": true})
         }
         "hello" => {
