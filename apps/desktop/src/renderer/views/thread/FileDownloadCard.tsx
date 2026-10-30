@@ -3,7 +3,7 @@ import { isImageName } from '@shared/models'
 import { useEffect, useState } from 'react'
 import { useStore } from '../../store/context'
 import { Icon } from '../../components/Icon'
-import { IconButtonBase } from '../../components/Overlay'
+import { IconButtonBase, ModalHeader, Sheet } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { decodeFileChunk } from '../../../shared/files.ts'
 import { attachmentSymbol, byteCount } from './Attachments'
@@ -54,10 +54,14 @@ export function FileDownloadCard({ entry, file }: { entry: Entry; file: SharedFi
   const detail = busy ? `${byteCount(state.received)} of ${byteCount(file.size)}` : state?.kind === 'failed' ? state.message : state?.kind === 'saved' ? `${byteCount(file.size)} · Saved` : byteCount(file.size)
   const image = isImageName(file.name)
   const preview = useFilePreview(entry, file)
+  const [expanded, setExpanded] = useState(false)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bubble-agent)', borderRadius: 16, overflow: 'hidden', maxWidth: 380 }}>
       {image ? (
-        <div style={{ width: 320, maxWidth: '100%', minHeight: 120, display: 'grid', placeItems: 'center', background: 'var(--bubble-user)' }}>
+        <div
+          onClick={() => preview.url && setExpanded(true)}
+          style={{ width: 320, maxWidth: '100%', minHeight: 120, display: 'grid', placeItems: 'center', background: 'var(--bubble-user)', cursor: preview.url ? 'zoom-in' : 'default' }}
+        >
           {preview.url ? (
             <img src={preview.url} alt={file.name} style={{ display: 'block', width: '100%', maxHeight: 300, objectFit: 'cover' }} />
           ) : (
@@ -73,6 +77,16 @@ export function FileDownloadCard({ entry, file }: { entry: Entry; file: SharedFi
         </div>
         <IconButtonBase title={action} icon={busy ? 'xmark' : 'arrow.down.to.line'} size={36} onClick={() => busy ? store.fileDownloads.cancel(file.id) : void store.fileDownloads.save(store.client, entry.id, file)} />
       </div>
+    <Sheet open={expanded} onClose={() => setExpanded(false)} width={720} height={560}>
+      {expanded && preview.url ? (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
+          <ModalHeader title={file.name} onClose={() => setExpanded(false)} />
+          <div style={{ flex: 1, minHeight: 0, padding: 12, display: 'grid', placeItems: 'center' }}>
+            <img src={preview.url} alt={file.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+          </div>
+        </div>
+      ) : null}
+    </Sheet>
     </div>
   )
 }

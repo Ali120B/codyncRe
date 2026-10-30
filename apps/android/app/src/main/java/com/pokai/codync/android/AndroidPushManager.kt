@@ -61,7 +61,7 @@ class AndroidPushManager(
             state.connections.mapValues { (computerId, connection) ->
                 Target(computerId, connection.kind != com.pokai.codync.transport.TransportKind.Offline && connection.hello != null)
             }
-        }.distinctUntilChanged()
+        }
 
         scope.launch {
             while (true) {
