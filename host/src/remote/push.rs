@@ -157,6 +157,7 @@ pub fn notify(hub: &Hub, bot: &BotConfig, from: Option<&str>, title: &str, body:
         }));
     }
     if !notifications.is_empty() {
+        tracing::info!(bot = %bot.id, count = notifications.len(), "push queued");
         post(format!("{relay}/push-batch"), json!({"notifications": notifications}));
     }
 }

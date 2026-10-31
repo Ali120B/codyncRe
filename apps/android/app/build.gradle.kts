@@ -38,12 +38,19 @@ android {
         applicationId = "com.pokai.Codync.android"
         minSdk = 31
         targetSdk = 36
-        versionCode = 31
-        versionName = "3.4.5"
+        versionCode = 32
+        versionName = "3.4.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "CLOUD_URL", "\"https://api.codync.dev\"")
         buildConfigField("String", "CLERK_PUBLISHABLE_KEY", "\"$clerkPublishableKey\"")
+        // Public Firebase client identifiers. CI does not have the untracked
+        // google-services.json, so the app initializes Firebase from these values.
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"mybot-f2d34\"")
+        buildConfigField("String", "FIREBASE_SENDER_ID", "\"318342768846\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\"AIzaSyDzjhejtwZM67rA9Wi5zVeEzmTo02zr5UY\"")
+        buildConfigField("String", "FIREBASE_STORAGE_BUCKET", "\"mybot-f2d34.firebasestorage.app\"")
+        buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"1:318342768846:android:ec25d1ac75f09213e5089f\"")
     }
 
     flavorDimensions += "channel"
@@ -54,6 +61,7 @@ android {
             versionNameSuffix = "-dev"
             resValue("string", "app_name", "Codync Dev")
             buildConfigField("String", "CLOUD_URL", "\"https://codync-cloud-dev.codyncre.workers.dev\"")
+            buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"1:318342768846:android:1d3d5ee67906f071e5089f\"")
         }
         create("prod") {
             dimension = "channel"

@@ -3,12 +3,9 @@
 package com.pokai.codync.android.ui.settings
 
 import android.content.Intent
-import android.Manifest
 import android.net.Uri
 import android.os.Build
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,7 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.FirebaseApp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -109,11 +106,10 @@ fun SettingsScreen(
     val connections by session.computerConnections().collectAsState(initial = emptyMap())
     val connection by session.connectionStatus().collectAsState(initial = com.pokai.codync.transport.ConnectionState())
     var pushEnabled by remember(prefs) { mutableStateOf(prefs.push) }
-    val pushPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        pushEnabled = granted
-        prefs.push = granted
-    }
     val firebaseConfigured = remember { FirebaseApp.getApps(context).isNotEmpty() }
+    // App-level notification block (the Android 13+ permission or the system switch).
+    // Checking it lets the row send people straight to the screen that can fix it.
+    val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
     val scope = rememberCoroutineScope()
     var hostWorkspaces by remember { mutableStateOf(prefs.workspaces.sorted()) }
     val connected = connection.computer != null && connection.hello != null
@@ -128,10 +124,12 @@ fun SettingsScreen(
         }
     }
 
-    LaunchedEffect(firebaseConfigured, active, pushEnabled) {
-        if (firebaseConfigured && active && pushEnabled && Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            pushPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    fun openNotificationSettings() {
+        runCatching {
+            context.startActivity(
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+            )
         }
     }
 
@@ -139,9 +137,10 @@ fun SettingsScreen(
         if (!enabled) {
             pushEnabled = false
             prefs.push = false
-        } else if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            pushPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else if (!notificationsEnabled) {
+            // Android never shows the permission dialog twice after a denial; the
+            // system notification screen can always re-enable alerts.
+            openNotificationSettings()
         } else {
             pushEnabled = true
             prefs.push = true
@@ -228,13 +227,15 @@ fun SettingsScreen(
                         subtitle = when {
                             !firebaseConfigured -> "Add this flavor's Codync Firebase config to enable encrypted alerts."
                             !pushEnabled -> "Push alerts are turned off on this device."
-                            Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED -> "Allow notifications in Android settings to see alerts while Codync is closed."
-                            else -> "Host-sealed alerts use FCM; the relay also needs its Firebase service account configured."
+                            !notificationsEnabled -> "Android is blocking Codync alerts. Tap to open notification settings."
+                            else -> "Bot and group alerts arrive with their own icons while Codync is closed."
                         },
                         icon = CodyncIcons.Notifications,
                         showChevron = false,
                         trailing = { CodyncSwitch(pushEnabled, onCheckedChange = ::setPushEnabled, enabled = true) },
-                        onClick = { setPushEnabled(!pushEnabled) },
+                        onClick = {
+                            if (notificationsEnabled) setPushEnabled(!pushEnabled) else openNotificationSettings()
+                        },
                     )
                 }
             }

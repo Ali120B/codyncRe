@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -44,6 +46,7 @@ class CodyncMessagingService : FirebaseMessagingService() {
             }.getOrNull()
         } else null
         val title = alert?.get("title")?.jsonPrimitive?.content ?: data["fallbackTitle"] ?: "Codync"
+        val subtitle = alert?.get("subtitle")?.jsonPrimitive?.content?.takeIf(String::isNotBlank)
         val body = alert?.get("body")?.jsonPrimitive?.content ?: data["fallbackBody"] ?: "Open Codync to review activity."
         val deepLink = if (!computerId.isNullOrBlank() && !botId.isNullOrBlank()) {
             Uri.parse("codync://bot/${Uri.encode(computerId)}/${Uri.encode(botId)}")
@@ -65,11 +68,18 @@ class CodyncMessagingService : FirebaseMessagingService() {
             .setSmallIcon(R.drawable.ic_stat_codync)
             .setContentTitle(title)
             .setContentText(body)
+            .setSubText(subtitle)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setShowWhen(true)
+            .setWhen(System.currentTimeMillis())
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setGroup(computerId ?: "codync")
+            .setSortKey("$computerId:$botId")
+        subtitle?.let { builder.setTicker("$title · $it") }
         NotificationIcon.render(alert)?.let(builder::setLargeIcon)
         val notification = builder.build()
         runCatching {
@@ -80,15 +90,26 @@ class CodyncMessagingService : FirebaseMessagingService() {
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < 26) return
         val manager = getSystemService(NotificationManager::class.java)
+        manager.deleteNotificationChannel(LEGACY_ALERT_CHANNEL)
         if (manager.getNotificationChannel(ALERT_CHANNEL) != null) return
+        val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         manager.createNotificationChannel(
             NotificationChannel(ALERT_CHANNEL, getString(R.string.push_channel_name), NotificationManager.IMPORTANCE_HIGH).apply {
                 description = getString(R.string.push_channel_description)
+                setSound(
+                    sound,
+                    AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build(),
+                )
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 220, 120, 220)
+                setShowBadge(true)
             },
         )
     }
 
     companion object {
-        private const val ALERT_CHANNEL = "codync_alerts"
+        // A fresh channel also repairs installs whose old channel was muted or downgraded.
+        private const val ALERT_CHANNEL = "codync_alerts_v2"
+        private const val LEGACY_ALERT_CHANNEL = "codync_alerts"
     }
 }

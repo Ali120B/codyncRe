@@ -30,10 +30,11 @@ object NotificationIcon {
             }
         }
         val first = parsed.firstOrNull() ?: return null
-        val size = 128
+        val size = 192
         if (first.kind == "group" && first.members.isNotEmpty()) {
             val members = parsed.drop(1).take(2).ifEmpty { parsed.take(2) }
             if (members.size >= 2) {
+                val scale = size / 128f
                 val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bitmap)
                 canvas.drawCircle(
@@ -42,11 +43,13 @@ object NotificationIcon {
                     size / 2f,
                     Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFF7F7F7.toInt() },
                 )
-                val faceSize = 78
+                val faceSize = (78 * scale).toInt()
+                val inset = 8 * scale
+                val top = 25 * scale
                 val left = characterAvatarBitmap(members[0].color, members[0].shape, faceSize, background = false)
                 val right = characterAvatarBitmap(members[1].color, members[1].shape, faceSize, background = false)
-                canvas.drawBitmap(left, 8f, 25f, null)
-                canvas.drawBitmap(right, size - faceSize - 8f, 25f, null)
+                canvas.drawBitmap(left, inset, top, null)
+                canvas.drawBitmap(right, size - faceSize - inset, top, null)
                 return bitmap
             }
         }

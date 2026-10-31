@@ -411,10 +411,12 @@ When that happens, remove in this order:
 
 - Configure FCM for the Codync Android app and complete the encrypted notification path through
   the fork-owned relay. The app reads flavor-specific `google-services.json` files from
-  `apps/android/app/src/dev/` and `apps/android/app/src/prod/`; upload the Firebase service-account
-  JSON to the relay as the `FCM_SERVICE_ACCOUNT` Worker secret. Neither config nor credentials
-  belong in git. The Android token is registered with each host as it is connected; the host seals
-  alert content to the Android-only X25519 push key before sending it to the relay.
+  `apps/android/app/src/dev/` and `apps/android/app/src/prod/` when present; release builds also
+  carry the public client identifiers and initialize Firebase themselves, so CI builds without a
+  local config still register for FCM. The relay holds the Firebase service-account JSON as the
+  `FCM_SERVICE_ACCOUNT` Worker secret; neither config nor credentials belong in git. The Android
+  token is registered with each host as it is connected; the host seals alert content to the
+  Android-only X25519 push key before sending it to the relay.
 - Compile and install the current dev APK, then exercise pairing, account access, chat, offline
   cache and file flows on a real phone.
 - Finish the remaining fork feature audit in M3–M4 against the live host APIs. The milestone

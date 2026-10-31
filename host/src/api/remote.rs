@@ -24,6 +24,7 @@ pub(super) async fn call(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value
             }
             let name = b["name"].as_str().unwrap_or("iPhone");
             hub.store.add_push_ticket(ticket, caller.device_key(), push_key, b["ctx"].as_str(), name)?;
+            tracing::info!(device = caller.device_key(), name, "push ticket registered");
             json!({})
         }
         "unregisterDevice" => {

@@ -2,6 +2,7 @@ package com.pokai.codync.android
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.SystemClock
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.pokai.codync.data.SessionStore
@@ -40,22 +41,32 @@ class AndroidPushManager(
     // A registration can land while a host is still starting up or the relay is briefly down.
     // Re-register periodically instead of waiting for the socket to change state again.
     private val retry = MutableStateFlow(0)
+    /** Last successful registration per computer, in elapsed-realtime milliseconds. */
+    private val registeredAt = mutableMapOf<String, Long>()
+    private val failed = mutableSetOf<String>()
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { preferences, key ->
         when {
-            preferences === hostPrefs && key == KEY_TOKEN -> token.value = hostPrefs.getString(KEY_TOKEN, null)
-            preferences === appPrefs && key == KEY_PUSH_ENABLED -> enabled.value = appPrefs.getBoolean(KEY_PUSH_ENABLED, true)
+            preferences === hostPrefs && key == KEY_TOKEN -> {
+                synchronized(registeredAt) {
+                    registeredAt.clear()
+                    failed.clear()
+                }
+                token.value = hostPrefs.getString(KEY_TOKEN, null)
+            }
+            preferences === appPrefs && key == KEY_PUSH_ENABLED -> {
+                synchronized(registeredAt) {
+                    registeredAt.clear()
+                    failed.clear()
+                }
+                enabled.value = appPrefs.getBoolean(KEY_PUSH_ENABLED, true)
+            }
         }
     }
 
     init {
         hostPrefs.registerOnSharedPreferenceChangeListener(listener)
         appPrefs.registerOnSharedPreferenceChangeListener(listener)
-        if (FirebaseApp.getApps(appContext).isNotEmpty()) {
-            runCatching { FirebaseMessaging.getInstance().token }
-                .onSuccess { task ->
-                    task.addOnSuccessListener { value -> saveToken(value) }
-                }
-        }
+        requestToken()
 
         val targets = store.snapshot.map { state ->
             state.connections.mapValues { (computerId, connection) ->
@@ -66,6 +77,7 @@ class AndroidPushManager(
         scope.launch {
             while (true) {
                 delay(REGISTER_RETRY_MS)
+                if (token.value == null) requestToken()
                 retry.value += 1
             }
         }
@@ -74,37 +86,73 @@ class AndroidPushManager(
             combine(targets, token, enabled, retry) { current, fcmToken, notificationsEnabled, attempt ->
                 SyncRequest(current, fcmToken, notificationsEnabled, attempt)
             }.distinctUntilChanged().collect { request ->
-                val ticket = if (request.enabled && request.token != null) runCatching { relayTicket(request.token) }.getOrNull() else null
-                request.targets.forEach { (computerId, target) ->
-                    // Each host owns its own ticket and must know when this phone is reachable.
-                    if (target.connected && request.enabled && ticket != null) {
+                val now = SystemClock.elapsedRealtime()
+                val pending = request.targets.filter { (computerId, target) ->
+                    if (!target.connected) return@filter false
+                    if (!request.enabled) return@filter true
+                    if (request.token == null) return@filter false
+                    val last = synchronized(registeredAt) { registeredAt[computerId] }
+                    computerId in synchronized(registeredAt) { failed } ||
+                        last == null || now - last > REREGISTER_MS
+                }
+                if (pending.isEmpty()) return@collect
+                if (!request.enabled) {
+                    pending.keys.forEach { computerId ->
                         runCatching {
-                            store.selectComputer(computerId)
-                            store.call("registerDevice", buildJsonObject {
-                                put("ticket", ticket)
-                                put("relay", RELAY_URL)
-                                put("name", identity.deviceName)
-                                put("pushKey", identity.pushPublicKey)
-                                put("ctx", "android-local")
-                            }).getOrThrow()
-                        }.onFailure { failure ->
-                            if (failure is CancellationException) throw failure
-                            android.util.Log.w(TAG, "Couldn't register push on $computerId", failure)
-                        }
-                    } else if (target.connected && !request.enabled) {
-                        runCatching {
-                            store.selectComputer(computerId)
-                            store.call("unregisterDevice", buildJsonObject {}).getOrThrow()
+                            store.callOn(computerId, "unregisterDevice", buildJsonObject {}).getOrThrow()
                         }.onFailure {
                             android.util.Log.w(TAG, "Couldn't unregister push on $computerId", it)
                         }
+                    }
+                    return@collect
+                }
+                val fcmToken = request.token ?: return@collect
+                val ticket = runCatching { relayTicket(fcmToken) }.onFailure {
+                    android.util.Log.w(TAG, "Couldn't create a push ticket", it)
+                }.getOrNull() ?: return@collect
+                pending.keys.forEach { computerId ->
+                    // Each host owns its own ticket and must know when this phone is reachable.
+                    runCatching {
+                        store.callOn(computerId, "registerDevice", buildJsonObject {
+                            put("ticket", ticket)
+                            put("relay", RELAY_URL)
+                            put("name", identity.deviceName)
+                            put("pushKey", identity.pushPublicKey)
+                            put("ctx", "android-local")
+                        }).getOrThrow()
+                        synchronized(registeredAt) {
+                            registeredAt[computerId] = now
+                            failed.remove(computerId)
+                        }
+                    }.onFailure { failure ->
+                        if (failure is CancellationException) throw failure
+                        synchronized(registeredAt) { failed += computerId }
+                        android.util.Log.w(TAG, "Couldn't register push on $computerId", failure)
                     }
                 }
             }
         }
     }
 
+    private fun requestToken() {
+        if (FirebaseApp.getApps(appContext).isEmpty()) {
+            android.util.Log.w(TAG, "Firebase is not initialized; skipping FCM token request")
+            return
+        }
+        runCatching { FirebaseMessaging.getInstance().token }
+            .onSuccess { task ->
+                task.addOnCompleteListener { result ->
+                    result.result?.let(::saveToken)
+                    result.exception?.let {
+                        android.util.Log.w(TAG, "Couldn't obtain the FCM token", it)
+                    }
+                }
+            }
+            .onFailure { android.util.Log.w(TAG, "Couldn't request the FCM token", it) }
+    }
+
     private fun saveToken(value: String) {
+        if (value.isBlank() || value == token.value) return
         hostPrefs.edit().putString(KEY_TOKEN, value).apply()
     }
 
@@ -148,7 +196,8 @@ class AndroidPushManager(
         private const val APP_PREFS = "codync_prefs"
         private const val KEY_TOKEN = "fcm_token"
         private const val KEY_PUSH_ENABLED = "push"
-        private const val REGISTER_RETRY_MS = 60 * 1000L
+        private const val REGISTER_RETRY_MS = 30 * 1000L
+        private const val REREGISTER_MS = 15 * 60 * 1000L
 
         fun saveUpdatedToken(context: Context, token: String) {
             context.applicationContext.getSharedPreferences(HOST_PREFS, Context.MODE_PRIVATE)

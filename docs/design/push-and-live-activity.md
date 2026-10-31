@@ -110,7 +110,7 @@ For a phone that still shows fallback text:
 
 ## Configuration and release checks
 
-The Worker uses `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_SIGNING_KEY`, `FCM_SERVICE_ACCOUNT`, and `TICKET_KEY`; see the [relay deployment guide](../../relay/README.md). Android builds also need the flavor's untracked `google-services.json`. Keep `TICKET_KEY` stable across deployments. Rotating it invalidates every existing ticket. Tickets are bearer capabilities accepted by the Worker and must not be logged.
+The Worker uses `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_SIGNING_KEY`, `FCM_SERVICE_ACCOUNT`, and `TICKET_KEY`; see the [relay deployment guide](../../relay/README.md). Android release builds embed the public Firebase client identifiers and initialize Firebase even when the flavor's untracked `google-services.json` is absent, so CI artifacts receive FCM tokens; a local config file still takes precedence. Keep `TICKET_KEY` stable across deployments. Rotating it invalidates every existing ticket. Tickets are bearer capabilities accepted by the Worker and must not be logged.
 
 The app bundle is `com.pokai.Codync.ios`. App and notification extension share `group.com.pokai.Codync` and the expanded shared Keychain access group. `project.yml` embeds both extension targets and enables `NSSupportsLiveActivities`; no new entitlement is required by these changes. Confirm sandbox versus production against the signed provisioning profile, especially for distribution builds.
 
