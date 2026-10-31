@@ -68,6 +68,11 @@ private enum class HomeFilter(val label: String, val symbol: com.pokai.codync.de
     Hidden("Hidden", CodyncIcons.Hide),
 }
 
+object HomeFilterState {
+    var filter: HomeFilter = HomeFilter.All
+    var selectedComputerId: String? = null
+}
+
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 fun LiveBotsScreen(
@@ -241,7 +246,7 @@ fun LiveBotsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, top = 6.dp, bottom = 88.dp),
+                contentPadding = PaddingValues(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 if (scopeId == null && computers.size > 1) {

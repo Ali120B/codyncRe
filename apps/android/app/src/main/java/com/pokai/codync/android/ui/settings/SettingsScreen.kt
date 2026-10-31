@@ -445,7 +445,7 @@ private fun AccountCard(account: AndroidAccountSession, active: Boolean) {
                 subtitle = "Sign in to discover cloud computers",
                 icon = CodyncIcons.Lock,
                 onClick = {
-                    if (Clerk.isInitialized) scope.launch { Clerk.auth.startHostedAuth() }
+                    if (Clerk.isInitialized.value) scope.launch { Clerk.auth.startHostedAuth() }
                 },
                 showChevron = false,
                 trailing = { Pill("Local", fill = colors.bubbleAgent, color = colors.secondary) },
