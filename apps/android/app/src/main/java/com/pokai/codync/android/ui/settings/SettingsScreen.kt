@@ -60,6 +60,7 @@ import com.pokai.codync.android.ui.AppPreferences
 import com.pokai.codync.android.ui.LargeHeader
 import com.pokai.codync.android.ui.SectionLabel
 import com.pokai.codync.android.ui.ThemeMode
+import com.pokai.codync.android.ui.EmailAuthSection
 import com.pokai.codync.android.ui.relativeShort
 import com.pokai.codync.data.SessionStore
 import com.clerk.api.Clerk
@@ -491,6 +492,7 @@ private fun ConfiguredAccountCard(account: AndroidAccountSession, state: Android
                     }
                 },
             )
+            EmailAuthSection(configured = BuildConfig.CLERK_PUBLISHABLE_KEY.isNotBlank(), onSignedIn = { scope.launch { account.refresh() } })
         } else {
             SettingsRow(
                 title = "Codync Cloud account",

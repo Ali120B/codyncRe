@@ -19,6 +19,8 @@ export class AccountSession extends Observable {
   errorMessage: string | null = null
   user: AccountInfo | null = null
   cloudURL: string | null = null
+  emailVerificationPending = false
+  pendingEmail: string | null = null
 
   get isSignedIn() {
     return this.user !== null
@@ -37,11 +39,29 @@ export class AccountSession extends Observable {
     this.errorMessage = s.error
     this.user = s.user
     this.cloudURL = s.cloudURL
+    this.emailVerificationPending = s.emailVerificationPending
+    this.pendingEmail = s.pendingEmail
     this.changed()
   }
 
   async signIn(provider: SignInProvider) {
     await window.codync.account.signIn(provider)
+  }
+
+  async signInWithEmail(email: string, password: string) {
+    await window.codync.account.signInEmail(email, password)
+  }
+
+  async signUpWithEmail(email: string, password: string) {
+    await window.codync.account.signUpEmail(email, password)
+  }
+
+  async verifyEmail(code: string) {
+    await window.codync.account.verifyEmail(code)
+  }
+
+  async cancelEmailAuth() {
+    await window.codync.account.cancelEmail()
   }
 
   async signOut() {

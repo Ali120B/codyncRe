@@ -1,6 +1,6 @@
 [package]
 name = "codync-host"
-version = "3.4.6"
+version = "3.4.7"
 edition = "2024"
 # let-chains (`if let … && let …`) need 1.88.
 rust-version = "1.88"

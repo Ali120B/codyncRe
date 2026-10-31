@@ -88,6 +88,7 @@ export class AccountService extends EventEmitter {
   private deviceToken: string | null = null
   private client: ClerkClient | null = null
   private cachedToken: { sessionId: string; jwt: string; until: number } | null = null
+  private pendingSignUpId: string | null = null
   state: AccountState = {
     ready: !this.base,
     configured: !!this.base && !!this.config.cloudURL,
@@ -95,6 +96,8 @@ export class AccountService extends EventEmitter {
     error: null,
     user: null,
     cloudURL: this.config.cloudURL,
+    emailVerificationPending: false,
+    pendingEmail: null,
   }
 
   private get storePath() {
@@ -104,6 +107,10 @@ export class AccountService extends EventEmitter {
   register(windows: () => BrowserWindow[]) {
     ipcMain.handle('account:state', () => this.state)
     ipcMain.handle('account:signIn', (_e, provider: 'apple' | 'google') => this.signIn(provider))
+    ipcMain.handle('account:signInEmail', (_e, email: string, password: string) => this.signInWithEmail(email, password))
+    ipcMain.handle('account:signUpEmail', (_e, email: string, password: string) => this.signUpWithEmail(email, password))
+    ipcMain.handle('account:verifyEmail', (_e, code: string) => this.verifyEmail(code))
+    ipcMain.handle('account:cancelEmail', () => this.cancelEmailAuth())
     ipcMain.handle('account:signOut', () => this.signOut())
     ipcMain.handle('account:token', () => this.sessionToken())
     this.on('change', () => {
@@ -235,6 +242,77 @@ export class AccountService extends EventEmitter {
     } finally {
       this.set({ busy: false })
     }
+  }
+
+  async signInWithEmail(email: string, password: string) {
+    if (this.state.busy) return
+    if (!this.base) return this.set({ error: "Sign-in isn't configured in this build." })
+    this.set({ busy: true, error: null })
+    try {
+      const created = await this.request<SignInResource>('POST', '/v1/client/sign_ins', { strategy: 'password', identifier: email, password })
+      if (created.status !== 'complete') {
+        const err = created.first_factor_verification?.error
+        throw new ClerkError(0, err?.long_message ?? err?.message ?? 'Sign-in failed.')
+      }
+      await this.refreshClient()
+      this.set({ emailVerificationPending: false, pendingEmail: null })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (message && !/timed out|fetch failed|Failed to fetch|network/i.test(message)) this.set({ error: message })
+      else this.set({ error: "Couldn't sign in. Check your connection and try again." })
+    } finally {
+      this.set({ busy: false })
+    }
+  }
+
+  async signUpWithEmail(email: string, password: string) {
+    if (this.state.busy) return
+    if (!this.base) return this.set({ error: "Sign-in isn't configured in this build." })
+    this.set({ busy: true, error: null })
+    try {
+      const created = await this.request<{ id: string; status: string; verifications?: { email_address?: { status: string } } }>('POST', '/v1/client/sign_ups', { email_address: email, password })
+      if (created.status === 'complete') {
+        await this.refreshClient()
+        this.set({ emailVerificationPending: false, pendingEmail: null })
+        return
+      }
+      this.pendingSignUpId = created.id
+      await this.request('POST', `/v1/client/sign_ups/${created.id}/prepare_verification`, { strategy: 'email_code' })
+      this.set({ emailVerificationPending: true, pendingEmail: email })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      // If the account already exists, Clerk returns an error; surface it.
+      if (message && !/timed out|fetch failed|Failed to fetch|network/i.test(message)) this.set({ error: message })
+      else this.set({ error: "Couldn't create the account. Check your connection and try again." })
+    } finally {
+      this.set({ busy: false })
+    }
+  }
+
+  async verifyEmail(code: string) {
+    if (this.state.busy || !this.pendingSignUpId) return
+    this.set({ busy: true, error: null })
+    try {
+      const res = await this.request<{ status: string }>('POST', `/v1/client/sign_ups/${this.pendingSignUpId}/attempt_verification`, { strategy: 'email_code', code })
+      if (res.status !== 'complete') throw new ClerkError(0, 'Verification failed.')
+      this.pendingSignUpId = null
+      await this.refreshClient()
+      this.set({ emailVerificationPending: false, pendingEmail: null })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (message && !/timed out|fetch failed|Failed to fetch|network/i.test(message)) this.set({ error: message })
+      else this.set({ error: "Couldn't verify the code. Try again." })
+    } finally {
+      this.set({ busy: false })
+    }
+  }
+
+  async cancelEmailAuth() {
+    if (this.pendingSignUpId) {
+      try { await this.request('DELETE', `/v1/client/sign_ups/${this.pendingSignUpId}`) } catch {}
+      this.pendingSignUpId = null
+    }
+    this.set({ emailVerificationPending: false, pendingEmail: null, error: null })
   }
 
   async signOut() {

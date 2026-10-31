@@ -1,7 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { CharacterAvatar, type Mood } from '../components/Avatar'
 import { Button, Spinner } from '../components/Controls'
-import { Icon } from '../components/Icon'
 import { font } from '../lib/fonts'
 import { useReduceMotion } from '../lib/theme'
 import { useAccount } from '../store/account'
@@ -14,6 +13,11 @@ export function AccountWelcomeView({ onContinue }: { onContinue: () => void }) {
   const account = useAccount()
   const reduce = useReduceMotion()
   const [beat, setBeat] = useState(reduce ? 4 : 0)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+
 
   useEffect(() => {
     if (account.isSignedIn) onContinue()
@@ -66,16 +70,6 @@ export function AccountWelcomeView({ onContinue }: { onContinue: () => void }) {
           <Button onClick={onContinue} style={{ ...font('headline'), minHeight: 50, width: '100%' }}>
             Continue on this {deviceName}
           </Button>
-          <Button onClick={() => void account.signIn('apple')} disabled={!account.isConfigured || account.isBusy} style={{ ...font('headline'), minHeight: 50, width: '100%' }}>
-            {account.isBusy ? (
-              <Spinner size={18} />
-            ) : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Icon name="apple.logo" size={20} />
-                Continue with Apple
-              </span>
-            )}
-          </Button>
           <Button kind="secondary" onClick={() => void account.signIn('google')} disabled={!account.isConfigured || account.isBusy} style={{ ...font('headline'), minHeight: 50, width: '100%' }}>
             {account.isBusy ? (
               <Spinner size={18} />
@@ -86,6 +80,29 @@ export function AccountWelcomeView({ onContinue }: { onContinue: () => void }) {
               </span>
             )}
           </Button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text)' }} />
+            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text)' }} />
+            {account.emailVerificationPending ? (
+              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Verification code" style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--text)' }} />
+            ) : null}
+            <Button onClick={() => {
+              if (account.emailVerificationPending) void account.verifyEmail(code)
+              else if (mode === 'signin') void account.signInWithEmail(email, password)
+              else void account.signUpWithEmail(email, password)
+            }} disabled={!account.isConfigured || account.isBusy || !email || !password} style={{ ...font('headline'), minHeight: 44, width: '100%' }}>
+              {account.isBusy ? <Spinner size={18} /> : (account.emailVerificationPending ? 'Verify' : (mode === 'signin' ? 'Sign in with email' : 'Create account'))}
+            </Button>
+            {!account.emailVerificationPending ? (
+              <button onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')} style={{ ...font('footnote'), color: 'var(--secondary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                {mode === 'signin' ? 'Need an account? Sign up' : 'Already have an account? Sign in'}
+              </button>
+            ) : (
+              <button onClick={() => void account.cancelEmailAuth()} style={{ ...font('footnote'), color: 'var(--secondary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Cancel
+              </button>
+            )}
+          </div>
           {account.errorMessage ? <div style={{ ...font('footnote'), color: 'var(--warning)' }}>{account.errorMessage}</div> : null}
         </div>
       </div>

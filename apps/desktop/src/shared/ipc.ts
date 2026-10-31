@@ -98,6 +98,9 @@ export interface AccountState {
   error: string | null
   user: { userId: string; email: string | null; avatarURL: string | null } | null
   cloudURL: string | null
+  /** An email sign-up is awaiting a verification code. */
+  emailVerificationPending: boolean
+  pendingEmail: string | null
 }
 
 export type SpeechEvent =
@@ -133,6 +136,10 @@ export interface CodyncBridge {
     state(): Promise<AccountState>
     onChange(cb: (s: AccountState) => void): () => void
     signIn(provider: 'apple' | 'google'): Promise<void>
+    signInEmail(email: string, password: string): Promise<void>
+    signUpEmail(email: string, password: string): Promise<void>
+    verifyEmail(code: string): Promise<void>
+    cancelEmail(): Promise<void>
     signOut(): Promise<void>
     /** The signed-in session's JWT for the Codync cloud. */
     token(): Promise<string>

@@ -13,6 +13,7 @@ import { UpdateButton, useUpdates } from '../UpdateButton'
 import { AiSettings } from './AiSettings'
 import { ComputersView } from './ComputersView'
 import { errorText, thisMac } from './parts'
+import { EmailSignInForm } from './EmailSignInForm'
 import { UsageLimits } from './UsageLimits'
 import { VoiceChatSettingsView } from './VoiceChatSettingsView'
 import { ComputerAccessView } from '../computer-access/ComputerAccessView'
@@ -147,14 +148,14 @@ function GeneralSettings() {
               {account.isBusy ? 'Please wait…' : 'Sign out'}
             </Button>
           ) : (
-            <>
-              <Button kind="secondary" onClick={() => void account.signIn('apple')} disabled={account.isBusy}>
-                Apple
-              </Button>
-              <Button kind="secondary" onClick={() => void account.signIn('google')} disabled={account.isBusy}>
-                Google
-              </Button>
-            </>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button kind="secondary" onClick={() => void account.signIn('google')} disabled={account.isBusy}>
+                  Google
+                </Button>
+              </div>
+              <EmailSignInForm />
+            </div>
           )}
         </div>
       </CardSection>
