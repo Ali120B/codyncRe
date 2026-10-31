@@ -16,7 +16,6 @@ import { useComputerRoster } from '../store/computer-roster'
 import { BotRoster } from './BotRoster'
 import { NeedsYouInbox } from './NeedsYouInbox'
 import { SidebarFooter } from './SidebarFooter'
-import { TeamMapView } from './team/TeamMapView'
 import { UpdateBadge } from './UpdateButton'
 import { ComputerFilterHeader, computerSelection } from './ComputerFilterHeader'
 import { ThreadView } from './thread/ThreadView'
@@ -176,7 +175,6 @@ function ChatSplitView() {
   const [contextBot, setContextBot] = useState<{ target: BotTarget; x: number; y: number } | null>(null)
   const [editing, setEditing] = useState<EditTarget | null>(null)
   const [groupSettings, setGroupSettings] = useState<{ bot: Bot; store: BotStore } | null>(null)
-  const [teamMap, setTeamMap] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<BotTarget | null>(null)
   const [marketplace, setMarketplace] = useState<string | null>(null)
   const [settings, setSettings] = useState<SettingsPage | null>(null)
@@ -472,7 +470,7 @@ function ChatSplitView() {
             </button>
           </div>
         ) : (
-          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={openMarketplace} onTeamMap={() => {}} />
+          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={openMarketplace} />
         )}
       </aside>
       <div className="sidebar-divider" onPointerDown={onDividerDown} onPointerMove={onDividerMove} onPointerUp={() => (dragStart.current = null)} role="separator" aria-label="Resize sidebar" aria-valuenow={width} />

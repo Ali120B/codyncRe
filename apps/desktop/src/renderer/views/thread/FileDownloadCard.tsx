@@ -60,7 +60,7 @@ export function FileDownloadCard({ entry, file }: { entry: Entry; file: SharedFi
       {image ? (
         <div
           onClick={() => preview.url && setExpanded(true)}
-          style={{ width: 320, maxWidth: '100%', minHeight: 120, display: 'grid', placeItems: 'center', background: 'var(--bubble-user)', cursor: preview.url ? 'zoom-in' : 'default' }}
+          style={{ width: '100%', maxWidth: 320, minHeight: 120, display: 'grid', placeItems: 'center', background: 'var(--bubble-user)', cursor: preview.url ? 'zoom-in' : 'default' }}
         >
           {preview.url ? (
             <img src={preview.url} alt={file.name} style={{ display: 'block', width: '100%', maxHeight: 300, objectFit: 'cover' }} />
