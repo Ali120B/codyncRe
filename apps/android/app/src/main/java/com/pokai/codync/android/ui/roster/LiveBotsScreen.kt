@@ -249,16 +249,7 @@ fun LiveBotsScreen(
                 contentPadding = PaddingValues(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
-                if (scopeId == null && computers.size > 1) {
-                    computers.forEach { computer ->
-                        val computerBots = visible.filter { botComputers[it.id] == computer.id }
-                        if (computerBots.isNotEmpty()) {
-                            item(key = "header_${computer.id}") {
-                                ComputerGroupHeader(computer, connections[computer.id], computerBots)
-                            }
-                            rosterItems(computerBots, hostBots, onOpenChat, onOpenBotDetails, keyPrefix = computer.id)
-                        }
-                    }
+                if (false) {
                 } else {
                     val groups = visible.filter { it.kind == "group" }.sortedByDescending { it.lastAt }
                     val singles = visible.filter { it.kind != "group" }.sortedByDescending { it.lastAt }
