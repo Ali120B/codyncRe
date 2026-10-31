@@ -68,7 +68,7 @@ private enum class HomeFilter(val label: String, val symbol: com.pokai.codync.de
     Hidden("Hidden", CodyncIcons.Hide),
 }
 
-object HomeFilterState {
+private object HomeFilterState {
     var filter: HomeFilter = HomeFilter.All
     var selectedComputerId: String? = null
 }
