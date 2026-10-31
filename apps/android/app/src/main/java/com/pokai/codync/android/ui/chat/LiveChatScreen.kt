@@ -159,7 +159,6 @@ fun LiveChatScreen(
     val connection by session.connectionForBot(botId).collectAsState(initial = com.pokai.codync.transport.ConnectionState())
     val actionError by session.actionError().collectAsState(initial = null)
     val context = LocalContext.current
-    BackHandler { onBack() }
     val colors = CodyncTheme.colors
     val startingNewChat = chatId == "new"
     var loadedThread by remember(botId, chatId) { mutableStateOf<List<Entry>>(emptyList()) }
@@ -188,6 +187,10 @@ fun LiveChatScreen(
     }
     val chatRoomMode = rootEntry?.data?.chat == true
     val threadMode = chatId.isNotBlank() && chatId != "main" && chatId != "new" && !chatRoomMode
+    BackHandler {
+        if (threadMode) onOpenChat(botId, "main") else onBack()
+    }
+    val backHandlerThread = threadMode
     val chatTitles by session.chatTitles(botId).collectAsState(initial = emptyMap())
     val timelineWithThread by produceState(timeline, timeline, loadedThread) {
         value = if (loadedThread.isEmpty()) {

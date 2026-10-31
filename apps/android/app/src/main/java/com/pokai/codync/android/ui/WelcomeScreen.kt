@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -307,10 +308,23 @@ fun EmailAuthSection(configured: Boolean, onSignedIn: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var currentSignUp by remember { mutableStateOf<com.clerk.api.signup.SignUp?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Text("Sign in with email", color = colors.text, style = CodyncType.headline)
+        OutlinedTextField(
+            value = email, onValueChange = { email = it }, label = { Text("Email") }, singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, focusedLabelColor = colors.accent, cursorColor = colors.accent),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = password, onValueChange = { password = it }, label = { Text("Password") }, singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, focusedLabelColor = colors.accent, cursorColor = colors.accent),
+            modifier = Modifier.fillMaxWidth(),
+        )
         if (mode == "verify") {
-            OutlinedTextField(value = code, onValueChange = { code = it }, label = { Text("Verification code") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = code, onValueChange = { code = it }, label = { Text("Verification code") }, singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, focusedLabelColor = colors.accent, cursorColor = colors.accent),
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         SecondaryButton(
             text = if (busy) "Working…" else if (mode == "verify") "Verify" else if (mode == "signup") "Create account" else "Sign in with email",
