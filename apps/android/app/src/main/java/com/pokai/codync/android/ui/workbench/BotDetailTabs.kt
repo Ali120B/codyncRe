@@ -651,6 +651,14 @@ internal fun BotRoutinesTab(session: SessionStore, botId: String) {
                             onCheckedChange = { draft = draft.copy(enabled = it) },
                         )
                     }
+                    Text("Run after another routine (optional)", color = colors.tertiary, style = CodyncType.caption)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip("None", draft.afterRoutine == null, onClick = { draft = draft.copy(afterRoutine = null) })
+                        routines.filter { it.string("id") != draft.id }.forEach { r ->
+                            val rid = r.string("id").orEmpty()
+                            FilterChip(r.string("name").orEmpty(), draft.afterRoutine == rid, onClick = { draft = draft.copy(afterRoutine = rid) })
+                        }
+                    }
                 }
             }
             if (error != null) DetailError(error!!)
@@ -666,6 +674,7 @@ internal fun BotRoutinesTab(session: SessionStore, botId: String) {
                             put("instruction", draft.instruction.trim())
                             put("enabled", draft.enabled)
                             put("timeoutSeconds", draft.timeoutSeconds.toLongOrNull() ?: 3600L)
+                            draft.afterRoutine?.let { put("afterRoutine", it) }
                             put("triggers", draft.triggerArray())
                         }
                         session.call("saveRoutine", args)
@@ -805,6 +814,7 @@ private data class RoutineDraft(
     val at: Long = System.currentTimeMillis() + 3_600_000L,
     val intervalSeconds: String = "3600",
     val timeoutSeconds: String = "3600",
+    val afterRoutine: String? = null,
     val originalTriggers: JsonArray = JsonArray(emptyList()),
     val summary: String = "",
 ) {
@@ -888,6 +898,7 @@ private data class RoutineDraft(
                 at = first?.long("at") ?: System.currentTimeMillis() + 3_600_000L,
                 intervalSeconds = first?.long("seconds")?.toString() ?: "3600",
                 timeoutSeconds = routine.long("timeoutSeconds")?.toString() ?: "3600",
+                afterRoutine = routine.string("afterRoutine"),
                 originalTriggers = triggers,
                 summary = summary,
             )
