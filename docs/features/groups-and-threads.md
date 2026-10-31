@@ -1,6 +1,6 @@
 # Group chats and threads
 
-Both features live in the host. Every client (iPhone, desktop, terminal) calls the same
+Both features live in the host. Every client (Android phone, desktop, terminal) calls the same
 methods and renders the same data: none of them routes messages, parses mentions or counts
 replies itself.
 
@@ -83,6 +83,6 @@ replies itself.
 ## Client checklist
 
 Roster row for groups (member avatars), a trace per lane (main chat, or one thread), author label on group replies, the thread summary
-under a root (opens the thread; "N new" while `unread > 0`), "Reply in thread" on any main-chat message (desktop: while the pointer is over a message, its footer beside the time shows quick reactions, reply, copy — never on the bubble; iPhone: long-press, reactions on top of the menu), reactions under a message (tap to take back), a thread view
+under a root (opens the thread; "N new" while `unread > 0`), "Reply in thread" on any main-chat message (desktop: while the pointer is over a message, its footer beside the time shows quick reactions, reply, copy — never on the bubble; Android phone: long-press, reactions on top of the menu), reactions under a message (tap to take back), a thread view
 (root, replies, composer sending `threadId`), group create/edit (name, members), Stop in a
 group calls `stop` with the group id.

@@ -17,4 +17,4 @@ Consumers:
 - `apps/ios/Kit/Tests/CodyncKitTests/RelayVectorsTests.swift`
 - `cloud/test/vectors.test.ts` and `cloud/test/relay.test.ts`
 
-When moving or changing a fixture, update those paths and the cloud, iOS Kit (`kit.yml`) and host CI path filters. Run the affected vector tests; a Markdown link check alone cannot validate executable imports. [Protocol reference](../remote-relay.md).
+When moving or changing a fixture, update those paths and the cloud, Android Kit (`kit.yml`) and host CI path filters. Run the affected vector tests; a Markdown link check alone cannot validate executable imports. [Protocol reference](../remote-relay.md).

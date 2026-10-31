@@ -17,7 +17,7 @@ npx wrangler secret put FCM_SERVICE_ACCOUNT # paste the full Firebase service-ac
 ```
 
 The Android-only setup needs `TICKET_KEY` and `FCM_SERVICE_ACCOUNT`. Add the following secrets
-only if configuring iOS push: `APNS_TEAM_ID`, `APNS_KEY_ID`, and `APNS_SIGNING_KEY`.
+only if configuring Android push: `APNS_TEAM_ID`, `APNS_KEY_ID`, and `APNS_SIGNING_KEY`.
 
 Android's Firebase config is flavor-specific at
 `apps/android/app/src/dev/google-services.json` and

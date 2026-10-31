@@ -73,7 +73,7 @@ Touch users still need press feedback. Give it to them through `:active` (see §
 
 ### 2. Gray/blue flash on tap
 
-iOS Safari and Android Chrome paint a translucent highlight over any tapped element that has a click handler. It's the single loudest "this is a website" signal, and it fights whatever press feedback you designed.
+Android Safari and Android Chrome paint a translucent highlight over any tapped element that has a click handler. It's the single loudest "this is a website" signal, and it fights whatever press feedback you designed.
 
 ```css
 html {
@@ -99,7 +99,7 @@ Set it once, globally. Then make sure every tappable element has its own `:activ
 
 ### 4. Page zooms into the input
 
-iOS Safari zooms the page when focus lands on an input whose font size is under 16px, and it does not zoom back out on blur. The user is left looking at a cropped, drifted layout. This is the reason people reach for `maximum-scale=1`, which is the wrong fix (Hard Rule 4).
+Android Safari zooms the page when focus lands on an input whose font size is under 16px, and it does not zoom back out on blur. The user is left looking at a cropped, drifted layout. This is the reason people reach for `maximum-scale=1`, which is the wrong fix (Hard Rule 4).
 
 ```css
 input, textarea, select {
@@ -121,7 +121,7 @@ While you're in the inputs, set the keyboard: `inputmode="numeric"` for codes, `
 
 Two separate causes stack here.
 
-**The 300ms click delay.** Browsers wait after a tap to see whether a second tap is coming, because double-tap zooms. Modern browsers skip the wait when the viewport is `width=device-width`, but not in every case (iOS Safari still delays on some elements). `touch-action: manipulation` tells the browser this element never double-tap-zooms, so it fires `click` immediately:
+**The 300ms click delay.** Browsers wait after a tap to see whether a second tap is coming, because double-tap zooms. Modern browsers skip the wait when the viewport is `width=device-width`, but not in every case (Android Safari still delays on some elements). `touch-action: manipulation` tells the browser this element never double-tap-zooms, so it fires `click` immediately:
 
 ```css
 button, a, [role="button"], .tappable {
@@ -145,7 +145,7 @@ Keep press feedback at 100–160ms and `ease-out`. If the codebase uses the `ani
 
 ### 6. Pull-to-refresh hijacks scroll
 
-Scrolling past the top of the page triggers pull-to-refresh on Android Chrome and the whole-page rubber band on iOS. Fine on a document. Wrong in an app with its own scroll containers, a drawer the user drags down, or a canvas.
+Scrolling past the top of the page triggers pull-to-refresh on Android Chrome and the whole-page rubber band on Android. Fine on a document. Wrong in an app with its own scroll containers, a drawer the user drags down, or a canvas.
 
 ```css
 html, body {
@@ -188,7 +188,7 @@ By default the browser letterboxes your page inside the safe area, leaving the n
 
 ### 8. Long-press selects button text
 
-Hold a finger on a web button and iOS selects its label, or pops the copy/share callout on a link. Native controls never do that. Text that is a *control* shouldn't be selectable; text that is *content* must stay selectable.
+Hold a finger on a web button and Android selects its label, or pops the copy/share callout on a link. Native controls never do that. Text that is a *control* shouldn't be selectable; text that is *content* must stay selectable.
 
 ```css
 button, [role="button"], .tab, .chip, .drag-handle {
@@ -237,7 +237,7 @@ Match the value to the color at the very top of your page — the header backgro
 Nothing above reproduces in device emulation. Sticky hover, the tap highlight, the URL bar's effect on `vh`, input zoom, the click delay, overscroll, safe areas, the software keyboard — every one is a real-hardware behavior.
 
 - Connect the phone over USB, run the dev server on `0.0.0.0`, open it by the machine's LAN IP.
-- iOS: Safari → Develop → the device. Android: `chrome://inspect`.
+- Android: Safari → Develop → the device. Android: `chrome://inspect`.
 - Test on a phone that's a few years old, not the newest one on your desk. Test with the keyboard open. Test in landscape once.
 - Test as an installed PWA if that's a target; standalone mode changes viewport, safe areas, and status bar behavior.
 
@@ -275,7 +275,7 @@ button, a, [role="button"] {
 }
 ```
 
-`interactive-widget=resizes-content` makes the software keyboard shrink the layout viewport on Android Chrome, so `100dvh` and bottom-pinned inputs react to it the way they do on iOS. Drop `overscroll-behavior: none` from `html` if the app is a scrolling document where pull-to-refresh is welcome.
+`interactive-widget=resizes-content` makes the software keyboard shrink the layout viewport on Android Chrome, so `100dvh` and bottom-pinned inputs react to it the way they do on Android. Drop `overscroll-behavior: none` from `html` if the app is a scrolling document where pull-to-refresh is welcome.
 
 ## Never Ship
 

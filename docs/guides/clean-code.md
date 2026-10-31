@@ -1,6 +1,6 @@
 # Clean code
 
-Rules every change follows, in every part of the repository (host, iOS, desktop, cloud, relay). Language-specific rules stay in [CLAUDE.md](../../CLAUDE.md) (Swift 6, Rust lints, TypeScript); where to put a file is in [file structure](../architecture/file-structure.md).
+Rules every change follows, in every part of the repository (host, Android, desktop, cloud, relay). Language-specific rules stay in [CLAUDE.md](../../CLAUDE.md) (Swift 6, Rust lints, TypeScript); where to put a file is in [file structure](../architecture/file-structure.md).
 
 ## Before writing code
 

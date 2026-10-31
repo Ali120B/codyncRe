@@ -8,7 +8,7 @@ See [side-by-side Dev and production apps](dev-app.md) for schemes, identifiers,
 
 | Layer | Source | Selection |
 | --- | --- | --- |
-| Apple app | `apps/shared/Config/dev.plist`, `main.plist` | `project.yml` copies the selected file to bundled `AccountConfig.plist`; `iOS Dev` uses dev; `iOS` uses main |
+| Apple app | `apps/shared/Config/dev.plist`, `main.plist` | `project.yml` copies the selected file to bundled `AccountConfig.plist`; `Android Dev` uses dev; `Android` uses main |
 | Account SDK | `apps/ios/App/AccountSession.swift` | Public Clerk configuration; development environment overrides are supported |
 | Host | `host/src/remote/cloud.rs` | `CODYNC_CLOUD=off` or stored disable wins; then `CODYNC_CLOUD_URL`, then the build's cloud (`CODYNC_ENV` at compile time) |
 | Cloud Worker / D1 / DO | `cloud/wrangler.toml` | Root production, `dev`, or `local` environment |
@@ -26,13 +26,13 @@ The environment is chosen when building, never stored: the host compiles in its 
 
 Check the environment before resetting keys, pairing again, or removing an account computer. A healthy local host and an active relay connection only prove connectivity to **that host's configured cloud**. Development and production have separate account directories, grants and presence; signing in with the same Apple account does not join those environments.
 
-Observed on 2026-10-09: MacBook-Pro-3 ran a local development build connected to `dev-api.codync.dev`, while the Mac mini ran a production build connected to `api.codync.dev`. Both hosts reported `registered: true` and `connected: true`. The MacBook's same `computerId` was online in development D1 and offline in production D1. The Mac mini's account list therefore correctly showed the old production record as **Offline**. This was an environment mismatch, not evidence of a stopped host or a duplicate identity.
+Observed on 2026-10-09: MacBook-Pro-3 ran a local development build connected to `dev-api.codync.dev`, while the Linux mini ran a production build connected to `api.codync.dev`. Both hosts reported `registered: true` and `connected: true`. The MacBook's same `computerId` was online in development D1 and offline in production D1. The Linux mini's account list therefore correctly showed the old production record as **Offline**. This was an environment mismatch, not evidence of a stopped host or a duplicate identity.
 
 Before testing account discovery or access approval:
 
 1. Run `codync-host cloud` on each computer and compare `url`, `registered`, `connected`, and `last error`. Use the installed app's bundled executable if the shell's host binary is not the one being tested.
 2. Check `http://127.0.0.1:19222/health` (or the configured development port) for the running binary path, version and `computerId`.
-3. Verify the desktop app and its host target the same environment, and the iPhone build targets that environment too. An identical version number or Apple login is not sufficient.
+3. Verify the desktop app and its host target the same environment, and the Android phone build targets that environment too. An identical version number or Apple login is not sufficient.
 4. Use matching builds across the devices participating in the test, then refresh the account list. Local or SSH access working does not establish that their account clouds match.
 
 ### Separate Codync Dev app
@@ -79,7 +79,7 @@ The repository is public, so its whole history counts as published. Last scan: 2
 
 The Worker accepting `windows` was deployed to both environments from the `windows` branch on 2026-10-07, ahead of its merge; its cloud code differed from `main` only in that platform list.
 
-`0003` lets `devices.platform` be `linux` or `windows`. Accounts were built when only the iPhone and the SwiftUI Mac app signed in; the Electron app brought sign-in to Linux (and later Windows), whose device registration the cloud rejected (`400 Invalid platform`), so main held no Linux devices at all. It rebuilds `devices` with `access_requests` and `grants` the same way as `0002`. Row counts were unchanged (dev 14 devices, 8 grants, 14 access requests; main 128, 41, 53) with no orphaned rows; a `windows` device row inserted on dev was accepted and removed. The Worker accepting both platforms was deployed to dev and main the same day from the `device-platforms` branch, which differed from `main` only there. Windows apps up to 2.9.0 register as `linux`; later ones send `windows`.
+`0003` lets `devices.platform` be `linux` or `windows`. Accounts were built when only the Android phone and the SwiftUI Linux app signed in; the Electron app brought sign-in to Linux (and later Windows), whose device registration the cloud rejected (`400 Invalid platform`), so main held no Linux devices at all. It rebuilds `devices` with `access_requests` and `grants` the same way as `0002`. Row counts were unchanged (dev 14 devices, 8 grants, 14 access requests; main 128, 41, 53) with no orphaned rows; a `windows` device row inserted on dev was accepted and removed. The Worker accepting both platforms was deployed to dev and main the same day from the `device-platforms` branch, which differed from `main` only there. Windows apps up to 2.9.0 register as `linux`; later ones send `windows`.
 
 A `0004_computer_order.sql` (an account-wide computer order) reached only dev before ordering became device-local. On 2026-10-11 its column was dropped from `codync-dev` and its row deleted from `d1_migrations` (restore point `00001447-00000002-00005101-ce9dbb4b6e3847fef79f63887a5d89af`), and the file was removed, so both environments match `0001`–`0003`.
 

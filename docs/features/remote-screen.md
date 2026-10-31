@@ -17,25 +17,25 @@ A cloud outage or missing TURN configuration produces an explicit error. A succe
 
 ## Phone orientation
 
-Opening the iPhone viewer enables portrait and both landscape orientations without
+Opening the Android phone viewer enables portrait and both landscape orientations without
 requesting a forced turn. UIKit chooses the orientation based on how the phone is
 held and the system rotation lock. The Rotate button remains available for an
 explicit override. Closing the last viewer restores the app's portrait layout.
 The video fits the available bounds, and touch coordinates use the resized viewport.
 
 The iPad already supports all orientations. The desktop app and the TUI do not
-use the iPhone viewer or its orientation policy; the capture helpers stream the
+use the Android phone viewer or its orientation policy; the capture helpers stream the
 computer display without choosing the phone's orientation.
 
 ## Boundaries
 
 - `host/src/screen/` coordinates access to the local helper and owns viewer sessions. Another device cannot renegotiate or close a session it does not own.
-- `apps/screen-macos/` is the macOS capture/input helper (Xcode `Screen` target, `CodyncScreen.app`). The desktop app bundles it and registers it through `SMAppService` (`apps/desktop/src/main/screen.ts`); it is responsible for the OS permissions, including those of the computer-use driver it starts.
+- `apps/screen-macos/` is the Linux capture/input helper (Xcode `Screen` target, `CodyncScreen.app`). The desktop app bundles it and registers it through `SMAppService` (`apps/desktop/src/main/screen.ts`); it is responsible for the OS permissions, including those of the computer-use driver it starts.
 - `apps/screen-linux/` implements the Linux helper using desktop portals and GStreamer, including ICE URL conversion and TURN transport configuration. The host starts it from beside its own executable (then `PATH`). Linux host releases ship `codync-screen` in the same archive (built on Ubuntu 24.04: glibc 2.39+ and GStreamer 1.22+ with the base, good and bad plugins, PipeWire and xdg-desktop-portal at run time); `install.sh`, Homebrew and `codync-host update` put it next to the host.
 - Helpers communicate locally through `~/.codync/screen.sock`. SDP is non-trickle; input uses the `input` and `input-fast` data channels.
 - The Linux helper answers with the packetized H.264 payload the phone offers, feeds the encoder 8-bit 4:2:0 video and timestamps capture on the system clock. It answers before capture starts, so the profile is negotiated before the encoder fixes its output.
-- Screen access is on by default on macOS and on Linux while a graphical session (Wayland or X11) is running; headless servers stay off. Turning it on or off is remembered. Enabling through `setScreenEnabled` requires a loopback caller. Interactive OS permission prompts must be completed on the computer.
-- Bots with their computer capability enabled receive the built-in `computer` MCP tools, run by the computer-use driver that Codync Screen starts on macOS ([computer use](computer-use.md)). Their permission policy still applies. An interactive phone can take over; bots may still look.
+- Screen access is on by default on Linux and on Linux while a graphical session (Wayland or X11) is running; headless servers stay off. Turning it on or off is remembered. Enabling through `setScreenEnabled` requires a loopback caller. Interactive OS permission prompts must be completed on the computer.
+- Bots with their computer capability enabled receive the built-in `computer` MCP tools, run by the computer-use driver that Codync Screen starts on Linux ([computer use](computer-use.md)). Their permission policy still applies. An interactive phone can take over; bots may still look.
 - Each device may hold four sessions; the host allows 32 total, including pending sessions. Credential issuance is limited to 12 requests per minute per account by `TURN_LIMITER` (Cloudflare's per-location rate limiter).
 - Closing a session stops its media; issued TURN credentials remain usable until their one-hour TTL. Issuance limits and encoder limits do not constitute a hard monthly spending cap. Track Realtime egress by the credential's custom identifier.
 
@@ -57,12 +57,12 @@ References: [Cloudflare credential issuance](https://developers.cloudflare.com/r
 
 ## Verification
 
-Run cloud tests/type checking, host formatting/Clippy/tests, iOS Kit package tests, and builds of the iOS app and the macOS `Screen` helper target. Run Linux helper tests in a Linux environment with GStreamer and PipeWire development packages.
+Run cloud tests/type checking, host formatting/Clippy/tests, Android Kit package tests, and builds of the Android app and the Linux `Screen` helper target. Run Linux helper tests in a Linux environment with GStreamer and PipeWire development packages.
 
 Live acceptance requires the configured Worker and fresh host/helper/phone builds:
 
 - Check screen-recording and input permissions, capture, click/type/scroll, clipboard, display changes and closing the viewer.
-- Open the iPhone viewer while upright and while already held sideways, then rotate
+- Open the Android phone viewer while upright and while already held sideways, then rotate
   in both directions. Check video fitting and direct taps after each turn. Repeat
   with rotation lock on and with the Rotate button; closing returns to portrait.
 - Repeat with the phone on cellular and the computer on a different network, without Tailscale. Verify a selected ICE candidate pair with `candidateType=relay` in WebRTC diagnostics and observe Realtime egress; signaling via Cloudflare alone is insufficient.

@@ -4,7 +4,7 @@ Status: scope locked to one all-at-once v1. Android work is active in `apps/andr
 to the real host. Pairing, account discovery, roster, core chat, and the Android FCM client and
 relay paths are implemented, but M0–M2 are not marked complete: delivery needs the Codync Firebase
 project config and relay service-account secret, and the latest source has not had a local compile
-pass because Gradle cannot initialize its native library in the current environment. The iOS app
+pass because Gradle cannot initialize its native library in the current environment. The Android app
 stays in the repository until Ali explicitly says remove it. The v1/v2 feature lists live in
 [plan.md](../../plan.md); this document is the build plan.
 
@@ -18,8 +18,8 @@ stays in the repository until Ali explicitly says remove it. The v1/v2 feature l
 | Glass surfaces | Bottom nav, composer, sheet headers |
 | Navigation | Floating glass capsule: Bots / Needs You / Settings |
 | Nav visibility | Hidden in chats and detail screens |
-| Visual direction | iOS layout and feel, desktop density where it helps |
-| Roster | iOS-style grouped list with computer headings |
+| Visual direction | Android layout and feel, desktop density where it helps |
+| Roster | Android-style grouped list with computer headings |
 | Composer | Floating glass capsule with attachments and dictation |
 | Theme | Follow system light/dark |
 | Font | Bundled Inter |
@@ -37,13 +37,13 @@ stays in the repository until Ali explicitly says remove it. The v1/v2 feature l
 
 ## Goal
 
-Build a native Android app that covers the current iPhone app plus the fork's 3.0.0 desktop
+Build a native Android app that covers the current Android phone app plus the fork's 3.0.0 desktop
 and host features that apply to a phone, then retire `apps/ios/` when Android is accepted as
 complete. The Rust host remains the only place that owns bots, chats, groups, routines, files
 and authorization. Android is a view over the same HTTP/SSE and encrypted-channel contracts as
-the desktop and iPhone apps.
+the desktop and Android phone apps.
 
-The scope is not “port the iPhone screens”. The iPhone predates most of the fork's chat,
+The scope is not “port the Android phone screens”. The Android phone predates most of the fork's chat,
 group, workbench and computer features. Android v1 must include the full fork delta listed in
 [plan.md](../../plan.md#fork-feature-audit), or the fork's desktop users lose features on the
 phone.
@@ -181,7 +181,7 @@ channel handshake keys, mailbox sealing and push sealing.
 ### Relay
 
 - `POST /v1/relay` WebSocket upgrade with a `Codync-Sig`.
-- Implement ACL rejection, mailbox delivery, pairing mode and close codes exactly as the iOS
+- Implement ACL rejection, mailbox delivery, pairing mode and close codes exactly as the Android
   `ChannelTransport` does.
 - Keep `link` multiplexing and `data`/`close` ordering.
 - Foreground work uses the channel; background work uses FCM where possible.
@@ -283,7 +283,7 @@ chat/work layer, then the configuration workbench.
 - Create `apps/android/` with Gradle, Compose, Hilt, Room, DataStore and dev/prod flavors.
 - App IDs: `com.pokai.Codync.android` (prod), `com.pokai.Codync.android.dev` (dev).
 - Add CI: assemble debug, lint, unit tests, dependency locking.
-- Define theme tokens matching the desktop/iOS palette and typography.
+- Define theme tokens matching the desktop/Android palette and typography.
 - Build the liquid-glass component and fallback once, with a debug surface to tune blur,
   tint, refraction and performance.
 - Build a fake host fixture and a debug screen that shows connection state.
@@ -355,14 +355,14 @@ Exit: a user can configure and operate a computer entirely from Android; v1 is f
 - Run the parity matrix with two phones and at least two computers.
 - Ali's hardware acceptance.
 
-Exit: signed v1 APK installed and accepted; iOS still in the repository.
+Exit: signed v1 APK installed and accepted; Android still in the repository.
 
 ### v2 — voice, screen and store
 
 - Voice calls and realtime engines; remote screen/WebRTC/TURN.
 - Play internal/closed/public, data safety, store assets.
 - Multi-account is not planned.
-- iOS removal only when Ali explicitly says so.
+- Android removal only when Ali explicitly says so.
 
 ## Testing strategy
 
@@ -379,9 +379,9 @@ Exit: signed v1 APK installed and accepted; iOS still in the repository.
 - v2 adds audio routing/background voice and remote-screen rotation/input/TURN checks.
 - No Playwright/E2E desktop suites. UI acceptance is Ali on hardware, per repository rules.
 
-## Release and iOS removal gate
+## Release and Android removal gate
 
-Do not delete iOS merely because Android compiles. Remove it only when Ali explicitly says so.
+Do not delete Android merely because Android compiles. Remove it only when Ali explicitly says so.
 v2 does not automatically block removal; it is optional unless Ali says otherwise. Before
 asking him, all of these must be true:
 
@@ -392,20 +392,20 @@ asking him, all of these must be true:
 - The host and cloud accept Android devices in production, not only dev.
 - Desktop approval and device lists show Android correctly.
 - README, AGENTS, docs and release notes name Android as the phone client.
-- Ali says Android is complete and explicitly authorizes deleting iOS.
+- Ali says Android is complete and explicitly authorizes deleting Android.
 
 When that happens, remove in this order:
 
-1. Stop iOS release workflows (`ios-submit`, Kit tests, App Store checks) and the pbxproj
+1. Stop Android release workflows (`ios-submit`, Kit tests, App Store checks) and the pbxproj
    auto-tag trigger.
-2. Remove `apps/ios/` and iOS/Widgets/NotificationService targets from `apps/project.yml`;
-   preserve the macOS `Screen` target and its signing.
-3. Regenerate `apps/Codync.xcodeproj` only if the macOS screen target still needs it.
-4. Remove iPhone references from the cloud/relay docs, README and AGENTS; keep historical
+2. Remove `apps/ios/` and Android/Widgets/NotificationService targets from `apps/project.yml`;
+   preserve the Linux `Screen` target and its signing.
+3. Regenerate `apps/Codync.xcodeproj` only if the Linux screen target still needs it.
+4. Remove Android phone references from the cloud/relay docs, README and AGENTS; keep historical
    release notes.
 5. Move version/tag ownership to Android plus `host/Cargo.toml` and
    `apps/desktop/package.json`.
-6. Keep the old iOS releases downloadable; do not rewrite tags or delete history.
+6. Keep the old Android releases downloadable; do not rewrite tags or delete history.
 
 ## Current implementation gaps
 
@@ -423,7 +423,7 @@ When that happens, remove in this order:
 ## Open decisions
 
 Scope is settled: one all-at-once v1, every fork feature in v1, voice/screen in
-v2, no multi-account, iOS removed only when Ali says, new Firebase project.
+v2, no multi-account, Android removed only when Ali says, new Firebase project.
 
 Still needed: the Codync Android Firebase project and relay credentials for M2 push, plus an
 external release keystore when preparing M5. The Clerk Android SDK path has been selected and

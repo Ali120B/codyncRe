@@ -6,7 +6,7 @@ Codync keeps agents and their working files on a computer. Clients address that 
 
 ```mermaid
 flowchart LR
-    Phone[iPhone] -->|Encrypted WebSocket| Cloud[cloud/ Worker + ComputerRelay DO]
+    Phone[Android phone] -->|Encrypted WebSocket| Cloud[cloud/ Worker + ComputerRelay DO]
     Phone -->|Encrypted direct channel| Host[codync-host]
     Cloud <-->|Encrypted frames| Host
     Local[Desktop app / TUI] -->|Loopback HTTP + SSE| Host
@@ -40,7 +40,7 @@ Cloud account metadata includes names, public keys, ownership and access state. 
 
 ## Host owns the logic
 
-Product logic and heavy work run once, in the Rust host. The iPhone app, the desktop app and the terminal UI are views over host state: logic in one client would need a copy in the others, and the copies drift.
+Product logic and heavy work run once, in the Rust host. The Android phone app, the desktop app and the terminal UI are views over host state: logic in one client would need a copy in the others, and the copies drift.
 
 The host owns:
 
@@ -53,7 +53,7 @@ The host owns:
 Clients keep:
 
 - Rendering, input and animation; UI-only state (drafts, scroll position, selection, open sheets); optimistic display that host events then confirm or replace.
-- Work only the device can do. On iPhone: microphone and speech, Keychain, APNs registration, push decryption in the notification extension, end-to-end channel crypto and widgets. In the desktop main process: installing and controlling the host service, SSH tunnels, the speech helper, Codync Screen registration and app updates.
+- Work only the device can do. On Android phone: microphone and speech, Keychain, APNs registration, push decryption in the notification extension, end-to-end channel crypto and widgets. In the desktop main process: installing and controlling the host service, SSH tunnels, the speech helper, Codync Screen registration and app updates.
 
 When a client needs data or behavior the host doesn't offer, add a host method or event (additive; see [compatibility](../reference/compatibility.md)) and use it from every client. Never rebuild it inside one client.
 
@@ -65,11 +65,11 @@ When a client needs data or behavior the host doesn't offer, add a host method o
 
 ## Client state and routing
 
-- On iPhone, `AccountSession` owns Clerk integration; `AccountStore` owns one account context's computer stores.
+- On Android phone, `AccountSession` owns Clerk integration; `AccountStore` owns one account context's computer stores.
 - `BotReference(accountId, computerId, botId)` identifies a destination. Widgets and pushes carry account/computer scope.
 - `BotStore` mirrors one computer and consumes a `HostTransport`: loopback or encrypted channel.
 - Account changes retire the old stores; late responses must not update the new context. Signing out erases that context's local credentials and caches.
-- The desktop app (`apps/desktop/`) has its own TypeScript `BotStore` and attaches its local host and configured SSH hosts through loopback only ([desktop app](desktop-app.md)). iPhone connections use device identities.
+- The desktop app (`apps/desktop/`) has its own TypeScript `BotStore` and attaches its local host and configured SSH hosts through loopback only ([desktop app](desktop-app.md)). Android phone connections use device identities.
 
 The product currently prioritizes one computer. Existing account-scoped aggregation and SSH support remain; their presence is not a reason to add multi-computer features without a product requirement.
 
@@ -83,4 +83,4 @@ Remote screen uses the channel for signaling and WebRTC for media/input. Cloudfl
 
 Client/host compatibility uses mutual minimum versions (`minApp` / `minHost`, see [compatibility](../reference/compatibility.md)). The channel wire version (`v=1`), pairing URL version (`v=3`) and the cloud health endpoint's service version are separate values.
 
-The `iOS Dev` scheme (`DevDebug` / `DevRelease`) uses `apps/shared/Config/dev.plist`; `iOS` (`Debug` / `Release`) uses `main.plist`. The desktop app takes the same values through `apps/desktop/tools/account-config.mjs`. The host compiles in its cloud from `CODYNC_ENV` (`main`, else dev), set by the same packaging script (`dist:<platform>:dev` / `dist:<platform>:main`). See [environments](../guides/environments-and-deployment.md).
+The `Android Dev` scheme (`DevDebug` / `DevRelease`) uses `apps/shared/Config/dev.plist`; `Android` (`Debug` / `Release`) uses `main.plist`. The desktop app takes the same values through `apps/desktop/tools/account-config.mjs`. The host compiles in its cloud from `CODYNC_ENV` (`main`, else dev), set by the same packaging script (`dist:<platform>:dev` / `dist:<platform>:main`). See [environments](../guides/environments-and-deployment.md).

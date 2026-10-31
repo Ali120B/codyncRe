@@ -1,6 +1,6 @@
 # Running the host on a Linux server or cloud VM
 
-`codync-host` runs on any 64-bit Linux machine: a desktop, a home server, or a headless cloud VM (AWS, GCP, Azure, Hetzner, DigitalOcean…). It needs no display. Bots run on that machine and you message them from the iPhone, the desktop app or `codync-host tui`.
+`codync-host` runs on any 64-bit Linux machine: a desktop, a home server, or a headless cloud VM (AWS, GCP, Azure, Hetzner, DigitalOcean…). It needs no display. Bots run on that machine and you message them from the Android phone, the desktop app or `codync-host tui`.
 
 ## Requirements
 
@@ -35,7 +35,7 @@ The phone connects over the encrypted device channel. The pairing link lists onl
 
 - **Tailscale (recommended for VMs):** install Tailscale on the VM and on the phone, then `codync-host pair`. The Tailscale name comes first in the link. You don't need to open port 19222 in the cloud firewall.
 - **Cloudflare cloud:** start the host with `CODYNC_CLOUD_URL=https://…` if you run your own Codync cloud. The production cloud isn't live yet (see [environments](environments-and-deployment.md)).
-- **Desktop app over SSH:** the desktop app (macOS or Linux) can attach an SSH computer and tunnel to its loopback API ([Accounts and SSH](accounts-and-ssh.md)). From any terminal: `ssh -L 19222:127.0.0.1:19222 vm`, then `codync-host tui` locally.
+- **Desktop app over SSH:** the desktop app (Linux or Linux) can attach an SSH computer and tunnel to its loopback API ([Accounts and SSH](accounts-and-ssh.md)). From any terminal: `ssh -L 19222:127.0.0.1:19222 vm`, then `codync-host tui` locally.
 
 The host listens on `0.0.0.0:19222`. The local API (`/api/*`, `/events`, terminals; bearer token) answers **loopback callers only**, so a public address never exposes it. From outside, only `/health` (host id, computer id, version) and the end-to-end encrypted device channel answer, and the channel only serves devices holding this host's pairing keys. Keep 19222 closed in the cloud firewall anyway unless you deliberately pair over a VPN or private network.
 
@@ -56,4 +56,4 @@ Tested in Docker on arm64 (the x86_64 build is the same code and the same CI job
 - The v2.1.0 glibc release failed on Ubuntu 22.04 and Debian 12 (`GLIBC_2.39 not found`). The workflow now builds musl for that reason.
 - Host tests passed on Linux: 101 + 9 + 1.
 
-Not covered: a real cloud provider VM, pairing a physical iPhone over Tailscale to a VM, and bot turns with signed-in agents on the VM (these need real credentials). Those use the same code paths as a Linux desktop.
+Not covered: a real cloud provider VM, pairing a physical Android phone over Tailscale to a VM, and bot turns with signed-in agents on the VM (these need real credentials). Those use the same code paths as a Linux desktop.

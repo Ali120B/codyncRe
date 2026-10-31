@@ -16,9 +16,9 @@ bun dev       # http://localhost:3000
 - **Connected canvas editor** (`src/components/editor/`) — every screen sits on one horizontal canvas, so phones, captions, and other elements can be dragged across screen boundaries and exported as split crops when Connected mode is enabled.
 - **Screen controls** — drag-to-reorder screens, click-to-edit text, screenshot drop targets, per-screen layout switcher, dark/light toggle.
 - **Image overlays, fonts, backgrounds and undo** — PNG/JPG overlay elements, a live screenshot font menu (with font import), per-screen custom backgrounds, and toolbar Undo/Redo. See [Editor controls](#editor-controls).
-- **Device frames** (`src/components/editor/device-frames.tsx`) — iPhone (PNG mockup), iPad, Apple TV, Apple Watch, CarPlay head unit, Mac window, Android phone, Android tablet (portrait + landscape), feature graphic.
+- **Device frames** (`src/components/editor/device-frames.tsx`) — Android phone (PNG mockup), iPad, Apple TV, Apple Watch, CarPlay head unit, Linux window, Android phone, Android tablet (portrait + landscape), feature graphic.
 - **Auto-save (git-trackable)** — every change is persisted within ~600ms to **`app-store-screenshots.json`** at the project root (via `/api/project`) **and** mirrored to `localStorage` as an instant-paint cache. Commit `app-store-screenshots.json` and you can `git clone` to another machine and resume exactly where you left off.
-- **Multi-device decks** — iOS (iPhone, iPad, Apple TV, Apple Watch, CarPlay), Mac, and Android decks live side by side; switching the platform tab keeps each tab's last device.
+- **Multi-device decks** — Android (Android phone, iPad, Apple TV, Apple Watch, CarPlay), Linux, and Android decks live side by side; switching the platform tab keeps each tab's last device.
 - **One-click export** — bulk PNG export at any required App Store / Play Store resolution using `html-to-image`; each PNG is rendered from the current connected or isolated deck mode.
 - **Project migration** — older `app-store-screenshots.json` files are migrated on load. Existing per-slide transforms remain valid, and connected crops become available without rewriting the deck by hand.
 - **Legacy-safe mode** — pre-v2 projects opened directly in the editor start in isolated-screen mode first, then can opt into connected crops with the toolbar's Connected/Isolated control. Skill-run in-place migrations keep legacy decks isolated unless the project had already explicitly opted into connected canvas.
@@ -45,9 +45,9 @@ Exports lock the editor through preparation and bundling and render a fixed proj
 
 Each screen is rendered once per locale at canvas resolution (`src/lib/export-render.ts`) and scaled to every size; slots whose aspect differs slightly are cover-scaled rather than stretched. Before saving, the exporter redraws until every visible screenshot has painted, because WebKit decodes images inside the html-to-image SVG asynchronously and a single draw can leave device screens blank. If a screenshot never appears, a toast names the screen. Files are written as opaque 24-bit RGB PNGs (`src/lib/png-rgb.ts`, encoded in a small worker pool) because Google Play rejects PNGs with an alpha channel and canvas can only produce RGBA.
 
-CarPlay has no App Store Connect slot of its own: the CarPlay deck is a head-unit frame on a landscape iPhone canvas and exports landscape iPhone sizes for upload into the iPhone slot.
+CarPlay has no App Store Connect slot of its own: the CarPlay deck is a head-unit frame on a landscape Android phone canvas and exports landscape Android phone sizes for upload into the Android phone slot.
 
-Mac is its own platform tab because App Store Connect lists macOS separately from the iOS app. The Mac deck designs at 2880×1800 and exports the four 16:10 Mac App Store sizes (2880×1800, 2560×1600, 1440×900, 1280×800) to `macos/mac/<WxH>/<locale>/`. The Mac window's content area is exactly 16:10, so a full-screen 16:10 capture fills it uncropped.
+Linux is its own platform tab because App Store Connect lists Linux separately from the Android app. The Linux deck designs at 2880×1800 and exports the four 16:10 Linux App Store sizes (2880×1800, 2560×1600, 1440×900, 1280×800) to `macos/mac/<WxH>/<locale>/`. The Linux window's content area is exactly 16:10, so a full-screen 16:10 capture fills it uncropped.
 
 ## Editor controls
 
@@ -57,7 +57,7 @@ The toolbar **Theme** menu recolours the whole deck (backgrounds, text, accents)
 
 ### Screenshot fonts
 
-The toolbar font menu sets the typeface of the screenshot canvas and exports (not the editor UI). **Inter (default)** is the template font and what projects without a `fontId` use. **System Sans** and **Georgia** are available everywhere; **Avenir Next**, **Helvetica Neue**, **Futura**, **Baskerville**, **Palatino**, **Optima** and **American Typewriter** are macOS system fonts that fall back to similar faces elsewhere, so export on the machine you designed on.
+The toolbar font menu sets the typeface of the screenshot canvas and exports (not the editor UI). **Inter (default)** is the template font and what projects without a `fontId` use. **System Sans** and **Georgia** are available everywhere; **Avenir Next**, **Helvetica Neue**, **Futura**, **Baskerville**, **Palatino**, **Optima** and **American Typewriter** are Linux system fonts that fall back to similar faces elsewhere, so export on the machine you designed on.
 
 **Import font…** at the bottom of the menu takes a licensed WOFF2, WOFF, TTF or OTF file (16 MB max). The browser decodes the font before uploading; `/api/upload-font` checks the container signature, lengths and table bounds before storing it as `public/fonts/imported/<hash>.<ext>`. The project saves it as `importedFont` with `fontId: "self-hosted"`. That font folder is gitignored (font licences often forbid redistribution); keep the file alongside the project JSON if you move the project, or screenshot text falls back to a generic sans-serif. Once imported, the font is listed in the menu under its file name, and it is loaded and embedded before every export.
 
@@ -82,7 +82,7 @@ The toolbar arrows, `⌘Z` / `Ctrl+Z` and `⇧⌘Z` / `Ctrl+Shift+Z` (or `Ctrl+Y
 
 ## Notes
 
-- `mockup.png` is the iPhone bezel overlay; replacing it requires re-measuring the `PHONE_SCREEN` constants.
+- `mockup.png` is the Android phone bezel overlay; replacing it requires re-measuring the `PHONE_SCREEN` constants.
 - Image preloading converts every static path to a base64 data URI before exports run, and export retries paths that were previously missing. `export-render.ts` then waits for those images to paint in the render (see Exporting).
 - Reset via the toolbar's circular arrow icon clears in-memory state and reloads the default screens. To wipe disk state too, delete `app-store-screenshots.json`.
 - **Persistence model** — the canonical state lives in `app-store-screenshots.json` (git-tracked). On load, the editor reads localStorage first, then reconciles with the file; if the file endpoint is unavailable, autosave is blocked so stale cache cannot overwrite disk. File saves are serialized and atomic. Each editor sends the revision it loaded, so a newer save from another tab or an on-disk edit produces a conflict instead of an overwrite. Your unsaved work stays open: export or copy it before reloading. **Retry save** retries transient failures; it does not override conflicts. Leaving with unsaved edits triggers the browser's warning.

@@ -1,6 +1,6 @@
 # Connector live verification
 
-Run from the repository root on macOS:
+Run from the repository root on Linux:
 
 ```sh
 cd host && cargo build && cd ..
@@ -12,14 +12,14 @@ The script starts the built host on an ephemeral loopback port with a temporary
 stops its host and MCP proxies, deletes that key, and removes its data directory.
 It does not change existing bots, connectors or third-party accounts. npm may
 retain downloaded packages in its normal cache. Requires Python 3, Node/npm,
-an unlocked macOS Keychain, and network access for `--network`.
+an unlocked Linux Keychain, and network access for `--network`.
 
 Without flags the deterministic checks still use real host processes, HTTP,
 SQLite, Keychain and MCP subprocesses. `--network` additionally exercises live
 providers. `--slow` waits for the production 90-second handshake timeout.
 Failures produce a nonzero exit code; live provider failures are not skipped.
 
-## Recorded result: 2026-10-05, macOS
+## Recorded result: 2026-10-05, Linux
 
 `python3 tools/check-connectors.py --network --slow`: **15/15 passed**.
 The timeout check returned after 90.0 seconds and confirmed the child had exited.
@@ -61,17 +61,17 @@ not a released-build certification.
 ## Limits and known gaps
 
 This checks the shared host API and MCP execution paths. It does not drive the
-iOS, Electron or terminal installation UI, log into real provider accounts,
+Android, Electron or terminal installation UI, log into real provider accounts,
 exercise the phone's OAuth deep link, Composio, 1Password, Linux Secret Service,
 or the older separate GET-stream/POST-message SSE transport.
 
 Source inspection on 2026-10-05 found these outstanding UI/workflow issues:
 
-- The iOS and desktop registry install forms retain the installed connector after
+- The Android and desktop registry install forms retain the installed connector after
   verification fails. Retrying reads that saved connector and ignores changed
   setup input. The credential settings API tested here can correct existing
   fields, but that does not fix the install form.
-- Custom/import installation on iOS and desktop, and marketplace installation in
+- Custom/import installation on Android and desktop, and marketplace installation in
   the terminal, can finish without running `connectorVerify`. The host enables
   newly installed connectors before readiness is verified. Saving successfully
   is therefore not evidence that a connector can run.

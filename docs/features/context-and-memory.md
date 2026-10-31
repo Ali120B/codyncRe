@@ -49,7 +49,7 @@ its own context and compacts it itself.
   bot's selected model with inline instructions. Automatic naming still uses `chat/naming.rs`.
 - The built-in memory MCP server forwards native Engram tools for recall, saving, review and conflict
   judgment, and retains `search_history` for the bot's original main-chat and thread messages.
-- iOS, desktop and terminal provide search, CRUD, pinning, review, history, timeline, export and import.
+- Android, desktop and terminal provide search, CRUD, pinning, review, history, timeline, export and import.
   See [Engram memory integration](engram-memory.md) for storage, migration, deletion semantics, API and tests.
 
 ## Turns

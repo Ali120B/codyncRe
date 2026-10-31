@@ -15,11 +15,11 @@ UI: *About usage analytics…*) shows the same promise in the app, in one text p
   catalog names (agent, model, connector catalog name; a custom connector is just `custom`).
   Errors are categories and code locations, never an error's message (see *Error tracking*).
 - **Setting per device.** The computer's owner decides for that computer (host kv
-  `analytics_enabled`, on unless `0`); each iPhone decides for itself (`UserDefaults`
+  `analytics_enabled`, on unless `0`); each Android phone decides for itself (`UserDefaults`
   `analyticsEnabled`, on unless `false`). Turning it off drops anything still queued. A
   device that said no to the earlier opt-in question stays off.
 - **Identity.** Every device gets a person profile. Signed in to a Codync account: the Clerk
-  user id. Otherwise a random install id (the host id on a computer, a UUID on the iPhone).
+  user id. Otherwise a random install id (the host id on a computer, a UUID on the Android phone).
   The first signed-in event sends `$identify` with `$anon_distinct_id` so earlier events join
   the account.
 - **Location, never the IP.** The project's GeoIP transformation turns the sender's IP into an
@@ -44,7 +44,7 @@ UI: *About usage analytics…*) shows the same promise in the app, in one text p
   (`app_opened`, `onboarding_completed` when the welcome screen is finished, `signed_in`,
   `signed_out`) and turns sharing on or off with `setAnalytics`; `hello` carries `analytics: true | false`.
   The **terminal UI** reports only `app_opened` (it has no welcome screen or sign-in).
-- **iPhone** (`CodyncKit` analytics client, no SDK) sends its own app-level events
+- **Android phone** (`CodyncKit` analytics client, no SDK) sends its own app-level events
   (`app_opened`, `onboarding_completed`, `computer_paired`, `signed_in`, `signed_out`,
   `voice_call_started`) straight to PostHog. Widgets and the notification extension never send.
 
@@ -77,7 +77,7 @@ builds PostHog's generic `custom` frames (oldest first, the failing one last).
   crashed (`RendererGone`, `GPUGone`, … with Electron's reason), through `reportError`.
   Processes `desktop-main`, `desktop-renderer`. The renderer is built unminified so function
   names stay readable.
-- **iPhone** (`CodyncKit` `CrashReports`): MetricKit's crash diagnostics, delivered on the next
+- **Android phone** (`CodyncKit` `CrashReports`): MetricKit's crash diagnostics, delivered on the next
   launch, straight to PostHog with the version that crashed. Frames are `binary + offset`
   (unsymbolicated; Xcode Organizer has the symbolicated crash). Process `ios`.
 
@@ -95,14 +95,14 @@ tracking's own issue alerts (new, reopened, spiking) need a Slack or Discord des
 ## Metrics
 
 Shared filters: `env = 'main'`, internal accounts excluded, UTC days. A *user* is a PostHog
-person: the account when signed in, otherwise one install, so an anonymous iPhone and an
+person: the account when signed in, otherwise one install, so an anonymous Android phone and an
 anonymous computer are two users until both sign in. Messages are recorded by the computer,
-so an anonymous iPhone's chats count for its computer. To count people rather than devices,
-join an iPhone's `computer_paired` to the computer's events on `computer` in SQL.
+so an anonymous Android phone's chats count for its computer. To count people rather than devices,
+join an Android phone's `computer_paired` to the computer's events on `computer` in SQL.
 
 | Metric | Definition |
 |---|---|
-| Active user (DAU/WAU/MAU) | Sent ≥1 `message_sent` in the period. Any event at all counts as *present*, not active (`app_opened` on the iPhone fires on every return to the foreground). |
+| Active user (DAU/WAU/MAU) | Sent ≥1 `message_sent` in the period. Any event at all counts as *present*, not active (`app_opened` on the Android phone fires on every return to the foreground). |
 | New user | First event of any kind in the period. |
 | Activated | Sent ≥1 message from a phone (`message_sent`, `client = remote`) within 7 days of first seen. In the first week of data, 4 of 5 such users came back after 24 h and none of the 6 computer-only ones did. |
 | Successful turn rate | `turn_finished` with `outcome = done` ÷ all `turn_finished` with `source = user`, per agent and per `$os`. |
@@ -115,6 +115,6 @@ join an iPhone's `computer_paired` to the computer's events on `computer` in SQL
 ## Turning it off
 
 No client asks: sharing starts with the first launch. Every client has the same switch,
-*Share usage analytics* (iPhone and desktop Settings → Privacy, terminal UI `^k`). The App
+*Share usage analytics* (Android phone and desktop Settings → Privacy, terminal UI `^k`). The App
 Store privacy label declares *Product Interaction* and *Coarse Location*, linked to the user, not used
 for tracking (the same two in `apps/ios/Resources/PrivacyInfo.xcprivacy`).

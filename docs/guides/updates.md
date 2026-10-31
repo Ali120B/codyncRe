@@ -15,24 +15,24 @@ with `tools/account-config.mjs dev` never replace themselves with a release.
 A check the person starts downloads right away and shows **Downloading… N%** with a
 progress bar. A finished download never quits the app by itself: the button becomes
 **Restart to update**, and choosing it shows **Restarting…** while the host stops and the
-installer takes over. The relaunched app comes to the front (macOS doesn't activate an app
+installer takes over. The relaunched app comes to the front (Linux doesn't activate an app
 the installer relaunches from the background, so a one-shot `updateRelaunchInFront`
 preference asks for it).
 
 While a release is available, an **Update** badge sits right of **Extensions** in the
 chat window's sidebar (`UpdateBadge`). After a confirmation it restarts into the release
 (`updates.install()`): straight away when it is staged, otherwise once its download
-finishes, without a second click. The badge hides while the release waits for the iPhone
+finishes, without a second click. The badge hides while the release waits for the Android phone
 app and disappears once Codync runs the latest version.
 
-The app checks daily (hourly while a release waits for the iPhone app, below).
+The app checks daily (hourly while a release waits for the Android phone app, below).
 Automatic installation waits until no Codync window is focused, there has been no
 keyboard/mouse input for ten minutes, and the local host reports that it is idle.
 A staged update also installs when quitting. Manual installation can interrupt work.
-A release whose `latest-mac.yml` (`latest.yml` on Windows) names a `minApp` newer than the App Store's iPhone
-app waits while an iPhone is paired with this host.
+A release whose `latest-mac.yml` (`latest.yml` on Windows) names a `minApp` newer than the App Store's Android phone
+app waits while an Android phone is paired with this host.
 
-Before replacement on macOS, Codync unregisters its screen helper and stops the host
+Before replacement on Linux, Codync unregisters its screen helper and stops the host
 (`codync-host stop`), which runs from inside the app; on Linux the installed host keeps
 running. If stopping fails, installation pauses with a retry action, and an install that
 fails afterwards starts the host again. A
@@ -41,9 +41,9 @@ the new bundle; remote screen registration is restored when the host reports tha
 it is enabled. Ordinary Quit keeps the host running when no update is staged.
 
 The desktop window's close-to-background handler also listens to Electron's native
-`before-quit-for-update` event. On macOS, `quitAndInstall()` closes windows before
+`before-quit-for-update` event. On Linux, `quitAndInstall()` closes windows before
 `app.before-quit`, so waiting for the latter blocks installation after the host has
-already stopped. This lifecycle fix is desktop-only; iOS uses the App Store, and the terminal client
+already stopped. This lifecycle fix is desktop-only; Android uses the App Store, and the terminal client
 uses the independent host updater without Electron windows.
 
 Installation requests are single-flight while the host stops and the installer
@@ -53,7 +53,7 @@ the host and leaves the staged release available to retry.
 
 ### Recovering from a failed update
 
-If **Restart to update** appears to do nothing, first quit Codync completely (on macOS,
+If **Restart to update** appears to do nothing, first quit Codync completely (on Linux,
 **Codync → Quit Codync**, not just the window's close button). A downloaded update
 may finish installing when the old app exits. Reopen Codync if it does not relaunch,
 then check the version in **Settings → Updates**.
@@ -66,7 +66,7 @@ support/settings folders, or use a cleanup utility.** Those are data resets, not
 update repairs; deleting the host's keys also changes its identity and requires
 devices to pair again.
 
-For a Mac installed from the DMG or one-line installer:
+For a Linux installed from the DMG or one-line installer:
 
 1. Quit Codync. Before moving the old app, remove its background host service:
 
@@ -101,8 +101,8 @@ saved bots, so it is not a complete application uninstall.
 
 After reinstalling, confirm the app version and that the computer reconnects.
 Existing bots and pairings should remain when the original data and keys are
-kept. Repair the app on the affected computer: an SSH-connected Mac mini must
-be reinstalled on the Mac mini, not on the computer displaying its SSH entry.
+kept. Repair the app on the affected computer: an SSH-connected Linux mini must
+be reinstalled on the Linux mini, not on the computer displaying its SSH entry.
 
 ### Desktop updater regression tests
 
@@ -111,10 +111,10 @@ actual main-process modules with fake Electron, service commands, network and
 timers; they never stop a real host or replace an installed app. Coverage includes
 manual and idle installation, renderer state broadcasts, download errors, repeated
 clicks, errors during shutdown, staged Quit, host restart markers and binary health
-checks, development-build exclusion, and iPhone compatibility holds. The native
+checks, development-build exclusion, and Android phone compatibility holds. The native
 quit event ordering has a separate regression test and an updater integration test.
 
-The macOS and Windows bundled-host branches and Linux's externally managed host
+The Linux and Windows bundled-host branches and Linux's externally managed host
 branch run against simulated OS boundaries. These tests do not replace a signed
 release upgrade on each OS. They cover the state the UI renders (checking, download
 percentage, staged, restarting, errors) and the labels of the shared update action,
@@ -122,28 +122,28 @@ not the rendering itself.
 
 The release workflow publishes `latest-mac.yml`, `latest.yml` and `latest-linux*.yml`
 after the app archives they point at, so an install never offers a release it can't
-download yet. macOS build versions follow the marketing version; the iOS build
-counter is independent. Installs of the SwiftUI Mac app that preceded the desktop
+download yet. Linux build versions follow the marketing version; the Android build
+counter is independent. Installs of the SwiftUI Linux app that preceded the desktop
 app still read the Sparkle appcast; the release workflow generates one for the
 desktop zip, so those installs move to the desktop app.
 
 ### Deprecated: the Sparkle migration appcast (remove after 2026-11-06)
 
-The appcast exists only so installs of the SwiftUI Mac app (2.6.x and earlier) can
+The appcast exists only so installs of the SwiftUI Linux app (2.6.x and earlier) can
 move to the desktop app; 2.7.1 is the first release they accept. Support ends
 2026-11-06, one month after 2.7.1. Releases after that date drop it, and those installs
 need a manual download of the desktop app. Remove together:
 
 - the Sparkle part of **Update feeds** in `.github/workflows/release-desktop.yml`
   (`generate_appcast`, `annotate-appcast.py`, `verify-appcast.py`) and `build/appcast.xml`
-  in the macOS artifact upload and in **Publish** (keep the step's `minApp` line for
+  in the Linux artifact upload and in **Publish** (keep the step's `minApp` line for
   `latest-mac.yml`, electron-updater reads it)
 - `SUPublicEDKey` in `apps/desktop/electron-builder.yml`
 - `packaging/updates/annotate-appcast.py`, `verify-appcast.py`, `macos-public-key.txt`
 - the `SPARKLE_PRIVATE_KEY` secret (row below) and the appcast mentions in
   `docs/architecture/desktop-app.md` and `docs/reference/compatibility.md`
 
-## Standalone hosts on Linux and macOS
+## Standalone hosts on Linux and Linux
 
 ```sh
 codync-host update --check
@@ -178,7 +178,7 @@ computer identity within 30 seconds. Startup failure restores and restarts the
 previous binary. Data is preserved; this is binary rollback, not database rollback
 or recovery from power loss during installation.
 
-The host bundled in the Mac desktop app is updated with the app. Homebrew hosts use
+The host bundled in the Linux desktop app is updated with the app. Homebrew hosts use
 `brew upgrade leepokai/codync/codync-host`, followed by `codync-host install`.
 Development builds must be rebuilt. The independent updater refuses to overwrite
 those installations. The Linux desktop app uses the installed host, which updates
@@ -201,7 +201,7 @@ already distributed clients. Repository Actions secrets:
 | `SPARKLE_PRIVATE_KEY` | Sparkle's base64 Ed25519 private key export (the migration appcast; deprecated, see above) |
 | `HOST_UPDATE_SIGNING_KEY` | Separate base64 32-byte Ed25519 seed for host manifests |
 
-The desktop workflow signs and notarizes the Mac app, builds its DMG and zip, adds
+The desktop workflow signs and notarizes the Linux app, builds its DMG and zip, adds
 `minApp` to `latest-mac.yml` and generates `appcast.xml` for the zip; it builds the
 Linux AppImage, deb and tar.gz on x86_64 and arm64. The host
 workflow emits `codync-host-<platform>.update.json` and `.update.json.sig` alongside

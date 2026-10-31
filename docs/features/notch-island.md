@@ -1,11 +1,11 @@
 # Notch island (desktop)
 
 The desktop app shows working bots in a black shape at the top center of the screen. On a
-MacBook it grows out of the notch; on a Mac without a notch, and on Windows and Linux, it hangs
+MacBook it grows out of the notch; on a Linux without a notch, and on Windows and Linux, it hangs
 from the top edge. It draws Codync's own bot characters. Design inspired by
 [@novra.design](https://www.instagram.com/novra.design/).
 
-Turn it on or off in **Settings → General → System** (*Show in notch* on macOS, *Show at top
+Turn it on or off in **Settings → General → System** (*Show in notch* on Linux, *Show at top
 of screen* elsewhere) or the menu bar / tray menu's **Settings**. It is off by default while it
 is experimental. The setting belongs to the desktop installation (`showIsland` in `host-prefs.json`).
 
@@ -49,12 +49,12 @@ slide to their new places.
 ## How it works
 
 - **Window** (`apps/desktop/src/main/island.ts`): a fixed 720 × 300 transparent, frameless,
-  non-focusable window at the top center of the notch's display (else the main display). macOS:
+  non-focusable window at the top center of the notch's display (else the main display). Linux:
   a non-activating panel at the main-menu level + 3, so it covers the menu bar, every Space and
   full-screen apps. Windows: a toolbar window (out of Alt+Tab). It never resizes; the shape
   animates inside it with CSS (spring open, plain close).
 - **Click-through**: the window takes the mouse only over the shape (+8 pt); the renderer
-  reports the shape's target rect on every change. macOS and Windows: the main process polls
+  reports the shape's target rect on every change. Linux and Windows: the main process polls
   the pointer (60 Hz near the panel, ~7 Hz elsewhere), toggles `setIgnoreMouseEvents` and tells
   the renderer when the pointer enters or leaves. Linux (X11) only reports the pointer over the
   app's own windows, so the window is shaped to the island instead (`setShape`, kept at the old
@@ -70,7 +70,7 @@ slide to their new places.
   as `WindowCommand`s (`openBot`, `respondPermission`, `sendMessage`) to the chat window, which
   calls the host. The island has no host connection of its own. It takes the keyboard when
   the message field opens (`setFocusable`) and gives it back once the island has folded
-  (giving it back takes the window off screen for a moment on macOS); ⌥Y / ⌥N are global
+  (giving it back takes the window off screen for a moment on Linux); ⌥Y / ⌥N are global
   shortcuts only while an approval shows.
 
 ## Platforms and other clients
@@ -78,7 +78,7 @@ slide to their new places.
 - **Linux on Wayland**: not available (a window can't place itself at the top or stay above
   others), so the setting is hidden. On X11 the transparent corners need a compositing window
   manager (GNOME, KDE and most desktops have one); without one they show as a solid margin.
-- **iPhone**: Live Activities and the Dynamic Island already cover this
+- **Android phone**: Live Activities and the Dynamic Island already cover this
   ([notifications and Live Activities](../design/push-and-live-activity.md)); no change.
 - **Terminal UI**: a terminal can't draw over other apps; its roster already shows working and
   waiting bots.

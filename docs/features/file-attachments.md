@@ -2,10 +2,10 @@
 
 Files travel in both directions: users attach inputs, and bots explicitly share generated outputs.
 
-- Composer: the **+** button left of the message box. iPhone: a menu with Photos (sent as JPEG) and
+- Composer: the **+** button left of the message box. Android phone: a menu with Photos (sent as JPEG) and
   Files (plus Paste when the clipboard has an image); desktop: an open panel. Files and images can
   also be dropped on the box or pasted: ⌘V / Ctrl+V on the desktop takes a copied image or file
-  (`apps/desktop/src/renderer/views/thread/Composer.tsx`); on the iPhone through Paste in the
+  (`apps/desktop/src/renderer/views/thread/Composer.tsx`); on the Android phone through Paste in the
   + menu.
   HEIC/TIFF/BMP become JPEG (`OutgoingFile.prepared`, `Thread/Attachments.swift`). Picked files show as chips above
   the text and can be removed; a message can be files only. Not in group chats (a group has no
@@ -60,7 +60,7 @@ clients need Control access. It returns `{data: <base64>, size}` in chunks of at
 
 Updated clients show a filename, size, file icon and download action. File extension
 only selects the icon; it never restricts saving or changes bytes. Desktop uses its
-native Save dialog, iPhone hands the verified temporary file to the native share
+native Save dialog, Android phone hands the verified temporary file to the native share
 sheet (including Save to Files), and the terminal's selected-message `f` action saves
 to Downloads without replacing existing files. Progress and errors appear alongside
 the action; cancel stops further reads, discards late responses and removes partial

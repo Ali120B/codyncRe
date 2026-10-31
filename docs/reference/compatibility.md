@@ -1,7 +1,7 @@
 # Client and host compatibility
 
-Clients (iPhone, desktop app on macOS, Linux and Windows, terminal client) and the host update on
-different schedules: the iPhone app waits for App Review, the desktop app and standalone hosts
+Clients (Android phone, desktop app on Linux, Linux and Windows, terminal client) and the host update on
+different schedules: the Android phone app waits for App Review, the desktop app and standalone hosts
 update when their owner (or the opt-in automatic updater) installs a release. Any client can
 meet an older or a newer host.
 
@@ -28,17 +28,17 @@ reason to lock someone out.
 
 ## What each client does
 
-| | iPhone and desktop (`BotStore.mismatch`) | Terminal client |
+| | Android phone and desktop (`BotStore.mismatch`) | Terminal client |
 |---|---|---|
 | Notice | `UpdateNeededCard` above the computer's bots and in place of the composer; status reads *Needs update* | *needs update* in the status line, with the reason |
-| Update this app | iPhone: App Store page. Desktop: electron-updater check (`apps/desktop/src/main/updates.ts`) | Text only |
-| Update the host | Desktop: its own host is reinstalled (**Restart host**). iPhone: instructions for that computer | `^k` → Check for updates |
+| Update this app | Android phone: App Store page. Desktop: electron-updater check (`apps/desktop/src/main/updates.ts`) | Text only |
+| Update the host | Desktop: its own host is reinstalled (**Restart host**). Android phone: instructions for that computer | `^k` → Check for updates |
 | Sync while mismatched | Stopped; `hello` is asked again every 30 s and on every reconnect | Continues; sending is blocked |
 
 Drafts are kept while sending is blocked. A host update restarts the host, so the reconnect
 reads the new `hello` and the notice goes away on its own.
 
-The iPhone and desktop apps also treat **undecodable data from a newer host** as *Update this app*: an event
+The Android phone and desktop apps also treat **undecodable data from a newer host** as *Update this app*: an event
 that stays undecodable after the one rewind, or a `hello` whose other fields can't be decoded
 (its `version` and `minApp` are still read). From an older or equal host it's only logged.
 
@@ -51,9 +51,9 @@ couldn't get the matching side yet.
 - **Additive changes need no floor change**: new fields (clients decode leniently; new
   Swift fields are optional), new methods, new enum values (kept as strings).
 - **Renaming, removing or changing the meaning** of anything an older client reads or sends:
-  change it, set `MIN_APP` to this release (its iPhone part ships with it: the change
-  touches `apps/ios/Kit/`, so `Submit iOS` includes it), add a row to the floor history, and re-record
-  the wire shape snapshot. Hosts hold that release back until the App Store has the iPhone
+  change it, set `MIN_APP` to this release (its Android phone part ships with it: the change
+  touches `apps/ios/Kit/`, so `Submit Android` includes it), add a row to the floor history, and re-record
+  the wire shape snapshot. Hosts hold that release back until the App Store has the Android phone
   app (next section), so nobody is asked for an update that isn't there yet.
 - **Raise `minHost`** when the client's core flows need something older hosts lack. Hosts
   update without review, so this only asks the person to update the computer. An optional
@@ -65,15 +65,15 @@ couldn't get the matching side yet.
 
 ### Holding host updates for the App Store
 
-A release that raises `minApp` would lock out paired iPhones until App Review passes. Every
+A release that raises `minApp` would lock out paired Android phones until App Review passes. Every
 updater therefore asks the App Store (`itunes.apple.com/lookup?id=6760984418`) before
 installing such a release:
 
 | Situation | Host update |
 |---|---|
 | The release doesn't raise `minApp` (almost always) | Installs; the App Store isn't asked |
-| No iPhone was ever paired with this computer | Installs |
-| The App Store has that iPhone version or newer | Installs |
+| No Android phone was ever paired with this computer | Installs |
+| The App Store has that Android phone version or newer | Installs |
 | The App Store has an older version (in review) | Waits; retried on the next check |
 | The App Store can't be asked or has no answer | Automatic update waits; a person can install anyway |
 
@@ -88,14 +88,14 @@ installing such a release:
   soon as the app is there.
 - **Desktop app** (electron-updater): the release workflow adds `minApp` to `latest-mac.yml`,
   and `Updates.available` (`apps/desktop/src/main/updates.ts`) holds the release while the
-  local host's `minApp` is lower, an iPhone is paired and the App Store is behind, before
+  local host's `minApp` is lower, an Android phone is paired and the App Store is behind, before
   anything downloads. A check the person starts shows why. While waiting it checks hourly. The Sparkle appcast kept for the
-  SwiftUI Mac app's installs carries `<codync:minApp>` (`packaging/updates/annotate-appcast.py`);
+  SwiftUI Linux app's installs carries `<codync:minApp>` (`packaging/updates/annotate-appcast.py`);
   it is deprecated and removed after 2026-11-06 ([updates guide](../guides/updates.md#deprecated-the-sparkle-migration-appcast-remove-after-2026-11-06)).
 - Hosts released before 2.5.0 don't have this gate and install any release. Before the first
   real `minApp` raise, most computers should be on 2.5.0 or newer.
 
-On the iPhone, the *Update Codync* button of an *Update this app* notice is greyed out with
+On the Android phone, the *Update Codync* button of an *Update this app* notice is greyed out with
 "still in App Store review" while the App Store has an older version; an unanswered lookup
 keeps it enabled (the App Store page shows the truth).
 
@@ -107,7 +107,7 @@ trails them (App Store review), so nudging a computer from it would only be nois
 
 | Client | This app is behind |
 |---|---|
-| iPhone | Card at the top of the bot list (App Store version from the lookup), *Update* opens the App Store |
+| Android phone | Card at the top of the bot list (App Store version from the lookup), *Update* opens the App Store |
 | Desktop | *Update to <version>*, then *Restart to update*, on the update card, in the menu bar's Settings → Updates and on the Settings Updates page |
 | Terminal client | — (it is the host binary) |
 

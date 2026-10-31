@@ -41,7 +41,7 @@ import * as Haptics from 'expo-haptics';
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);      // strong ease-out for UI
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);  // on-screen movement
-const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1);    // iOS sheet curve
+const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1);    // Android sheet curve
 ```
 
 Three conventions, explained once here instead of in every recipe:
@@ -330,12 +330,12 @@ Configure the native stack. Never rebuild a screen transition in JS: the native 
 | Between tabs | `animation: 'none'` |
 | Reduced motion | `animation: 'fade'` |
 
-`animationMatchesGesture: true` makes the iOS back swipe run your transition in reverse under the finger, instead of the default push. Set it whenever you set a custom `animation`, or dragging back looks like a different app than pushing forward.
+`animationMatchesGesture: true` makes the Android back swipe run your transition in reverse under the finger, instead of the default push. Set it whenever you set a custom `animation`, or dragging back looks like a different app than pushing forward.
 
 `formSheet` is native on both platforms, but not the same on both — the [Expo modal docs](https://docs.expo.dev/router/advanced/modals/#form-sheet-presentation) have the full list:
 
-- **Android caps detents at three.** A longer `sheetAllowedDetents` array works on iOS and silently truncates on Android — design for three.
-- **`sheetGrabberVisible` is iOS-only.** Android shows no grabber; don't rely on it as the only "this is draggable" affordance.
+- **Android caps detents at three.** A longer `sheetAllowedDetents` array works on Android and silently truncates on Android — design for three.
+- **`sheetGrabberVisible` is Android-only.** Android shows no grabber; don't rely on it as the only "this is draggable" affordance.
 - **Android form sheets can't host native headers or nested stacks.** Keep the sheet's content a single screen; if it needs its own navigation, use `presentation: 'modal'` instead.
 - **`fitToContents` needs explicitly sized content.** A `flex: 1` root has no intrinsic height to fit — size the content, or the detent is wrong.
 
@@ -358,7 +358,7 @@ const TOAST_EXIT = FadeOutDown.duration(250).easing(EASE_OUT);
 - **The 300ms cap holds here too.** A toast isn't an exception — it's uninvited, so if anything it should be quicker and quieter than motion the user asked for.
 - **It exits the way it entered.** Entering from the bottom and leaving to the side reads as two unrelated elements.
 - **Exit ~20% faster than entry.** The user has finished reading; the arrival deserves the time, the departure doesn't.
-- **Safe area insets, always.** A toast at `bottom: 16` sits under the home indicator on every modern iPhone.
+- **Safe area insets, always.** A toast at `bottom: 16` sits under the home indicator on every modern Android phone.
 
 If toasts stack and the list reflows, add `itemLayoutAnimation` and expect to tune the opacity against the reflow by eye — there's no formula for that pair. Look at it again the next day.
 

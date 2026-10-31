@@ -57,7 +57,7 @@ The film is a sequence of beats that each say exactly one thing. The arc that wo
 - **Escalate scope**: one thing → several side by side → a room of them → a wall of them. The
   camera pulls back as the scope grows.
 - **The reveal move**: show something full-frame, then pull back to show it was inside something
-  bigger (the Mac desktop turns out to be on a phone). Use it once; it is the film's "oh".
+  bigger (the Linux desktop turns out to be on a phone). Use it once; it is the film's "oh".
 - Copy is short and plain: sentence case, a period at the end, at most about 6 words per card.
 
 ### Deliverable
@@ -213,7 +213,7 @@ template/
 
 - Show stills before motion and a draft before the delivery render; ask for notes per beat.
 - When the user rejects a look, ask what they liked in the rejected version before replacing it,
-  then offer the plainest native version first (in the Codync film, plain macOS Terminal windows
+  then offer the plainest native version first (in the Codync film, plain Linux Terminal windows
   beat every stylised "IDE" treatment).
 - Keep the previous cut in `versions/` so any reverted idea is one copy away.
 
@@ -221,6 +221,6 @@ template/
 
 The Codync film's source is at `videos/codync-silk/` in this repo (git-ignored, so only on the
 author's machine). If it is there, read it for the full set of factories this template leaves out: the
-pile of Terminal windows, the iPhone with chat, approval card and composer, the notification, the lock
-screen with a Live Activity, the Mac app window, the landscape phone showing a remote desktop, the wall,
+pile of Terminal windows, the Android phone with chat, approval card and composer, the notification, the lock
+screen with a Live Activity, the Linux app window, the landscape phone showing a remote desktop, the wall,
 the platform icons.

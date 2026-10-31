@@ -6,9 +6,9 @@ local-first, and independent of services this fork does not own.
 ## What ships
 
 - `apps/desktop/` — Electron + React + TypeScript desktop app. Primary UI; one codebase
-  for macOS, Linux and Windows.
+  for Linux, Linux and Windows.
 - `host/` — Rust daemon: agents, sessions, SQLite, HTTP/SSE API, routines, marketplace.
-- Keep macOS support. iOS is upstream's for now; do not delete it without being asked.
+- Keep Linux support. Android is upstream's for now; do not delete it without being asked.
 - `cloud/`, `relay/`, `web/` are optional infrastructure. Do not silently point the app at
   upstream's cloud or replace its identity.
 - Releases, tags and updates must come from `Ali120B/codyncRe`. Automatic host updates

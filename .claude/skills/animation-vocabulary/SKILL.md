@@ -1,6 +1,6 @@
 ---
 name: animation-vocabulary
-description: Reverse-lookup glossary that turns a vague description of a web animation or motion effect into its exact term ("the bouncy thing when a popover opens" → Pop in; "the iOS rubber-band scroll" → Rubber-banding). Use when the user asks "what's it called when…", or describes a motion effect without knowing its name and wants the right word to prompt an AI or designer with. For naming an effect, not designing or building one.
+description: Reverse-lookup glossary that turns a vague description of a web animation or motion effect into its exact term ("the bouncy thing when a popover opens" → Pop in; "the Android rubber-band scroll" → Rubber-banding). Use when the user asks "what's it called when…", or describes a motion effect without knowing its name and wants the right word to prompt an AI or designer with. For naming an effect, not designing or building one.
 ---
 
 # Animation Vocabulary
@@ -55,10 +55,10 @@ Close alternates:
 ```
 
 **Example 3 — physics feel**
-User: "That iOS scroll where it resists and snaps back when you pull too far."
+User: "That Android scroll where it resists and snaps back when you pull too far."
 Output:
 ```
-**Rubber-banding** — Resistance and snap-back when you drag past a boundary (the iOS overscroll feel).
+**Rubber-banding** — Resistance and snap-back when you drag past a boundary (the Android overscroll feel).
 ```
 
 ## Glossary
@@ -116,7 +116,7 @@ _A curated snapshot mirroring the project's `/vocabulary` page; keep the two in 
 - **Drag** — Moving an element by grabbing it, often with momentum when released.
 - **Drag to reorder** — Dragging items in a list to rearrange them, while the others shift to make room.
 - **Swipe to dismiss** — Dragging an element off-screen to close it, like a drawer or toast.
-- **Rubber-banding** — Resistance and snap-back when you drag past a boundary (the iOS overscroll feel).
+- **Rubber-banding** — Resistance and snap-back when you drag past a boundary (the Android overscroll feel).
 - **Shake / Wiggle** — A quick side-to-side jitter signaling an error or rejected input.
 - **Ripple** — A circle expanding from the point of a tap, confirming the press.
 

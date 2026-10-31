@@ -6,7 +6,7 @@ Updated: 2026-10-25. This describes the implemented notification contract and it
 
 | Event | Notification | Live Activity / Dynamic Island |
 | --- | --- | --- |
-| A task is sent from this iPhone | No alert | Start one activity for this bot as the message leaves: Sending (orb), then Working once the computer accepts it |
+| A task is sent from this Android phone | No alert | Start one activity for this bot as the message leaves: Sending (orb), then Working once the computer accepts it |
 | The computer is offline (message waits in the relay mailbox) | No alert | Waiting for your computer (computer symbol), never marked delayed; Working when the computer picks it up |
 | The message couldn't be sent | No alert (the chat shows Failed to send) | Failed, “Couldn't send”, then dismiss after 60 seconds; a message taken back out of the mailbox ends the activity |
 | Working | No alert for each tool call | Bot identity and working orb |
@@ -15,11 +15,11 @@ Updated: 2026-10-25. This describes the implemented notification contract and it
 | Failed (an error, or the turn stopped short: output/step limit, refusal) | Bot name, “Task failed”, failure summary; “Open conversation” action | Error state, then dismiss after 60 seconds |
 | No fresh update for 15 minutes | No synthetic failure alert | Update delayed; never infer completion |
 
-The encrypted title is limited to 80 characters and the body to 400 characters. The body is an excerpt of the agent's final answer, not a newly generated summary. System notification previews, text truncation, Focus, sounds and delivery timing remain controlled by the operating system. Android receives a data-only FCM message, opens the host-sealed content locally and posts the notification; iOS uses APNs and its Notification Service Extension. Android has no Live Activity surface. There is no invented completion percentage or per-tool notification stream.
+The encrypted title is limited to 80 characters and the body to 400 characters. The body is an excerpt of the agent's final answer, not a newly generated summary. System notification previews, text truncation, Focus, sounds and delivery timing remain controlled by the operating system. Android receives a data-only FCM message, opens the host-sealed content locally and posts the notification; Android uses APNs and its Notification Service Extension. Android has no Live Activity surface. There is no invented completion percentage or per-tool notification stream.
 
 Notification actions open the scoped conversation. Permission approval still requires the normal in-app permission card. An account mismatch does not navigate into another account. Notifications are grouped by computer plus bot. Muted and hidden bots do not alert. The host suppresses pushes while any recognized phone event connection is open.
 
-On Android, Settings → Push delivery controls FCM and requests the Android notification permission; disabling it unregisters this phone when its host is connected. Per-bot notification preferences remain in the bot editor. On iOS, Settings → Notifications controls APNs; State → Live Activity controls automatic activity creation and shows system authorization. Turning it off ends this phone's activities. State → Dynamic Island shows the same switch: iOS renders one activity in both places and offers no island-only opt-out. The expanded island centers the bot name and current step under the camera, between the avatar and the orb (both vertically centered), so no text reaches the island's 44 pt corners. Its bottom row shows the elapsed time (from `startedAt`, counted by the system) or, when the bot needs you, a Review button that opens the conversation.
+On Android, Settings → Push delivery controls FCM and requests the Android notification permission; disabling it unregisters this phone when its host is connected. Per-bot notification preferences remain in the bot editor. On Android, Settings → Notifications controls APNs; State → Live Activity controls automatic activity creation and shows system authorization. Turning it off ends this phone's activities. State → Dynamic Island shows the same switch: Android renders one activity in both places and offers no island-only opt-out. The expanded island centers the bot name and current step under the camera, between the avatar and the orb (both vertically centered), so no text reaches the island's 44 pt corners. Its bottom row shows the elapsed time (from `startedAt`, counted by the system) or, when the bot needs you, a Review button that opens the conversation.
 
 ## Responsibilities and privacy
 
@@ -27,7 +27,7 @@ On Android, Settings → Push delivery controls FCM and requests the Android not
 flowchart LR
     H[Host: bot events and private summary] -->|sealed alert or status-only activity| W[relay/ push Worker]
     W --> A[Apple APNs]
-    A --> N[iOS Notification Service Extension]
+    A --> N[Android Notification Service Extension]
     N -->|decrypt locally| B[Notification banner]
     W --> F[Firebase Cloud Messaging]
     F --> D[Android Codync service]
@@ -47,7 +47,7 @@ Remote activity content contains only `status`, empty `activity`, and `startedAt
 
 ## Registration and lifecycle
 
-1. iOS registers its APNs token with `POST /register` using `platform: ios`, `kind: alert` and its build environment. Android registers its FCM token using `platform: android` and `kind: alert`.
+1. Android registers its APNs token with `POST /register` using `platform: ios`, `kind: alert` and its build environment. Android registers its FCM token using `platform: android` and `kind: alert`.
 2. The Worker returns an AES-GCM ticket. The phone sends it with its X25519 push public key and account context to `registerDevice` on the host.
 3. Registration atomically replaces previous alert tickets for that device identity. Delivery also selects only the latest stored ticket per device, so existing duplicate rows cannot fan out before that phone reconnects. Randomized tickets must not accumulate, retain obsolete keys or generate duplicate notifications.
 4. Sending a task starts an ActivityKit activity with `pushType: .token` in the local Sending state (Waiting for your computer when it goes to the mailbox); bot updates that aren't work yet don't end it. The phone registers each activity token using `kind: liveactivity`, then calls `registerActivity` for the bot.
@@ -64,7 +64,7 @@ Alert kinds are `done`, `needsInput`, and `failed`.
 
 Hosts submit an event's alert requests in registration order to `POST /push-batch` as `{ "notifications": [<push request>, ...] }` (1–256 entries). The Worker decrypts the tickets and sends only the last request for each physical provider destination and token kind. It returns indexed statuses; superseded tickets and HTTP 410 results are forgotten by the host on its next push operation. Superseded identities also lose their older ticket rows so they cannot reappear on the next event. This requires no new database, no plaintext notification content, and no change to the ticket encryption scheme. Live Activity updates continue using `/push` because each activity has its own token.
 
-The public APNs alert always has title `Codync` and a useful fallback sentence. Android FCM is data-only and carries a generic fallback sentence alongside the encrypted fields. The encrypted payload carries the private fields. `mutable-content: 1` requests iOS extension processing. The routing fields are `botId`, `computerId`, and `ctx`; APNs `thread-id` is `<computerId>:<botId>`.
+The public APNs alert always has title `Codync` and a useful fallback sentence. Android FCM is data-only and carries a generic fallback sentence alongside the encrypted fields. The encrypted payload carries the private fields. `mutable-content: 1` requests Android extension processing. The routing fields are `botId`, `computerId`, and `ctx`; APNs `thread-id` is `<computerId>:<botId>`.
 
 Live Activity requests carry:
 
@@ -92,7 +92,7 @@ Live Activity requests carry:
 - Invalid environment, kind, activity event, state or dates return 400. Remote activity free text is rejected. Alert custom data cannot overwrite `aps`; alert payloads larger than 4096 bytes return 413.
 - Unregistered/bad device tokens return 410. Provider signing-token errors remain delivery errors and do not invalidate a device ticket.
 
-Host delivery is currently best effort with a 10-second request timeout. There is no durable delivery queue or delivery receipt from iOS; a successful APNs response does not prove display. Second-resolution timestamps also do not provide a unique run identifier. Durable retries and activity identities per task would need a follow-up protocol change; this implementation does not claim exactly-once or guaranteed ordered delivery.
+Host delivery is currently best effort with a 10-second request timeout. There is no durable delivery queue or delivery receipt from Android; a successful APNs response does not prove display. Second-resolution timestamps also do not provide a unique run identifier. Durable retries and activity identities per task would need a follow-up protocol change; this implementation does not claim exactly-once or guaranteed ordered delivery.
 
 ## Why only “Done” appeared
 
@@ -114,7 +114,7 @@ The Worker uses `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_SIGNING_KEY`, `FCM_SERVICE_
 
 The app bundle is `com.pokai.Codync.ios`. App and notification extension share `group.com.pokai.Codync` and the expanded shared Keychain access group. `project.yml` embeds both extension targets and enables `NSSupportsLiveActivities`; no new entitlement is required by these changes. Confirm sandbox versus production against the signed provisioning profile, especially for distribution builds.
 
-Deployment order: Worker → host → iOS. The optional encrypted subtitle remains compatible with clients that decode only title/body. New clients accept older encrypted payloads without subtitles. The new `failed` category requires the updated app for its custom action. Follow the repository's stop-old-process/relaunch rules when installing builds.
+Deployment order: Worker → host → Android. The optional encrypted subtitle remains compatible with clients that decode only title/body. New clients accept older encrypted payloads without subtitles. The new `failed` category requires the updated app for its custom action. Follow the repository's stop-old-process/relaunch rules when installing builds.
 
 ### Acceptance matrix
 

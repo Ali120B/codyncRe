@@ -2,7 +2,7 @@
 
 The Extensions screen configures capabilities installed on the selected computer. Account membership does not install the same capability on every computer.
 
-The desktop and iPhone installed count is labeled **Connectors & skills**, and opens a library with that same title. It includes connected apps (stored as connectors), but excludes agents; agents show their own installation status in the Agents section. The terminal already separates these categories and does not show a combined installed count.
+The desktop and Android phone installed count is labeled **Connectors & skills**, and opens a library with that same title. It includes connected apps (stored as connectors), but excludes agents; agents show their own installation status in the Agents section. The terminal already separates these categories and does not show a combined installed count.
 
 | Capability | Implementation | Behavior |
 | --- | --- | --- |
@@ -29,7 +29,7 @@ Registry-backed package connectors follow their upstream release. The host check
 
 ## Commands
 
-Typing `/` at the start of a message to a bot (desktop, iPhone, terminal; not in a group, where each member has its own agent and skills) lists that bot's commands, filtered by what follows the `/` (a command's name or title): the built-in ones first, then the skills the bot has on. Each row shows an icon, the title and what it does. The list floats above the box on the desktop (↑/↓ move the highlight, Tab or Return picks it, Escape hides the list until the draft changes, hover and click work too), sits inline above the box on the iPhone (a tap picks; it isn't a menu, so the system-menu rule doesn't apply), and is the highlighted list over the transcript in the terminal (↑/↓, Tab or ↵).
+Typing `/` at the start of a message to a bot (desktop, Android phone, terminal; not in a group, where each member has its own agent and skills) lists that bot's commands, filtered by what follows the `/` (a command's name or title): the built-in ones first, then the skills the bot has on. Each row shows an icon, the title and what it does. The list floats above the box on the desktop (↑/↓ move the highlight, Tab or Return picks it, Escape hides the list until the draft changes, hover and click work too), sits inline above the box on the Android phone (a tap picks; it isn't a menu, so the system-menu rule doesn't apply), and is the highlighted list over the transcript in the terminal (↑/↓, Tab or ↵).
 
 | Command | Title | Does |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ Discovery prefers ACP `configOptions` with category `model` (including grouped o
 
 A model's `options` are its own settings, such as reasoning effort or fast mode: `[{id, name, values: [{id, name}], default}]`. Every `initialize` sends `clientCapabilities._meta.parameterizedModelPicker: true`; Cursor then lists plain models and, on `cursor/list_available_models` (asked only of the Cursor backend), each model's settings as ACP select config options. Without the flag Cursor offers one fixed variant per model (`grok-4.7[reasoning_effort=high,fast=true]`) and rejects every other. The bot stores the picks as `modelOptions` (option id → value; an absent id means the agent's default). After choosing the model with `session/set_config_option`, the host sets each option the same way, on new sessions and again after `session/load`, because Cursor resumes a session on its last-used model. A bot saved with a variant ID keeps working: when the agent lists the plain model instead, the bracket's `key=value` pairs become options (Auto's `default[]` becomes `default`). Some values change Cursor's billing: a larger context (Grok 4.7 at 500K) turns on its Max Mode. Changing the model or agent clears the options; the host also clears them when an app that predates them changes the model.
 
-The editor keeps Default, shows available models in a dropdown, and resets the selected model when changing agents. Under the model it shows one picker per option (iPhone and desktop: a row each, named by the agent, with Default first; terminal UI: an Options row, ←→ to move, space to change). Errors are visible and retryable. Custom commands and agents without model discovery retain manual ID entry; an existing unlisted ID is preserved. The probe uses an isolated directory, so project-specific agent configuration can differ from the real bot session. Changing the model restarts the bot's agent sessions with fresh model context and preserves the stored chat history. The agent remains responsible for validating availability when a session starts.
+The editor keeps Default, shows available models in a dropdown, and resets the selected model when changing agents. Under the model it shows one picker per option (Android phone and desktop: a row each, named by the agent, with Default first; terminal UI: an Options row, ←→ to move, space to change). Errors are visible and retryable. Custom commands and agents without model discovery retain manual ID entry; an existing unlisted ID is preserved. The probe uses an isolated directory, so project-specific agent configuration can differ from the real bot session. Changing the model restarts the bot's agent sessions with fresh model context and preserves the stored chat history. The agent remains responsible for validating availability when a session starts.
 
 ## Fast mode
 
@@ -93,6 +93,6 @@ Clients show Fast mode for an agent bot unless its runtime says `unsupported` (a
 ## Secure connection setup
 
 See [Connector setup and credentials](connector-credentials.md) for the shared
-macOS/Linux vault, optional 1Password references, in-chat connection requests and
+Linux/Linux vault, optional 1Password references, in-chat connection requests and
 MCP readiness checks. Single-option connectors without setup fields start adding
 immediately; setup failures remain visible for retry.

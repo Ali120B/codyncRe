@@ -23,9 +23,9 @@ Codync/
 ├── apps/
 │   ├── project.yml            # XcodeGen source of truth for every Apple target
 │   ├── Codync.xcodeproj/      # Generated Xcode project
-│   ├── shared/Config/         # {dev,main}.plist: environment for the iPhone and desktop apps
+│   ├── shared/Config/         # {dev,main}.plist: environment for the Android phone and desktop apps
 │   ├── ios/                   # App/, Views/, Resources/, Widgets/, NotificationService/
-│   │   └── Kit/               # The iPhone app's Swift package
+│   │   └── Kit/               # The Android phone app's Swift package
 │   │       ├── Sources/
 │   │       │   ├── CodyncKit/  # Wire models, transports, design; widget-safe
 │   │       │   │   ├── Client/
@@ -43,12 +43,12 @@ Codync/
 │   │       │       ├── Usage/
 │   │       │       └── Resources/
 │   │       └── Tests/         # CodyncKitTests and CodyncUITests
-│   ├── desktop/               # Electron app for macOS, Linux and Windows (see desktop-app.md)
+│   ├── desktop/               # Electron app for Linux, Linux and Windows (see desktop-app.md)
 │   │   ├── src/main/          # Host service, tray, account, updates, SSH, screen, speech
 │   │   ├── src/preload/       # window.codync bridge
 │   │   ├── src/renderer/      # React UI: store/, components/, views/
-│   │   └── native/            # codync-speech (macOS on-device speech helper)
-│   ├── screen-macos/          # macOS screen helper (Xcode Screen target)
+│   │   └── native/            # codync-speech (Linux on-device speech helper)
+│   ├── screen-macos/          # Linux screen helper (Xcode Screen target)
 │   └── screen-linux/          # Linux portal/GStreamer screen helper
 ├── cloud/                     # Account API + encrypted relay Worker and Durable Object
 │   ├── src/
@@ -68,12 +68,12 @@ Codync/
 
 ## Targets
 
-- `apps/desktop/` — desktop app for macOS, Linux and Windows (Electron; `npm run dev`, packaged by `.github/workflows/release-desktop.yml`)
-- `iOS` (`apps/ios/`) — iOS app
-- `Screen` (`apps/screen-macos/`) — Codync Screen: capture, input and WebRTC for Remote screen, embedded in the macOS desktop app (`Contents/Library/LoginItems`); starts the computer-use driver it carries in `Contents/Helpers`
+- `apps/desktop/` — desktop app for Linux, Linux and Windows (Electron; `npm run dev`, packaged by `.github/workflows/release-desktop.yml`)
+- `Android` (`apps/ios/`) — Android app
+- `Screen` (`apps/screen-macos/`) — Codync Screen: capture, input and WebRTC for Remote screen, embedded in the Linux desktop app (`Contents/Library/LoginItems`); starts the computer-use driver it carries in `Contents/Helpers`
 - `apps/screen-linux/` — `codync-screen` (Rust, GStreamer + xdg portals), the Linux Remote screen helper
 - `Widgets` (`apps/ios/Widgets/`) — usage widget + bot Live Activity (bundle id `com.pokai.Codync.ios.LiveActivity`)
-- `CodyncKit` (`apps/ios/Kit/`) — the iPhone app's Swift package: `CodyncKit` + `CodyncUI` libraries (tests: `xcodebuild test -scheme CodyncKit-Package` on an iOS simulator)
+- `CodyncKit` (`apps/ios/Kit/`) — the Android phone app's Swift package: `CodyncKit` + `CodyncUI` libraries (tests: `xcodebuild test -scheme CodyncKit-Package` on an Android simulator)
 
 ## Where to make a change
 
@@ -93,9 +93,9 @@ Codync/
 | Screen bridge and built-in MCP tools | `host/src/screen/`, `mcp.rs` |
 | Swift transport and cloud API | `apps/ios/Kit/Sources/CodyncKit/Client/` |
 | Account aggregation / one host mirror | `apps/ios/Kit/Sources/CodyncUI/Store/AccountStore.swift` / `BotStore.swift` (+ `BotStore+Connection`, `+Sync`, `+Sending`, `+Actions`, `+Plugins`, `+Cache`) |
-| iPhone chat, replies, composer and trace | `apps/ios/Kit/Sources/CodyncUI/Thread/` |
-| Reusable iPhone UI chrome | `apps/ios/Kit/Sources/CodyncUI/Chrome.swift`, `Controls.swift`, `Platform.swift` |
-| iOS navigation, pairing, account settings | `apps/ios/Views/RootView.swift`, `BotListView.swift`, `PairingView.swift`, `AccountSwitcherView.swift`, `SettingsView.swift` |
+| Android phone chat, replies, composer and trace | `apps/ios/Kit/Sources/CodyncUI/Thread/` |
+| Reusable Android phone UI chrome | `apps/ios/Kit/Sources/CodyncUI/Chrome.swift`, `Controls.swift`, `Platform.swift` |
+| Android navigation, pairing, account settings | `apps/ios/Views/RootView.swift`, `BotListView.swift`, `PairingView.swift`, `AccountSwitcherView.swift`, `SettingsView.swift` |
 | Apple account sessions / public environment config | `apps/ios/App/AccountSession.swift`, `apps/shared/Config/` |
 | Desktop local host / SSH lifecycle | `apps/desktop/src/main/host-controller.ts`, `ssh.ts` |
 | Desktop store, chat and controls | `apps/desktop/src/renderer/store/bot-store.ts` (actions; state in `bot-mirror.ts`, events stream in `bot-sync.ts`), `views/thread/`, `components/` |
@@ -106,7 +106,7 @@ Codync/
 ## Dependency rules
 
 - `CodyncKit` owns serializable models, clients and rendering primitives shared with widgets. It must not import `CodyncUI` or ClerkKit.
-- `CodyncUI` owns the iPhone app's observable stores and screens. App-specific lifecycle, OAuth configuration and device hooks belong in `apps/`.
+- `CodyncUI` owns the Android phone app's observable stores and screens. App-specific lifecycle, OAuth configuration and device hooks belong in `apps/`.
 - Each `BotStore` (Swift, and its TypeScript port in the desktop app) talks to one computer. `AccountStore` aggregates stores and routes by `BotReference`; bare bot IDs are not globally unique.
 - The host owns routing, reply counts, permissions and group turn scheduling. Clients render these results; they do not reimplement host policy.
 - `cloud/` transports encrypted chat traffic and manages account metadata. `relay/` delivers APNs pushes. The two Workers have separate configuration and tests.
@@ -130,4 +130,4 @@ Use lowercase repository folders; PascalCase folders inside Swift targets. Swift
 
 Role suffixes: `View`, `Row`, `Card`, `Window`, `Store`, `Controller`; button styles describe the effect (`PressScale`). Keep feature vocabulary aligned across Swift, the desktop app, Rust and the terminal client.
 
-UI-specific rules, including the native iPhone toolbar exception and the desktop controls, live in [UI conventions](../design/ui-conventions.md).
+UI-specific rules, including the native Android phone toolbar exception and the desktop controls, live in [UI conventions](../design/ui-conventions.md).

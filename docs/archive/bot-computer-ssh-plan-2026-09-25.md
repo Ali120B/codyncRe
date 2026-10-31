@@ -11,11 +11,11 @@
 
 例如：
 
-| Bot | Computer | 實際執行位置 | Mac 的連線方式 |
+| Bot | Computer | 實際執行位置 | Linux 的連線方式 |
 |---|---|---|---|
 | Personal reviewer | My MacBook | 本機專案與 agent | 本機連線 |
 | Backend maintainer | Dev Linux | 遠端 repo 與 agent | SSH tunnel |
-| Build assistant | Mac mini | Mac mini 的工具與工作目錄 | 直連或後續雲端中繼 |
+| Build assistant | Linux mini | Linux mini 的工具與工作目錄 | 直連或後續雲端中繼 |
 
 每個 bot 只有一個 computer。預設允許多個 bots 共用同一台 computer；這是多對一歸屬，不是要求每個 bot 獨占一台實體機器。
 
@@ -86,10 +86,10 @@
 
 ### 首選：遠端 host + OpenSSH tunnel
 
-遠端電腦安裝 codync-host，agent 與 repo 都在遠端；Mac 透過系統 OpenSSH 的 local forwarding 存取遠端 loopback API。SSH tunnel 本身不取代 codync-host 的授權。
+遠端電腦安裝 codync-host，agent 與 repo 都在遠端；Linux 透過系統 OpenSSH 的 local forwarding 存取遠端 loopback API。SSH tunnel 本身不取代 codync-host 的授權。
 
 ```text
-Mac Codync
+Linux Codync
   → 本機 loopback 上的臨時 tunnel port
   → OpenSSH 加密連線
   → 遠端 loopback 的 codync-host
@@ -109,7 +109,7 @@ Mac Codync
 7. 遠端安裝／更新是獨立明確動作；不因按「測試連線」就執行安裝腳本。
 8. 輸入以 structured argv 傳給 OpenSSH；限制可輸入的連線欄位，不將未驗證的 user/host/path 拼接 shell。
 
-MVP 支援既有 key／agent 驗證與 macOS 客戶端；password、互動式 MFA、ProxyJump、複雜 ssh config 與 Linux desktop 的支援逐項驗證後宣告，不能推定全部可用。
+MVP 支援既有 key／agent 驗證與 Linux 客戶端；password、互動式 MFA、ProxyJump、複雜 ssh config 與 Linux desktop 的支援逐項驗證後宣告，不能推定全部可用。
 
 ### 為何不只把 command 改成 `ssh ... agent`
 
@@ -119,17 +119,17 @@ MVP 支援既有 key／agent 驗證與 macOS 客戶端；password、互動式 MF
 
 ### 手機如何操作 SSH computer
 
-桌面 SSH tunnel 成功不代表手機可用 Mac 的 `127.0.0.1` tunnel port。明確支援三條路徑：
+桌面 SSH tunnel 成功不代表手機可用 Linux 的 `127.0.0.1` tunnel port。明確支援三條路徑：
 
 | 路徑 | 條件 | 推出順序 |
 |---|---|---|
 | 手機直連遠端 host | 遠端 host 已配對且有 Tailscale／受保護路徑 | 先沿用現有能力 |
 | 遠端 host 主動連 Cloudflare relay | 主計畫 P3 的出站中繼完成 | 推薦的後續體驗 |
-| 手機經 Mac gateway，再 SSH 到遠端 | Mac 在線且明確啟用 gateway，具備逐 target 授權 | 另立功能，不含在 SSH tunnel MVP |
+| 手機經 Linux gateway，再 SSH 到遠端 | Linux 在線且明確啟用 gateway，具備逐 target 授權 | 另立功能，不含在 SSH tunnel MVP |
 
-不將 desktop tunnel port 複製到手機配對資料。若只有 Mac 能連 SSH，手機顯示該 bot 目前需要桌面連線支援，不能把它假裝成可直接使用。
+不將 desktop tunnel port 複製到手機配對資料。若只有 Linux 能連 SSH，手機顯示該 bot 目前需要桌面連線支援，不能把它假裝成可直接使用。
 
-遠端 screen 依該 computer 的 OS/helper 能力決定；Linux headless computer 不顯示 Mac 的畫面控制按鈕。
+遠端 screen 依該 computer 的 OS/helper 能力決定；Linux headless computer 不顯示 Linux 的畫面控制按鈕。
 
 ## 6. 整合順序與是否現在一起做
 
@@ -158,7 +158,7 @@ MVP 支援既有 key／agent 驗證與 macOS 客戶端；password、互動式 MF
 
 ### D. 手機遠端體驗
 
-優先讓遠端 host 直接接 Cloudflare 中繼。Mac gateway 與手機原生 SSH client 都增加另一套生命週期與金鑰管理，等到有確實需求再做。
+優先讓遠端 host 直接接 Cloudflare 中繼。Linux gateway 與手機原生 SSH client 都增加另一套生命週期與金鑰管理，等到有確實需求再做。
 
 ## 7. 新增驗收條件
 
@@ -181,7 +181,7 @@ SSH 與 Clerk 具體 API／平台相容性應在實作階段依當時官方文�
 
 ## 9. 本次已落地與仍在規劃的範圍
 
-已落地：iOS 左上角帳號入口、Clerk Google 登入／新增帳號／session 切換、每個帳號獨立的手機配對清單與聊天 cache、切換時退出舊 store 和結束 Live Activities。「Computers & settings」移到帳號選單內。單 session 的 Clerk instance 會顯示登出後換帳號，而不是假的多帳號切換。
+已落地：Android 左上角帳號入口、Clerk Google 登入／新增帳號／session 切換、每個帳號獨立的手機配對清單與聊天 cache、切換時退出舊 store 和結束 Live Activities。「Computers & settings」移到帳號選單內。單 session 的 Clerk instance 會顯示登出後換帳號，而不是假的多帳號切換。
 
 這是手機端的登入與本機資料分區，尚未建立 Cloudflare ownership、雲端裝置目錄或逐裝置撤權。每個帳號仍需手動配對 computer；同一份有效配對憑證若被再次提供給另一帳號，現有 host 仍可能接受。舊 APNs ticket 也尚未具備帳號級撤權，相關安全邊界必須依主計畫 P2 完成後才能宣稱具備後端帳號隔離。
 

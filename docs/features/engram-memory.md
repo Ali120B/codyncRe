@@ -12,7 +12,7 @@ The host downloads the MIT-licensed release on first use, validates its SHA-256 
 `packaging/engram/release.json`, and installs it with its license in `engram/3.2.1/`.
 First use requires network access; subsequent use works offline. A failed download is retried after five
 minutes. Memory is best-effort: while Engram can't start, bots answer without it and say so once.
-Supported binaries are macOS, Linux and Windows, each on arm64 and x86_64. No global Engram install or HTTP
+Supported binaries are Linux, Linux and Windows, each on arm64 and x86_64. No global Engram install or HTTP
 listener is needed.
 
 The host lazily starts one native MCP stdio process per active bot. Requests serialize within that process;
@@ -45,7 +45,7 @@ back into the legacy format.
 
 ## Management and automation
 
-Desktop, iOS and terminal expose search, filters (all/about you/pinned/due for review), paginated browsing,
+Desktop, Android and terminal expose search, filters (all/about you/pinned/due for review), paginated browsing,
 add/edit, scope/category/topic, pin/unpin, mark reviewed, observation history and session timeline, forget,
 clear, and JSON export/import. A `personal` or `global` scope remains within this bot's database; it does not
 share memories with other bots. The TUI shows operation shortcuts in the memory sheet footer.
@@ -115,10 +115,10 @@ it never migrates the developer's real bots.
   host for add, pin, edit, Chinese search, history, export and clear.
 - Terminal: actual PTY interaction for memory browsing, adding and reading history. Footer shortcuts were
   shortened after checking the standard-width sheet.
-- iOS: 111 package tests on an iOS 26.5 simulator, including the latest memory views and compatibility floor.
+- Android: 111 package tests on an Android 26.5 simulator, including the latest memory views and compatibility floor.
   Physical-device memory UI and Linux/Windows runtime behavior were not exercised locally; the latter run
   in the host CI matrix.
 
 The initial parallel host integration run hit one fixture startup timeout; all 29 host/routine/team
 integration cases passed with one test thread. Raising the client host floor exposed an older version in
-an unrelated iOS fake-host fixture; it now uses the current floor and the full suite passes.
+an unrelated Android fake-host fixture; it now uses the current floor and the full suite passes.

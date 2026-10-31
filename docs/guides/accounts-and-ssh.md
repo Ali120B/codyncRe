@@ -1,14 +1,14 @@
 # Accounts, device approval and SSH
 
-The iOS app uses the official ClerkKit SDK (1.5.6). The desktop app talks to Clerk's
+The Android app uses the official ClerkKit SDK (1.5.6). The desktop app talks to Clerk's
 Frontend API directly, the way ClerkKit does on native apps (`apps/desktop/src/main/account.ts`):
 a device token kept encrypted with Electron `safeStorage`, OAuth in the system browser.
 
 ## Configuration
 
-The iOS app uses `apps/ios/App/AccountSession.swift`. Public keys and cloud URLs come from `apps/shared/Config/<env>.plist`, copied into the bundle as `AccountConfig.plist` by `project.yml`; `iOS Dev` (`DevDebug` / `DevRelease`) selects dev and `iOS` (`Debug` / `Release`) selects main. The desktop app reads the same plist through `node apps/desktop/tools/account-config.mjs <env>` (run by `npm run dev` and `npm run dist:*:<env>`), which writes `resources/account-config.json` (`CODYNC_CLERK_PUBLISHABLE_KEY` / `CODYNC_CLOUD_URL` override it). See [environments](environments-and-deployment.md).
+The Android app uses `apps/ios/App/AccountSession.swift`. Public keys and cloud URLs come from `apps/shared/Config/<env>.plist`, copied into the bundle as `AccountConfig.plist` by `project.yml`; `Android Dev` (`DevDebug` / `DevRelease`) selects dev and `Android` (`Debug` / `Release`) selects main. The desktop app reads the same plist through `node apps/desktop/tools/account-config.mjs <env>` (run by `npm run dev` and `npm run dist:*:<env>`), which writes `resources/account-config.json` (`CODYNC_CLERK_PUBLISHABLE_KEY` / `CODYNC_CLOUD_URL` override it). See [environments](environments-and-deployment.md).
 
-Confirm Apple and Google sign-in, Native API and the native app registrations in the intended Clerk instance. The desktop app uses `com.pokai.Codync`, iOS uses `com.pokai.Codync.ios`, with their matching `://callback` URLs. Dashboard configuration and actual OAuth consent must be verified independently of the checked-in plist. Do not bundle Clerk secret keys.
+Confirm Apple and Google sign-in, Native API and the native app registrations in the intended Clerk instance. The desktop app uses `com.pokai.Codync`, Android uses `com.pokai.Codync.ios`, with their matching `://callback` URLs. Dashboard configuration and actual OAuth consent must be verified independently of the checked-in plist. Do not bundle Clerk secret keys.
 
 ### Desktop Sign in with Apple
 
@@ -19,7 +19,7 @@ has Sign out.
 On the desktop, `AccountService.signIn('apple')` starts Clerk's `oauth_apple` sign-in
 and opens its redirect in the system browser, which returns to
 `com.pokai.Codync://callback` (`apps/desktop/src/main/auth.ts`). This uses Clerk's
-Apple Services ID and needs no native Sign in with Apple entitlement. iOS continues
+Apple Services ID and needs no native Sign in with Apple entitlement. Android continues
 using Clerk's native Apple authorization.
 
 The production Services ID `com.pokai.Codync.signin` is associated with primary
@@ -33,7 +33,7 @@ The development instance uses the same custom credentials (Services ID, team
 `7FUM8A8H72`, key `8S76D7ADWU`) since 2026-10-03, with
 `sunny-mollusk-8651.clerk.accounts.dev` and its `/v1/oauth_callback` added to the
 Services ID. Clerk's shared Apple credentials belong to Clerk's team, so with them
-the computer's web sign-in and the iPhone's native sign-in got different Apple user IDs
+the computer's web sign-in and the Android phone's native sign-in got different Apple user IDs
 and became two Clerk users; don't switch development back to shared credentials.
 
 To check cross-device discovery, sign in with the same Apple Account on both
@@ -45,7 +45,7 @@ device approval requirement.
 The desktop app's Apple sign-in and production cross-device identity matching
 still need to be checked on a release build.
 
-### iOS Sign in with Apple
+### Android Sign in with Apple
 
 The welcome, pairing and account screens offer **Continue with Apple** alongside
 Google, with matching headline typography and button sizing. Apple's native
@@ -58,7 +58,7 @@ incomplete sign-in/sign-up results remain explicit errors.
 Enable Apple for sign-up and sign-in in both Clerk environments, and register
 `7FUM8A8H72.com.pokai.Codync.ios` under Native applications. Enable the App ID's
 `APPLE_ID_AUTH` capability as a primary App ID and retain
-`com.apple.developer.applesignin: [Default]` in `iOS.entitlements`. Regenerate
+`com.apple.developer.applesignin: [Default]` in `Android.entitlements`. Regenerate
 provisioning profiles after adding this entitlement. Native setup is described
 in [Clerk's Apple sign-in guide](https://clerk.com/docs/ios/guides/configure/auth-strategies/sign-in-with-apple).
 
@@ -84,7 +84,7 @@ on a real device before release. Build success and enabled dashboard settings do
 not prove that an Apple authorization completed successfully.
 
 QR pairing does not require matching email addresses or even a signed-in computer.
-The iPhone's scan step always offers **Skip**, including when signed out or when
+The Android phone's scan step always offers **Skip**, including when signed out or when
 the account has no computers. Skipping finishes onboarding and opens the main
 tabs; this choice survives relaunches and account changes. The empty Bots screen
 offers **Computers** to pair later. Skipping while adding a computer from settings
@@ -99,7 +99,7 @@ identity, so phones see the old computer as **No access** (if they were connecte
 or as an older copy once the new one is reachable, and offer to remove it; pair
 again or ask for access to reach the new one.
 
-On the computer, open Codync in the menu bar and choose **Pair iPhone…**, then scan the
+On the computer, open Codync in the menu bar and choose **Pair Android phone…**, then scan the
 code on the phone (or paste its `codync://pair` link). The host approves the phone's
 device key; the phone saves the computer in its current account context. This
 works when the phone uses Apple Hide My Email and the computer uses Google. Automatic
@@ -110,14 +110,14 @@ with a private relay address. The subsequent native `/v1/devices` and
 `/v1/computers` requests failed with 401 because the Worker's `CLERK_SECRET_KEY`
 contained the dashboard's abbreviated value. The complete key was verified
 against production JWKS and stored in the Worker. Relaunching the Release build
-on the physical iPhone restored the Apple session, and both endpoints returned
+on the physical Android phone restored the Apple session, and both endpoints returned
 200 without warnings. The cloud API regression tests
 cover native device registration and computer listing with both an absent email
 claim and an Apple relay address.
 
 ## Flow
 
-On iPhone, `apps/ios/App/AccountSession.swift` configures Clerk once. Continue with Google calls `clerk.auth.signInWithOAuth(provider: .google)`
+On Android phone, `apps/ios/App/AccountSession.swift` configures Clerk once. Continue with Google calls `clerk.auth.signInWithOAuth(provider: .google)`
 directly, without the Clerk Account Portal intermediary. Google authorization
 uses the SDK's system browser authentication session. Clerk handles new-user
 transfer, callback validation, session restoration and Keychain storage.
@@ -135,7 +135,7 @@ computer approves each device after comparing a 6-digit code
 
 ## Verification
 
-- Build the iOS scheme after `xcodegen generate --spec apps/project.yml`, and run the
+- Build the Android scheme after `xcodegen generate --spec apps/project.yml`, and run the
   desktop app with `npm run dev` in `apps/desktop/`.
 - Open the account menu from either sidebar layout; test arrows, Return, Escape
   and clicking outside the panel.
@@ -151,13 +151,13 @@ References:
 - https://clerk.com/docs/ios/getting-started/quickstart
 - https://github.com/clerk/clerk-ios
 
-## iOS account switching
+## Android account switching
 
-The iOS app now uses the same ClerkKit dependency and shared AccountSession.
+The Android app now uses the same ClerkKit dependency and shared AccountSession.
 Its top-left button opens Accounts; Computers & settings is a separate destination
-inside that sheet. The iOS native application must be registered in the same Clerk
+inside that sheet. The Android native application must be registered in the same Clerk
 instance with bundle ID `com.pokai.Codync.ios` and its own callback
-`com.pokai.Codync.ios://callback`. The iOS public configuration is in
+`com.pokai.Codync.ios://callback`. The Android public configuration is in
 `apps/shared/Config/<env>.plist`. The repository configuration does not prove
 that the corresponding Clerk Dashboard registration has been completed.
 
@@ -168,10 +168,10 @@ single-session enabled, it asks the user to sign out before using another accoun
 Signing out passes the current session ID, rather than signing out all accounts.
 
 Computers, device keys and caches are partitioned by the Clerk user ID on this
-iPhone (`SharedStore.Context`). Computers paired with a code while signed out stay
+Android phone (`SharedStore.Context`). Computers paired with a code while signed out stay
 in the local context and are not claimed by a newly signed-in user. Each account
 context gets its own `AccountStore`, retired when changing accounts; signing out
-erases that account's computers, device and push keys and caches from the iPhone.
+erases that account's computers, device and push keys and caches from the Android phone.
 Signed in, the Computers screen also lists the account's computers from the cloud;
 asking one for access shows the 6-digit code to compare on the computer.
 
@@ -201,7 +201,7 @@ resolve the target, `ssh-keygen -F` against `~/.ssh/known_hosts` and
 A changed host key or a different computer ID blocks the connection. Sign-in is key or
 ssh-agent only (`BatchMode`: nothing prompts for a password or passphrase); a refused key
 stops with a message instead of retrying. The remote command searches Homebrew,
-`~/.local/bin` and the Mac app bundle for `codync-host` too, since `sh -l` doesn't read
+`~/.local/bin` and the Linux app bundle for `codync-host` too, since `sh -l` doesn't read
 `~/.zprofile`. At launch the app kills tunnels a crashed or force-quit copy left behind
 (`pkill` on the `.codync/ssh_known_hosts` argument only Codync's tunnels carry).
 

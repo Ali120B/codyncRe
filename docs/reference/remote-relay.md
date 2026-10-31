@@ -61,7 +61,7 @@ Shared deterministic [vectors](fixtures/remote-relay-vectors.json) and their [ge
 | Host cloud / relay | `host/src/remote/cloud.rs`, `relay.rs` |
 | Swift transports / identity | `apps/ios/Kit/Sources/CodyncKit/Client/` |
 | Account and per-computer state | `apps/ios/Kit/Sources/CodyncUI/` |
-| iOS account integration | `apps/ios/App/AccountSession.swift` |
+| Android account integration | `apps/ios/App/AccountSession.swift` |
 | Desktop account, device key, cloud API | `apps/desktop/src/main/account.ts`, `cloud.ts` |
 
 See [architecture](../architecture/overview.md) and [file structure](../architecture/file-structure.md). Application/host compatibility follows mutual minimum versions ([compatibility](compatibility.md)); channel `v`, QR version and Worker package version are separate values.
@@ -78,14 +78,14 @@ See [architecture](../architecture/overview.md) and [file structure](../architec
 - 寫入：先寫 `identity.json.tmp`（0600）再 rename。讀取失敗（格式錯）→ 啟動失敗並說明，不自動覆蓋。
 - `computerId` 由 `sign` 公鑰推導（§1）。
 
-### 3.2 Device（iPhone、桌面 App 作為 client）
+### 3.2 Device（Android phone、桌面 App 作為 client）
 
 - 只有一把 Ed25519 金鑰（`Curve25519.Signing.PrivateKey`）。
 - 每個 `SharedStore.Context.id`（帳號 namespace，`local` 或 hash(userID)）一把，避免跨帳號關聯。
 - 另有一把 X25519 **push key**（`Curve25519.KeyAgreement.PrivateKey`），同樣每 context 一把，只用於解開推播（§6.7）。
 - Keychain：`kSecClassGenericPassword`，`kSecAttrService = "com.pokai.Codync.device-key"`（push key 用 `"com.pokai.Codync.push-key"`），`kSecAttrAccount = context.id`，值 = 32-byte `rawRepresentation`，`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，`kSecAttrSynchronizable = false`。
 - 桌面 App（`apps/desktop/src/main/cloud.ts`）：每個帳號一把 Ed25519 device key，seed 以 Electron `safeStorage`（OS keychain）加密後存在 app 的 userData 目錄；只用於雲端 `/v1` API 的 `Codync-Sig`。
-- iOS App、Widgets、NotificationService 共用 access group `$(AppIdentifierPrefix)com.pokai.Codync`（`project.yml` 對這三個 target 加 `keychain-access-groups` entitlement；`CodyncKit` 從 Info.plist `CodyncKeychainGroup` 讀 group，缺值則不設 group）。
+- Android App、Widgets、NotificationService 共用 access group `$(AppIdentifierPrefix)com.pokai.Codync`（`project.yml` 對這三個 target 加 `keychain-access-groups` entitlement；`CodyncKit` 從 Info.plist `CodyncKeychainGroup` 讀 group，缺值則不設 group）。
 - 私鑰永不離開 Keychain／process；雲端只存公鑰。
 - 帳號登出／移除帳號：刪除該 context 的 device key、computers 快取、mailbox 草稿、widget snapshot。
 
@@ -144,7 +144,7 @@ codync://pair?v=3&name=<pct>&id=<computerId>&sk=<signPub>&bk=<boxPub>&code=<pair
 2. 手機載入／建立 device key，用 §7.5 的連線策略連線，hello 帶 `"pair": true`（中繼另需 URL `pair=<offerId>`）。
 3. 握手成功（手機已用 QR 的 `sk` 驗證 host）後，第一個 request 必須是：
    ```json
-   {"id":1,"m":"pair","b":{"code":"<code>","name":"Kevin's iPhone","platform":"ios"}}
+   {"id":1,"m":"pair","b":{"code":"<code>","name":"Kevin's Android phone","platform":"ios"}}
    ```
 4. host 驗 code（常數時間比較、未過期、未用過）→ 刪除該 code → 新增裝置列（`source=local`，`grant_id=NULL`，`scopes=["control","screen"]`，無 lease）→ 回 `{"id":1,"ok":{"computerId":"…","name":"…"}}` → **關閉這條 channel，close code `4100 paired`**（中繼：host 依序送 `data`（回應）→ `close {link, code:4100}` → 新 ACL（移除 offer、加入 dk）；同一條 host socket 保序，所以回應一定先到）。
 5. client 收到 `4100` 立即以一般模式重連（§7.5，不帶 `pair`）。直連與中繼行為相同；DO 不需要「升級」pairing socket。
@@ -167,7 +167,7 @@ codync://pair?v=3&name=<pct>&id=<computerId>&sk=<signPub>&bk=<boxPub>&code=<pair
 
 **B. 手機取得存取權**（commit-then-reveal SAS，ZRTP／BLE numeric comparison 同型）：
 1. 手機登入後 `POST /v1/devices`（Clerk + 該 device key 的 `Codync-Sig`）。
-2. `GET /v1/computers`（帶 `Codync-Sig` 則回傳每台的 `access`）。 iPhone 的 Bots 首頁直接列出尚未連線的帳號電腦，點 **Connect** 進入存取申請，不需掃 QR Code；核准後顯示該電腦的 bots。首次裝置授權仍由電腦上的使用者確認。
+2. `GET /v1/computers`（帶 `Codync-Sig` 則回傳每台的 `access`）。 Android phone 的 Bots 首頁直接列出尚未連線的帳號電腦，點 **Connect** 進入存取申請，不需掃 QR Code；核准後顯示該電腦的 bots。首次裝置授權仍由電腦上的使用者確認。
 3. 對 `access == "none"` 的電腦：手機產生 32 random bytes `nD`（只存記憶體），`POST /v1/computers/{id}/access-requests {"commit": b64url(SHA-256("codync/sascommit/v1" ‖ dk ‖ nD))}` → `{requestId, expiresAt}`。
 4. Worker 通知 DO → host 拉 state → 看到新申請（含 `commit`）→ host 產生 32 random bytes `nH`（存本機記憶體，每個 requestId 只產生一次）→ `POST /v1/host/access-requests/{id}/nonce {"nonce": nH}`（已有 host nonce → `409 conflict`，host 不得換）。
 5. 手機輪詢 `GET /v1/access-requests/{id}`（每 2 秒）→ 出現 `hostNonce` 後才 `POST /v1/access-requests/{id}/reveal {"nonce": nD}` → Worker 存入並通知 DO `cloud.changed`。手機此時計算 SAS 顯示「在電腦上確認代碼 123456」。
@@ -328,7 +328,7 @@ key  = HKDF-Expand(prk, "codync/push-key/v1", 32)
 ct   = ChaCha20-Poly1305(key, nonce = 12 × 0x00, plaintext = {"title","subtitle"?,"body"} JSON, aad = cidRaw)
 sealed = b64url(epk ‖ ct)
 ```
-送給 `relay/` 的 body：`alert` 為 Codync 與依 kind 選擇的通用說明句、`mutableContent: true`、`threadId = computerId:botId`、`category = done|needsInput|failed`、`data = {"botId","computerId","ctx","sealed"}`。iOS 以 `platform: ios` 註冊 APNs token，透過 Notification Service Extension 解密；Android 以 `platform: android` 註冊 FCM token，接收 data-only 訊息後由 app service 本機解密並顯示。兩者皆使用裝置的 X25519 push key；解不開時只顯示通用文字。Live Activity 的 `contentState` 只含 `status` 與 `startedAt`（`activity` 固定為空字串），不含任何自由文字。向量 `push` 保留沒有 subtitle 的相容格式。通知呈現、票券更新、ActivityKit 時間與部署驗收見 [通知與 Live Activity 設計](../design/push-and-live-activity.md)。
+送給 `relay/` 的 body：`alert` 為 Codync 與依 kind 選擇的通用說明句、`mutableContent: true`、`threadId = computerId:botId`、`category = done|needsInput|failed`、`data = {"botId","computerId","ctx","sealed"}`。Android 以 `platform: ios` 註冊 APNs token，透過 Notification Service Extension 解密；Android 以 `platform: android` 註冊 FCM token，接收 data-only 訊息後由 app service 本機解密並顯示。兩者皆使用裝置的 X25519 push key；解不開時只顯示通用文字。Live Activity 的 `contentState` 只含 `status` 與 `startedAt`（`activity` 固定為空字串），不含任何自由文字。向量 `push` 保留沒有 subtitle 的相容格式。通知呈現、票券更新、ActivityKit 時間與部署驗收見 [通知與 Live Activity 設計](../design/push-and-live-activity.md)。
 
 ---
 
@@ -510,13 +510,13 @@ The route table below summarizes the contract. Executable schema and validation 
 
 `codync-host cloud` reports cloud status; `devices` lists/revokes device access; `access` handles pending approval. `reset-token` rotates the local bearer credential, not remote device grants.
 
-## 10. iOS Swift integration
+## 10. Android Swift integration
 
 `CodyncKit/Client` (`apps/ios/Kit/`) owns transport, crypto, identity and cloud API models. `CodyncUI` owns account/per-computer stores and presentation. The desktop app doesn't use the device channel; it reaches its own host and SSH computers over loopback. Consumers must retain account and computer scope when handling asynchronous responses, links and cached widget data. See [file structure](../architecture/file-structure.md).
 
 ## 11. Apps and SSH
 
-The iOS app (ClerkKit) and the desktop app (Clerk Frontend API) sign in to the same Clerk instance. QR pairing remains usable without an account; account sign-in requires host-approved device access. The desktop app uses OpenSSH forwarding for SSH computers, not a mobile SSH gateway. See [accounts and SSH](../guides/accounts-and-ssh.md).
+The Android app (ClerkKit) and the desktop app (Clerk Frontend API) sign in to the same Clerk instance. QR pairing remains usable without an account; account sign-in requires host-approved device access. The desktop app uses OpenSSH forwarding for SSH computers, not a mobile SSH gateway. See [accounts and SSH](../guides/accounts-and-ssh.md).
 
 ## 12. Verification
 
@@ -534,7 +534,7 @@ Verify pairing and approval, same-computer direct/relay connectivity, encrypted 
 
 ## 14. Environments and deployment
 
-See [environments and deployment](../guides/environments-and-deployment.md) and [cloud setup](../../cloud/README.md). `iOS Dev` / `dist:*:dev` builds target development (`dev-api.codync.dev`); `iOS` / `dist:*:main` builds target production (`api.codync.dev`).
+See [environments and deployment](../guides/environments-and-deployment.md) and [cloud setup](../../cloud/README.md). `Android Dev` / `dist:*:dev` builds target development (`dev-api.codync.dev`); `Android` / `dist:*:main` builds target production (`api.codync.dev`).
 
 ## Implementation clarifications
 
@@ -554,7 +554,7 @@ The following implemented clarifications take precedence over the original contr
 - **ACL**：列表中 `grant` 為 null 的已封鎖 dk 會被解除封鎖；被封鎖的 dk 仍可開 pairing socket。
 - **帳號裝置 mailbox**：第一次拉取 state 之前收到的 item 先保留、不 ack。
 - **SSH forward**：以 `lsof` 確認本機 listener 屬於我們啟動的 `ssh`。
-- **取消 access request**：iOS SAS sheet 有取消按鈕（`DELETE /v1/access-requests/{id}`）。
+- **取消 access request**：Android SAS sheet 有取消按鈕（`DELETE /v1/access-requests/{id}`）。
 
 ## 15. Limits and risks
 

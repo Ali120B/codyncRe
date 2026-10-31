@@ -54,7 +54,7 @@ failed download reports the last stderr line that isn't an `npm notice`.
 
 ## Verification
 
-- Done: a unit test for the error line; on the Mac, `npm exec … -c "exit 0"` exits 0 (and
+- Done: a unit test for the error line; on the Linux, `npm exec … -c "exit 0"` exits 0 (and
   `"exit 3"` exits 3); a debug host with an empty npm cache downloaded the Claude adapter through the
   new prefetch, started it, and the bot replied.
 - Done in the VM by hand: steps 3 and 4 above, running the exact npm command.

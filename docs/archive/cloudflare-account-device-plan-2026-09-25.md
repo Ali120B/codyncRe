@@ -21,7 +21,7 @@ Cloudflare API、D1、裝置目錄、雲端授權／撤權與中繼由 Claude Co
 
 ## 1. 目標與核心決策
 
-讓使用者在 Mac 和 iPhone 登入同一個 Codync 帳號後，能找到自己的電腦、完成首次授權、管理已授權裝置，並在之後擴充訂閱與免 Tailscale 的遠端連線。
+讓使用者在 Linux 和 Android phone 登入同一個 Codync 帳號後，能找到自己的電腦、完成首次授權、管理已授權裝置，並在之後擴充訂閱與免 Tailscale 的遠端連線。
 
 採用以下分工：
 
@@ -37,7 +37,7 @@ Cloudflare API、D1、裝置目錄、雲端授權／撤權與中繼由 Claude Co
 
 ### 1.1 Bot、computer、帳號與連線方式（新增需求）
 
-每個 bot 固定屬於一台 computer；該 computer 是 agent、專案目錄、session 與聊天資料實際所在的位置。Mac App 是操作介面，不代表 bot 必須在目前這台 Mac 執行。
+每個 bot 固定屬於一台 computer；該 computer 是 agent、專案目錄、session 與聊天資料實際所在的位置。Linux App 是操作介面，不代表 bot 必須在目前這台 Linux 執行。
 
 - 一個 bot 只能對應一台 computer；預設允許同一台 computer 執行多個 bots，不強加「一台只能有一個 bot」的限制。
 - computer 可以是本機 Mac、另一台已配對的電腦，或經 SSH 連到的遠端 Mac／Linux。
@@ -54,8 +54,8 @@ Cloudflare API、D1、裝置目錄、雲端授權／撤權與中繼由 Claude Co
 
 | 現況 | 程式位置 | 對計畫的影響 |
 |---|---|---|
-| Mac 已使用 ClerkKit，支援 Google 登入 | `apps/shared/AccountSession.swift`、`docs/guides/accounts-and-ssh.md` | 延伸現有登入，不另建帳號系統 |
-| iOS 已接 Clerk 帳號入口，電腦仍靠掃碼配對 | `apps/ios/App/CodyncApp.swift`、`apps/ios/Views/RootView.swift`、`PairingView.swift` | 登入入口已建立；雲端電腦清單待實作 |
+| Linux 已使用 ClerkKit，支援 Google 登入 | `apps/shared/AccountSession.swift`、`docs/guides/accounts-and-ssh.md` | 延伸現有登入，不另建帳號系統 |
+| Android 已接 Clerk 帳號入口，電腦仍靠掃碼配對 | `apps/ios/App/CodyncApp.swift`、`apps/ios/Views/RootView.swift`、`PairingView.swift` | 登入入口已建立；雲端電腦清單待實作 |
 | host SQLite 位於 `~/.codync/codync.db` | `host/src/main.rs`、`host/src/store.rs` | 保留本機資料與既有 `rev` 同步機制 |
 | host 使用共用 pairing token，旋轉會使所有舊裝置失效 | `host/src/main.rs`、`host/src/api/mod.rs` | 必須新增逐裝置授權，才能精準撤權 |
 | 手機配對資料依帳號分區存入 App Group UserDefaults | `kit/Sources/CodyncKit/Client/SharedStore.swift` | 秘密搬到 Keychain，UserDefaults 僅留顯示資料與參照 |
@@ -63,7 +63,7 @@ Cloudflare API、D1、裝置目錄、雲端授權／撤權與中繼由 Claude Co
 | 已有 Cloudflare Worker 轉送 APNs，使用加密 ticket | `relay/src/index.ts`、`relay/wrangler.toml` | 保留相容性；它目前不是裝置目錄或聊天中繼 |
 | Remote screen 使用獨立 helper 與 WebRTC | `apps/screen-macos/`、`kit/Sources/CodyncUI/Screen/` | 影像傳輸與聊天中繼分開 |
 
-目前「Mac 登入成功」不等於「手機已獲准連 host」。現有配對 token 也不會因 Clerk 登出而自動失效。
+目前「Linux 登入成功」不等於「手機已獲准連 host」。現有配對 token 也不會因 Clerk 登出而自動失效。
 
 ## 3. 本機 SQLite 與雲端 D1 的資料邊界
 
@@ -107,8 +107,8 @@ Cloudflare Tunnel 不列為第一版終端使用者的安裝依賴。帳號驗�
 
 ```mermaid
 flowchart TD
-    IOS[iPhone App] --> CLERK[Clerk 登入]
-    MAC[Mac App] --> CLERK
+    IOS[Android phone App] --> CLERK[Clerk 登入]
+    MAC[Linux App] --> CLERK
     IOS --> API[Workers：Codync API]
     MAC --> API
     API --> D1[(D1：電腦歸屬與裝置授權)]
@@ -128,7 +128,7 @@ flowchart TD
 
 ## 6. 使用者流程
 
-### 6.1 Mac 首次綁定
+### 6.1 Linux 首次綁定
 
 1. 使用者透過現有 Clerk 流程登入。
 2. App 顯示「將這台電腦加入我的帳號」，明確展示目標帳號。
@@ -141,12 +141,12 @@ claim 必須綁定使用者、host 公鑰、nonce 與到期時間；只傳 `host
 
 第一次信任建立依靠本機 App／host 連線與使用者確認，不從未驗證的網路 `/health` 回應直接信任 host 身分。Linux 後續提供一次性瀏覽器 claim code 的等效流程，不儲存使用者 Clerk refresh credential 到 daemon。
 
-### 6.2 iPhone 登入與連接
+### 6.2 Android phone 登入與連接
 
-1. iPhone 使用與 Mac 相同環境的 Clerk instance 登入；使用 iOS 自己的 bundle ID 與 callback 設定。
+1. Android phone 使用與 Linux 相同環境的 Clerk instance 登入；使用 Android 自己的 bundle ID 與 callback 設定。
 2. `GET /v1/hosts` 取得自己的電腦清單，顯示離線／最後回報時間。
 3. 使用者選擇電腦，新手機提出裝置授權申請。
-4. Mac 顯示手機名稱、帳號與申請時間，由使用者確認。
+4. Linux 顯示手機名稱、帳號與申請時間，由使用者確認。
 5. 手機獲得綁定該 host 的短效 grant，並完成安全直連設定。
 6. 手機向 host 取得 bots 與歷史訊息。
 
@@ -159,7 +159,7 @@ claim 必須綁定使用者、host 公鑰、nonce 與到期時間；只傳 `host
 - 新裝置申請有效期建議 10 分鐘，過期要重申請，不能留成無限期待批准。
 - 手機登出／換帳號：關閉帳號連線，刪除該帳號 grant 與本機快取，清除相關 widget snapshot；不得顯示上一個帳號的 bots。
 - 手機登出盡力撤銷該裝置在雲端的 session／grant；若離線登出，先清本機資料，剩餘權限受 lease 到期限制。
-- Mac App 登出只結束互動式登入；daemon 的雲端綁定持續存在，UI 要提示如何另行解除綁定。
+- Linux App 登出只結束互動式登入；daemon 的雲端綁定持續存在，UI 要提示如何另行解除綁定。
 - 解除 host 綁定撤銷全部帳號型 grant 與機器憑證，不刪本機專案、bots 或聊天。
 - 帳號刪除要同步處理 host ownership、裝置、推播訂閱、雲端 metadata 與後续商業資料保留要求。
 
@@ -200,7 +200,7 @@ Worker 驗證 Clerk token 的簽章、issuer、到期與適用的 audience／aut
 ### 7.4 秘密與傳輸
 
 - Clerk publishable key 可存在 App；Clerk secret、APNs key、雲端簽章私鑰只放 Worker secrets。
-- iOS／macOS 的裝置私鑰與 grant 放 Keychain；widget 使用必要的 Keychain access group，不將 token 放 App Group UserDefaults。
+- Android／Linux 的裝置私鑰與 grant 放 Keychain；widget 使用必要的 Keychain access group，不將 token 放 App Group UserDefaults。
 - host 私鑰使用 OS 安全儲存或受限制權限的檔案；Linux 至少使用專屬使用者與 `0600`。
 - 所有遠端連線（LAN、Tailscale、中繼）都走同一套 E2E channel；長效 token 只接受 loopback。
 - 不在 URL query、一般 log、分析事件或 crash report 中記錄憑證。現有 query token 相容入口需列入退場範圍。
@@ -308,13 +308,13 @@ WebRTC 優先直連，必要時使用 TURN；憑證需短效且受裝置授權�
 |---|---|
 | `cloud/`（新增） | Workers API、D1 migrations、驗證／授權模組、API 測試、Wrangler 設定 |
 | `relay/` | ticket 升級、subscription 驗證、限流與相容遷移 |
-| `apps/shared/AccountSession.swift`（已提取共用） | 從 Mac 提取兩端共用 Clerk wrapper，以 target sources 引入 |
+| `apps/shared/AccountSession.swift`（已提取共用） | 從 Linux 提取兩端共用 Clerk wrapper，以 target sources 引入 |
 | `apps/ios/App/`、`apps/macos/App/` | App lifecycle、登入、登出清理、各平台 callback |
 | `apps/ios/Views/`、`apps/macos/Views/` | 登入入口、我的電腦、授權申請與撤權 |
 | `kit/Sources/CodyncKit/Client/` | `CloudClient`、Keychain 儲存、配對遷移；不引入 Clerk 到 widget-safe core |
 | `kit/Sources/CodyncUI/Store/` | 本機／雲端電腦清單合併、帳號切換、grant 更新 |
 | `host/src/` | host identity、cloud client、逐裝置 auth、撤權與版本協商 |
-| `project.yml` | iOS Clerk 依賴、shared sources、config 與 Keychain entitlement 配置 |
+| `project.yml` | Android Clerk 依賴、shared sources、config 與 Keychain entitlement 配置 |
 | `docs/guides/accounts-and-ssh.md`、README、PairingView 文案 | 更新帳號、資料處理與本機模式說明 |
 
 實作應保持帳號 SDK 與 widget-safe 資料模型分離，避免 widget 因共享套件被迫初始化 Clerk。不要把雲端管理 API 全塞進現有 `HostClient`。
@@ -323,10 +323,10 @@ WebRTC 優先直連，必要時使用 TURN；憑證需短效且受裝置授權�
 
 ### P0：確認邊界與協定
 
-- 確認本機模式保留、第一版仍可能掃碼／使用 Tailscale、首次手機需要 Mac 確認。
+- 確認本機模式保留、第一版仍可能掃碼／使用 Tailscale、首次手機需要 Linux 確認。
 - 完成 claim、grant、傳輸安全、撤權 lease 與 host identity 的協定細節。
-- 核對 Clerk 原生 iOS 配置、Cloudflare D1 一致性與 migration 能力。
-- 核對 iOS 上架所需的登入選項、帳號刪除流程；若需 Apple 登入則列入 P1。
+- 核對 Clerk 原生 Android 配置、Cloudflare D1 一致性與 migration 能力。
+- 核對 Android 上架所需的登入選項、帳號刪除流程；若需 Apple 登入則列入 P1。
 - 決定 dev／main（production）環境、API domain、秘密輪替與資料保存政策。
 
 完成條件：沒有「雲端已撤權但有效連線可無限使用」或「知道 host ID 就能認領」的空白設計。
@@ -334,8 +334,8 @@ WebRTC 優先直連，必要時使用 TURN；憑證需短效且受裝置授權�
 ### P1：兩端帳號與唯讀裝置目錄
 
 - 新增 `cloud/`、D1 migrations、JWT 驗證、`me`、host claim/list 與最小 audit。
-- iOS 加入 Clerk；共用 AccountSession；登入可略過。
-- Mac 明確 claim，host 以機器身分 heartbeat；iPhone 顯示我的電腦。
+- Android 加入 Clerk；共用 AccountSession；登入可略過。
+- Linux 明確 claim，host 以機器身分 heartbeat；Android phone 顯示我的電腦。
 - 已列出但未授權的電腦顯示後續設定提示，不能點一下就繞過配對。
 
 完成條件：同帳號兩端清單一致；不同帳號完全隔離；既有掃碼配對與本機資料仍可用。
@@ -362,9 +362,9 @@ WebRTC 優先直連，必要時使用 TURN；憑證需短效且受裝置授權�
 
 - P1／P2 的資料模型一併納入每 bot 的 computer 關聯、帳號作用域與複合路由 ID，避免日後重做 cache、deep link 與通知格式。
 - 先實作帳號內多 computer 的 bot 彙整與路由；每台 computer 保有自己的 `BotStore`／同步游標，不把多個 host 的 `rev` 混成一個。
-- SSH 試行使用 macOS 系統 OpenSSH，連到遠端已安裝的 codync-host，透過 loopback tunnel 重用既有 API；不先實作任意 SSH command 當完整 bot backend。
+- SSH 試行使用 Linux 系統 OpenSSH，連到遠端已安裝的 codync-host，透過 loopback tunnel 重用既有 API；不先實作任意 SSH command 當完整 bot backend。
 - SSH 試行不依賴雲端中繼，可以在 P2 後、P3 前交付；但必須先完成 host 身分驗證、獨立授權、連線生命週期及正確路由。
-- 手機直接連 SSH host、手機經 Mac gateway 存取，以及免安裝 remote host 是不同工作項；不因桌面 tunnel 成功就宣稱三者均完成。
+- 手機直接連 SSH host、手機經 Linux gateway 存取，以及免安裝 remote host 是不同工作項；不因桌面 tunnel 成功就宣稱三者均完成。
 
 完成條件與延後原因詳見 [SSH 計畫的整合門檻](bot-computer-ssh-plan-2026-09-25.md#6-整合順序與是否現在一起做)。
 
@@ -387,12 +387,12 @@ WebRTC 優先直連，必要時使用 TURN；憑證需短效且受裝置授權�
 | 撤權 | SSE／WebSocket 存量連線、雲端失聯 lease 到期、screen control、舊 token 仍在 |
 | 遷移 | 舊手機升級、寫 Keychain 失敗、重複跑 migration、多台電腦、帳號切換、widget |
 | 推播 | 已登出／撤權不再通知、ticket 過期、APNs token 更新與 `Unregistered` |
-| 網路 | LAN、Tailscale、行動網路、Mac 睡眠、host 重啟、雲端 outage、網路切換 |
+| 網路 | LAN、Tailscale、行動網路、Linux 睡眠、host 重啟、雲端 outage、網路切換 |
 | 冪等 | 重複 claim/approve/webhook/send、API response 丟失後重試不重複執行 |
 | 刪帳號 | 重複／亂序 webhook、禁止重新發 grant、撤權、metadata 清理與最小 tombstone |
 | 本機能力 | 未登入仍可本機執行；雲端故障不破壞本機 SQLite／現有工作 |
 
-Worker 執行 typecheck 與具 D1 binding 的整合測試；Rust 執行 auth／遷移測試；Swift 執行登入狀態、Keychain 與帳號切換測試。最後使用兩個測試帳號、兩台手機／模擬器與實際 Mac 驗證，不以編譯成功代替 OAuth／跨裝置驗收。
+Worker 執行 typecheck 與具 D1 binding 的整合測試；Rust 執行 auth／遷移測試；Swift 執行登入狀態、Keychain 與帳號切換測試。最後使用兩個測試帳號、兩台手機／模擬器與實際 Linux 驗證，不以編譯成功代替 OAuth／跨裝置驗收。
 
 ## 16. 部署、監控、成本與回滾
 
@@ -414,7 +414,7 @@ Worker 執行 typecheck 與具 D1 binding 的整合測試；Rust 執行 auth／�
 | 選項 | 預設建議 | 何時必須定案 |
 |---|---|---|
 | 是否強制登入 | 本機模式可略過；雲端管理需要登入 | P1 UI |
-| 新手機能否自動授權 | 需要 Mac 確認 | P2 |
+| 新手機能否自動授權 | 需要 Linux 確認 | P2 |
 | 雲端失聯可用多久 | 帳號型 grant 最長 15 分鐘；本機使用不受影響 | P2 |
 | 重新登入是否恢復舊批准 | 同一 installation 金鑰可重新驗證；已撤銷裝置需重新批准 | P2 |
 | 是否雲端保存聊天 | 第一版不保存 | 若進 P4 同步 |
@@ -426,7 +426,7 @@ Worker 執行 typecheck 與具 D1 binding 的整合測試；Rust 執行 auth／�
 
 本文件的現況已對照儲存庫。撰寫時網頁工具回傳驗證錯誤，先前直接存取官方網站也受到限制，因此不把最新價格、配額或上架規則寫成已驗證事實。以下官方入口供各里程碑實作前核對：
 
-- [Clerk iOS Quickstart](https://clerk.com/docs/ios/getting-started/quickstart)
+- [Clerk Android Quickstart](https://clerk.com/docs/ios/getting-started/quickstart)
 - [Clerk Session Tokens](https://clerk.com/docs/guides/sessions/session-tokens)
 - [Clerk JWT Verification](https://clerk.com/docs/guides/sessions/manual-jwt-verification)
 - [Cloudflare Workers](https://developers.cloudflare.com/workers/)
@@ -436,4 +436,4 @@ Worker 執行 typecheck 與具 D1 binding 的整合測試；Rust 執行 auth／�
 - [Cloudflare Queues](https://developers.cloudflare.com/queues/)
 - [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
 
-本地參考：[專案結構](../architecture/file-structure.md)、[目前 macOS Clerk 設定](../guides/accounts-and-ssh.md)、[既有推播 relay](../../relay/README.md)。
+本地參考：[專案結構](../architecture/file-structure.md)、[目前 Linux Clerk 設定](../guides/accounts-and-ssh.md)、[既有推播 relay](../../relay/README.md)。

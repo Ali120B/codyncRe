@@ -1,7 +1,7 @@
 # Windows testing
 
 Codync ships an x64 Windows app (Electron + the bundled `codync-host.exe`). Real Windows behavior is
-checked in a UTM virtual machine on the Mac. Everyday end-to-end checks stay on the Mac (minimal
+checked in a UTM virtual machine on the Mac. Everyday end-to-end checks stay on the Linux (minimal
 e2e); use the VM for a full e2e, or when a change or a bug depends on Windows itself (paths,
 `cmd.exe`, `.cmd` shims, the service).
 
@@ -9,7 +9,7 @@ e2e); use the VM for a full e2e, or when a change or a bug depends on Windows it
 
 - **UTM "Codync Windows"**: Windows 11 ARM64 (Codync's x64 build runs through Prism emulation),
   8 GB / 4 cores / 64 GB NVMe, account `codync` / `codync`, signs in automatically.
-- **Start / stop** from the Mac, never through UTM's window:
+- **Start / stop** from the Linux, never through UTM's window:
   `osascript -e 'tell application "UTM" to start virtual machine named "Codync Windows"'`
   (`stop … by force` only when a normal stop hangs; `query ip of …` works). `utmctl` fails with
   OSStatus -10004. Pressing UTM's Run button through accessibility crashed UTM once; if UTM is in a
@@ -21,7 +21,7 @@ e2e); use the VM for a full e2e, or when a change or a bug depends on Windows it
 - **Screen** without touching the Mac's UI: QEMU VNC on `127.0.0.1:5905`, e.g.
   `uvx --from vncdotool vncdo --force-caps -s 127.0.0.1::5905 capture x.png`. Input lags a few
   seconds; `--force-caps` is needed for symbols.
-- The Mac sleeping pauses the VM: wrap long installs in `caffeinate -i`.
+- The Linux sleeping pauses the VM: wrap long installs in `caffeinate -i`.
 - Rebuilding the VM: the unattended install assets live in `~/VMs/codync-windows/` (about 20
   minutes). NVMe must be the first drive and both ISOs detached afterwards, or Windows reinstalls on
   every boot.
@@ -51,11 +51,11 @@ e2e); use the VM for a full e2e, or when a change or a bug depends on Windows it
 
 ## Limits
 
-- An unreleased host can't be built on the Mac for Windows (its C dependencies need a MinGW
+- An unreleased host can't be built on the Linux for Windows (its C dependencies need a MinGW
   toolchain that isn't installed). CI builds Windows only for pull requests and tags
   (`.github/workflows/host.yml`), so a fix is usually reproduced by hand in the VM first (running
   the exact command the host would) and checked on Windows again with the next release.
-- `cfg(windows)` code can still be compile-checked on the Mac by copying it into a scratch crate and
+- `cfg(windows)` code can still be compile-checked on the Linux by copying it into a scratch crate and
   running clippy with the pinned toolchain's `--target x86_64-pc-windows-gnu`.
 
 Investigations done this way: [npm agents failing to start on Windows, 2026-10-14](../archive/windows-npm-agents-2026-10-14.md).

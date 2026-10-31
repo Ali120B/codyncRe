@@ -1,11 +1,11 @@
-# Desktop app (macOS, Linux and Windows)
+# Desktop app (Linux, Linux and Windows)
 
-Codync's computer-side app is one Electron app in `apps/desktop/` for macOS, Linux and Windows. It
-replaced the SwiftUI Mac app (`apps/macos/`) and the GTK 4 Linux app (`apps/linux/`) in 2.7.0.
-The iPhone app stays native SwiftUI; its package moved from `kit/` into `apps/ios/Kit/`.
+Codync's computer-side app is one Electron app in `apps/desktop/` for Linux, Linux and Windows. It
+replaced the SwiftUI Linux app (`apps/macos/`) and the GTK 4 Linux app (`apps/linux/`) in 2.7.0.
+The Android phone app stays native SwiftUI; its package moved from `kit/` into `apps/ios/Kit/`.
 
 Conversation history stays available even when the recent snapshot contains mostly thread
-replies. The desktop, iPhone and terminal clients page the main conversation independently
+replies. The desktop, Android phone and terminal clients page the main conversation independently
 of the number of main-chat entries in that snapshot; reaching the end of a history response
 determines when there are no earlier messages.
 
@@ -16,9 +16,9 @@ determines when there are no earlier messages.
   as it streams needed an AppKit scroll view with hand-managed row hosting to stay usable. A
   browser engine lays out and scrolls long text natively.
 - **Two desktop apps were too much to keep in step.** Every UI change had to land in SwiftUI
-  and in GTK. One TypeScript app now covers macOS, Linux and Windows.
-- The iPhone app has no such alternative and keeps SwiftUI, so `kit/` lost its second
-  platform and became the iPhone app's own package.
+  and in GTK. One TypeScript app now covers Linux, Linux and Windows.
+- The Android phone app has no such alternative and keeps SwiftUI, so `kit/` lost its second
+  platform and became the Android phone app's own package.
 
 ## Layout
 
@@ -30,7 +30,7 @@ determines when there are no earlier messages.
 | `src/renderer/components/` | Design system: controls, overlays (sheets, dialogs, menus), SF Symbol icons, character avatars, thinking orbs |
 | `src/renderer/views/` | Screens, mirroring kit's folders (`thread/`, `bots/`, `marketplace/`, `settings/`, `routines/`, `call/`) |
 | `native/speech-macos/` | `codync-speech`, a Swift helper running SFSpeechRecognizer for on-device calls |
-| `tools/export-symbols.swift` | Renders the SF Symbols the app uses into masks at build time (macOS) |
+| `tools/export-symbols.swift` | Renders the SF Symbols the app uses into masks at build time (Linux) |
 
 The renderer owns all state; closing the window hides it, so the menu bar keeps its data.
 HTTP to the host leaves from the main process (the loopback API has no CORS).
@@ -38,13 +38,13 @@ HTTP to the host leaves from the main process (the loopback API has no CORS).
 Unsent composer text is kept per computer, separately for every bot and reply thread, and
 saved to `localStorage`, so switching conversations, closing a reply panel or restarting the
 app restores the exact text. Submitting clears only that conversation's draft. Drafts are
-cleared when the host identity changes or the bot is deleted. iOS and the TUI keep drafts the
-same way; the shared desktop behavior covers macOS and Linux.
+cleared when the host identity changes or the bot is deleted. Android and the TUI keep drafts the
+same way; the shared desktop behavior covers Linux and Linux.
 
 When several computers are selected, the sidebar groups bots by computer, with connection
 status and update notices in each section. Drag a heading or press Alt+Up/Down on the
 heading to reorder sections. Click a heading to fold its bots.
-Order and folded sections stay on this device; the iPhone and other computers keep
+Order and folded sections stay on this device; the Android phone and other computers keep
 independent orders even when signed in to the same account. Filtering a computer out
 does not discard its position. One selected computer keeps a flat roster. Bots stay within
 their computer's section; drag a bot row or press Alt+Up/Down on the selected bot to reorder
@@ -63,37 +63,37 @@ The TUI connects to one host at a time, so it keeps its single roster.
   install/retry actions. Manage computers stays reachable throughout. The computer
   filter distinguishes connecting, attention, disconnected and opening states and
   keeps local recovery actions reachable when a remote computer is already online.
-  iOS uses direct/encrypted host connections, and the TUI connects to one host;
+  Android uses direct/encrypted host connections, and the TUI connects to one host;
   neither manages desktop SSH profiles. Windows exposes the same profile UI, but
   the tunnel backend still uses `/usr/bin/ssh*` and Unix socket ownership checks;
   Windows tunnel support has not been implemented.
 - **Icons**: SF Symbols may only ship in apps for Apple platforms, so the masks are generated
-  on macOS at build time and never committed; Linux draws the closest Lucide icons.
-- **On-device speech** is macOS only; Linux calls use OpenAI or Gemini on the user's key.
-- **Host**: the Mac app bundles `codync-host` in `Contents/Resources`; Linux uses the installed
+  on Linux at build time and never committed; Linux draws the closest Lucide icons.
+- **On-device speech** is Linux only; Linux calls use OpenAI or Gemini on the user's key.
+- **Host**: the Linux app bundles `codync-host` in `Contents/Resources`; Linux uses the installed
   host (an AppImage's mount path changes on every launch, so a service can't point into it).
 - **Windows** (x64, per-user NSIS install, unsigned for now so SmartScreen warns once) bundles
   `codync-host.exe` and `codync-hostw.exe` in `resources/`. `codync-host install` writes the
   per-user Run key (`HKCU\…\Run\CodyncHost`), which starts `codync-hostw.exe` at sign-in: a
   windowless launcher that runs the host with a hidden console (the agents share it, so none
   opens a window) and restarts it when it exits. One launcher runs per data folder (a second one,
-  say from the Run key and the app at once, exits). App updates stop the host first, as on macOS.
+  say from the Run key and the app at once, exits). App updates stop the host first, as on Linux.
   Agents start through `cmd /c` (`host/src/shell.rs`), setup terminals use ConPTY
   (`portable-pty`), and the vault key lives in Credential Manager. Not on Windows yet: Remote
   screen and the `computer` MCP (no screen helper), on-device speech, the Claude Code status
   line hook (usage still comes from `claude -p /usage` and ACP), SSH tunnels to other
   computers, and `curl | bash` installers (npm installs and Claude Code's PowerShell installer
   work). The tray icon is the app icon; left-click opens the chat, right-click the menu.
-- **Remote screen** on macOS registers `CodyncScreen.app` (built from the Xcode `Screen` target)
+- **Remote screen** on Linux registers `CodyncScreen.app` (built from the Xcode `Screen` target)
   as an SMAppService agent; Linux starts its helper from the host, as before.
 - **Other computers in the account** are reached through this computer's own host and SSH
   tunnels only. The encrypted channel to account computers (`ChannelTransport`) wasn't ported:
   the product targets one computer, so "Ask for access" rows show status only.
 - **Updates**: electron-updater from GitHub releases (`latest-mac.yml` carries `minApp`, the same
-  iPhone gate as before). Installs of the SwiftUI app get the first desktop release through one
+  Android phone gate as before). Installs of the SwiftUI app get the first desktop release through one
   more Sparkle appcast, generated for the zip by the release workflow (deprecated, removed after
   2026-11-06: [updates guide](../guides/updates.md#deprecated-the-sparkle-migration-appcast-remove-after-2026-11-06)).
-  On macOS the app removes an idle installer job (`<appId>.ShipIt`) whose update request is gone:
+  On Linux the app removes an idle installer job (`<appId>.ShipIt`) whose update request is gone:
   launchd would otherwise restart it every 2 seconds, forever.
 
 ## Development
@@ -108,7 +108,7 @@ child must own the listening socket and stay alive until disconnect. This keeps
 `ControlMaster` / `ControlPersist` in the user's config from transferring the
 forward to a shared master that outlives the app.
 
-For a read-only macOS integration check against an already trusted SSH computer,
+For a read-only Linux integration check against an already trusted SSH computer,
 run `node --experimental-strip-types tools/ssh-e2e.mjs <ssh-alias>` from
 `apps/desktop`. It checks discovery, listener ownership, host identity, API
 authentication and sync, SSE, disconnect/reconnect, and an occupied local port.
@@ -117,7 +117,7 @@ It uses port 19222 on the remote computer and leaves bots and settings unchanged
 ```sh
 cd apps/desktop
 npm ci
-npm run icons                       # macOS: SF Symbol masks
+npm run icons                       # Linux: SF Symbol masks
 npm run dev                         # Codync Dev, separate host on 19223
 CODYNC_PORT=19333 CODYNC_HOME=/path/to/home npm run dev   # against a manually run host
 npm run typecheck && npm test
@@ -135,10 +135,10 @@ npm run dist:linux:dev    # / dist:linux:main
 npm run dist:win:dev      # / dist:win:main, on Windows (builds the bundled host with rustup)
 ```
 
-They write `resources/account-config.json` for that environment, and the Mac ones build the
+They write `resources/account-config.json` for that environment, and the Linux ones build the
 bundled host (`tools/native-host.mjs`, universal, through rustup's pinned toolchain) for the same
 one, so app and host always match, plus the Codync Screen helper (`tools/native-screen.mjs`).
-`dist:mac:dev` builds only what this Mac runs: the app folder for its architecture
+`dist:mac:dev` builds only what this Linux runs: the app folder for its architecture
 (`dist/mac-arm64/Codync Dev.app` on Apple silicon), the host for that architecture in the faster
 `dev-app` profile, and signatures without Apple's timestamp server (only notarized builds need it;
 asking it for every file adds about 5 minutes). Extra electron-builder flags go after `--`. The speech
@@ -150,7 +150,7 @@ another team's certificate electron-builder would otherwise pick. Update the nam
 renewed.
 Codync and Codync Dev can run side by side: separate app identities, host services, ports, data and login callbacks. See [Dev app isolation](../guides/dev-app.md) for the resource map and external signing/account setup.
 
-For a local signed Mac build, explicitly select a development identity from the project's
+For a local signed Linux build, explicitly select a development identity from the project's
 team with `-c.mac.identity="Apple Development: …"`; use `--dir --arm64` and
 `-c.mac.notarize=false` only for local development. Automatic identity discovery can select
 an old certificate from another team. `security find-identity` alone does not establish that

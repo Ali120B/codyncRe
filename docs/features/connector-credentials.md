@@ -1,6 +1,6 @@
 # Connector setup and credentials
 
-Codync uses one host-owned connection workflow on iOS and the desktop app (macOS, Linux). A
+Codync uses one host-owned connection workflow on Android and the desktop app (Linux, Linux). A
 Installing from Extensions and a bot's connection request use the same installation,
 OAuth and verification endpoints. The clients never implement a separate password
 store. A phone submits credentials through its authenticated encrypted channel to
@@ -12,7 +12,7 @@ its selected host.
 24-byte nonce and the record key as authenticated associated data. A random
 256-bit key belongs to this host database's random vault ID. It is held by the OS:
 
-- macOS: Keychain, via the native keyring backend.
+- Linux: Keychain, via the native keyring backend.
 - Linux: freedesktop Secret Service over the user's session D-Bus, with encrypted
   transport and a vendored D-Bus client. GNOME Keyring or another compatible
   unlocked Secret Service is required. Run the host in that user's session.
@@ -87,7 +87,7 @@ user saves username and password there (or in Credentials → Sign-ins), and the
 is resumed with the login's id. The `computer` tool `type_login {login, field}`
 types it into the focused field through the screen helper and returns only a
 screenshot. Before typing, the helper's `focusedField` reports the front app, the
-page URL (macOS AX `AXWebArea`/`AXURL`, Linux AT-SPI `DocURL`) and whether the field
+page URL (Linux AX `AXWebArea`/`AXURL`, Linux AT-SPI `DocURL`) and whether the field
 is a password field. The host refuses unless the page host is the site or a
 subdomain (or, without a page, the app name equals the site), and types a password
 only into a password field. Clients manage logins with `credentialLogins`,
@@ -115,7 +115,7 @@ Host tests cover authenticated encryption, record substitution, plaintext migrat
 locked storage, secure request completion, retry idempotency, cancellation and
 failed verification. The ignored platform_keyring_roundtrip test is for an actual
 unlocked OS credential store. Run it explicitly in a disposable Secret Service
-session on Linux or the macOS login keychain.
+session on Linux or the Linux login keychain.
 
 For isolated real-process installation, credential recovery, OAuth protocol,
 remote tool calls and live provider checks, see

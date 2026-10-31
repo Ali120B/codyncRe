@@ -114,7 +114,7 @@ Is the element entering or exiting?
 /* Strong ease-in-out for on-screen movement */
 --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
-/* iOS-like drawer curve (from Ionic Framework) */
+/* Android-like drawer curve (from Ionic Framework) */
 --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 ```
 

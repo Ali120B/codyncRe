@@ -1,10 +1,10 @@
 # Mobile onboarding 與 Widgets 設計
 
-更新：2026-09-26。本文件描述 iOS onboarding、WidgetKit 與 ActivityKit 的目前設計。連線與部署另見 [Cloudflare 測試](../guides/cloudflare-testing.md)。
+更新：2026-09-26。本文件描述 Android onboarding、WidgetKit 與 ActivityKit 的目前設計。連線與部署另見 [Cloudflare 測試](../guides/cloudflare-testing.md)。
 
 ## 參考方向
 
-透過 iPhone Mirroring 觀察已安裝的兩個 app，沿用它們已建立的資訊層級：
+透過 Android phone Mirroring 觀察已安裝的兩個 app，沿用它們已建立的資訊層級：
 
 - **Nowdex 的狀態首頁**：小型 provider 圖示、緊湊的用量卡片、細刻度進度條、標籤靠左／數值靠右、次要重置時間。
 - **Nomo 的 Home 設定頁**：簡短介紹、依實際狀態完成的設定清單、加入 widget 與編輯 widget 的分段教學。
@@ -38,7 +38,7 @@ Widget 與 Live Activity 的頭像用 `CharacterAvatar(… still: true)`：畫�
 - 採平面深淺色表面、小型圖示、11–13 pt 標籤；大字只用於主要數值。
 - App 的 Usage 卡片同步縮小字級、圖示、內距，並使用同一款刻度條。
 - 底部的 State 分頁以頂部切換呈現 Widget／Live Activity／Dynamic Island 三頁；用量上限從右上角圖示開成 sheet。Computers & settings 不再放這些入口。
-- Widget 頁提供類型／provider／大小切換、三種主畫面尺寸預覽與設定教學。加入 widget 的教學（`WidgetSetupDemo.swift`）用 SwiftUI 畫出一支 iPhone，手指實際演出長按、Edit、Add Widget、找到 Codync、Add Widget、Done；整段由單一時鐘驅動，會循環，可暫停／播放，也可以拖曳進度條。
+- Widget 頁提供類型／provider／大小切換、三種主畫面尺寸預覽與設定教學。加入 widget 的教學（`WidgetSetupDemo.swift`）用 SwiftUI 畫出一支 Android phone，手指實際演出長按、Edit、Add Widget、找到 Codync、Add Widget、Done；整段由單一時鐘驅動，會循環，可暫停／播放，也可以拖曳進度條。
 - 「Lock Screen widgets」頁可切換 Bots／Usage limits，預覽圓形、矩形與行內形式。正式 widget 與預覽共用 `AccessoryWidgetCard`。
 - 設定清單讀取實際電腦配對狀態與 `WidgetCenter` 的已安裝配置；不以點過教學當作完成。
 - 查詢失敗時顯示錯誤與「Check again」，不會永久停在載入狀態。
@@ -59,18 +59,18 @@ State 分頁的 Live Activity 頁顯示鎖定畫面形式，Dynamic Island 頁�
 | Minimal | 只有 orb（或結束符號），VoiceOver 包含 bot 名稱 |
 | Expanded | bot、上色的一行說明、orb；底部是經過時間，待回應時換成 Review；整塊點擊回到對話 |
 
-狀態色：待回應琥珀（`Palette.attention`）、失敗紅、完成綠；工作中的說明維持灰色，只有需要注意的狀態跳出來。經過時間用 `Text(startedAt, style: .timer)` 由系統自己往上數，不需要推播（`startedAt` 已在 remote content state 裡）。狀態切換時動的是 bot 本身：每個 mood 有固定的一幀姿勢（idle 光從左上、working 光掃到右側且眼睛往右看、needs you 正面光加漣漪），`still: true` 時每顆點是獨立的 view，系統會逐點插值大小與顏色，所以 halftone 的亮處會滑到新位置、眼睛移過去（`Motion.activityPhase`）。右側的 orb／勾號／警告只做淡入淡出。文字用 `.contentTransition(.interpolate)`，Review／時間列由下往上進場。全部在 iOS 給 activity 更新的 2 s 內，而且只用內建 transition，因為 Live Activity 不執行自訂 transition。展開島底部的時間是單一置中 Text（圖示內嵌），避免 timer Text 佔滿寬度後偏左。Review 只開啟對話，核准仍在 App 的 permission card。
+狀態色：待回應琥珀（`Palette.attention`）、失敗紅、完成綠；工作中的說明維持灰色，只有需要注意的狀態跳出來。經過時間用 `Text(startedAt, style: .timer)` 由系統自己往上數，不需要推播（`startedAt` 已在 remote content state 裡）。狀態切換時動的是 bot 本身：每個 mood 有固定的一幀姿勢（idle 光從左上、working 光掃到右側且眼睛往右看、needs you 正面光加漣漪），`still: true` 時每顆點是獨立的 view，系統會逐點插值大小與顏色，所以 halftone 的亮處會滑到新位置、眼睛移過去（`Motion.activityPhase`）。右側的 orb／勾號／警告只做淡入淡出。文字用 `.contentTransition(.interpolate)`，Review／時間列由下往上進場。全部在 Android 給 activity 更新的 2 s 內，而且只用內建 transition，因為 Live Activity 不執行自訂 transition。展開島底部的時間是單一置中 Text（圖示內嵌），避免 timer Text 佔滿寬度後偏左。Review 只開啟對話，核准仍在 App 的 permission card。
 
-**動態島上工作中的 bot 會動**：Live Activity 只畫一幀，唯一會自己更新的是計時器文字，所以 Compact 與 Expanded 的頭像在 working 時是一個從 `startedAt` 起算的 timer `Text`，用自訂字型畫：字型裡 `0`–`9` 是 bot 工作迴圈的十格（光繞球一圈、眼睛右看→回正→左看、最後一格眨眼），只露出秒數最後一位，所以每秒換一格、十秒一輪。每種外型兩套字型疊起來（`Ink` 灰點、`Tint` 亮點上 bot 顏色），右側的 thinking orb 也用同一招（`CodyncOrb-Ghost` 淡軌跡、`CodyncOrb-Dot` 移動的點，來自 `ThinkingOrbGeometry.workingLoop`），和頭像同一個計時器所以同步換格；字型只畫計時器的最後一位（其他字元透過 contextual alternates 變成空白），整段文字剛好一格寬，不靠對齊或裁切。共 18 個 TTF 在 `apps/ios/Widgets/Resources/Fonts/`，由 widget 的 `UIAppFonts` 載入。格子來自 App 自己的繪圖（`DottedBody.workingLoop`），改了頭像畫法要重產：先跑 `exportBotFrames()` 測試輸出 JSON，再跑 `tools/timer-fonts.py`（步驟寫在檔頭）。展開島的計時器自成一行、置中（timer Text 會預留最寬寬度，跟圖示放一起就會偏）。這只用公開 API（自訂字型 + timer Text），不是 Apple 文件化的動畫方式，未來 iOS 改了 timer 的繪製可能失效；其他狀態與 Lock Screen 仍是靜態姿勢。
+**動態島上工作中的 bot 會動**：Live Activity 只畫一幀，唯一會自己更新的是計時器文字，所以 Compact 與 Expanded 的頭像在 working 時是一個從 `startedAt` 起算的 timer `Text`，用自訂字型畫：字型裡 `0`–`9` 是 bot 工作迴圈的十格（光繞球一圈、眼睛右看→回正→左看、最後一格眨眼），只露出秒數最後一位，所以每秒換一格、十秒一輪。每種外型兩套字型疊起來（`Ink` 灰點、`Tint` 亮點上 bot 顏色），右側的 thinking orb 也用同一招（`CodyncOrb-Ghost` 淡軌跡、`CodyncOrb-Dot` 移動的點，來自 `ThinkingOrbGeometry.workingLoop`），和頭像同一個計時器所以同步換格；字型只畫計時器的最後一位（其他字元透過 contextual alternates 變成空白），整段文字剛好一格寬，不靠對齊或裁切。共 18 個 TTF 在 `apps/ios/Widgets/Resources/Fonts/`，由 widget 的 `UIAppFonts` 載入。格子來自 App 自己的繪圖（`DottedBody.workingLoop`），改了頭像畫法要重產：先跑 `exportBotFrames()` 測試輸出 JSON，再跑 `tools/timer-fonts.py`（步驟寫在檔頭）。展開島的計時器自成一行、置中（timer Text 會預留最寬寬度，跟圖示放一起就會偏）。這只用公開 API（自訂字型 + timer Text），不是 Apple 文件化的動畫方式，未來 Android 改了 timer 的繪製可能失效；其他狀態與 Lock Screen 仍是靜態姿勢。
 
 模擬器截圖看不到 Live Activity，所以 Live Activity、動態島（各狀態 × Lock Screen／Compact／Minimal／Expanded，淺色與深色）和 widget 卡片改用 render 測試輸出 PNG 檢查：
 
 ```sh
 cd apps/ios/Kit && TEST_RUNNER_CODYNC_RENDER_DIR=<輸出資料夾> xcodebuild test -scheme CodyncKit-Package \
-  -derivedDataPath ../../../build/dd -destination 'platform=iOS Simulator,id=<sim-id>' '-only-testing:CodyncKitTests/renderSurfaces()'
+  -derivedDataPath ../../../build/dd -destination 'platform=Android Simulator,id=<sim-id>' '-only-testing:CodyncKitTests/renderSurfaces()'
 ```
 
-實際形式由 iOS 根據裝置、活動數量與互動決定；App 內的形式選單只控制設計預覽。[Apple Live Activities 設計指南](https://developer.apple.com/design/human-interface-guidelines/live-activities)
+實際形式由 Android 根據裝置、活動數量與互動決定；App 內的形式選單只控制設計預覽。[Apple Live Activities 設計指南](https://developer.apple.com/design/human-interface-guidelines/live-activities)
 
 所有形式共用 `BotActivityPresentation` 的狀態判斷：
 
@@ -98,13 +98,13 @@ Dynamic Island 固定黑底，文字採淺色；Lock Screen 卡片配合系統�
 
 ## 驗證
 
-在 `apps/ios/Kit` 以 iOS 模擬器執行 `xcodebuild test -scheme CodyncKit-Package`檢查共用邏輯。系統 WidgetKit／ActivityKit 預覽在 `apps/ios/Widgets/WidgetPreviews.swift`。
+在 `apps/ios/Kit` 以 Android 模擬器執行 `xcodebuild test -scheme CodyncKit-Package`檢查共用邏輯。系統 WidgetKit／ActivityKit 預覽在 `apps/ios/Widgets/WidgetPreviews.swift`。
 
 實機仍需分別確認加入 Home／Lock Screen widget、編輯 provider、跨帳號切換、背景刷新，以及 Live Activity／APNs 更新。共用圖片與 build 成功不等於這些系統整合已通過。[歷史檢查紀錄](../archive/mobile-widgets-verification-2026-09-26.md) 保留當時的測試範圍與操作限制。
 
 ## Halftone 與 Thinking Orbs（2026-09-26）
 
-Bot 的角色頭像使用 `CharacterAvatar` 點陣；provider 圖示由 `ProviderMascot` 選擇，小尺寸可使用隨 app 打包的官方 provider 圖示。15 pt 用 7 × 7、20–26 pt 用 9 × 9、28 pt 以上用 13 × 13 網格，保留鏤空眼睛並提高小尺寸墨色。iOS App 與 widgets 共用 provider 呈現邏輯；桌面 App 的對應實作在 `apps/desktop/src/renderer/views/usage/ProviderMascot.tsx`。
+Bot 的角色頭像使用 `CharacterAvatar` 點陣；provider 圖示由 `ProviderMascot` 選擇，小尺寸可使用隨 app 打包的官方 provider 圖示。15 pt 用 7 × 7、20–26 pt 用 9 × 9、28 pt 以上用 13 × 13 網格，保留鏤空眼睛並提高小尺寸墨色。Android App 與 widgets 共用 provider 呈現邏輯；桌面 App 的對應實作在 `apps/desktop/src/renderer/views/usage/ProviderMascot.tsx`。
 
 狀態圖示以 [Jakub Antalik 的 thinking-orbs](https://github.com/Jakubantalik/thinking-orbs) 為來源，這次原生移植四種實際使用的造型：
 

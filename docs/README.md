@@ -9,7 +9,7 @@ Source review, a passing build, local integration tests and production acceptanc
 |---|---|
 | Find a module or decide where a file belongs | [File structure](architecture/file-structure.md) |
 | Understand clients, host, cloud and data ownership | [Architecture](architecture/overview.md) |
-| Work on the macOS, Linux and Windows desktop app (Electron) | [Desktop app](architecture/desktop-app.md) |
+| Work on the Linux, Linux and Windows desktop app (Electron) | [Desktop app](architecture/desktop-app.md) |
 | Build, install, restart and run checks | [Development](guides/development.md) |
 | Test a phone over Cloudflare instead of LAN | [Cloudflare testing](guides/cloudflare-testing.md) |
 | Configure dev/main or deploy the services | [Environments and deployment](guides/environments-and-deployment.md) |
@@ -18,7 +18,7 @@ Source review, a passing build, local integration tests and production acceptanc
 | Set up accounts, approvals or desktop SSH | [Accounts and SSH](guides/accounts-and-ssh.md) |
 | Change transport or cryptography | [Remote protocol](reference/remote-relay.md) and [shared vectors](reference/fixtures/README.md) |
 | Change what the host and clients exchange | [Client and host compatibility](reference/compatibility.md) |
-| Change an iPhone or desktop screen or button | [UI conventions](design/ui-conventions.md) |
+| Change an Android phone or desktop screen or button | [UI conventions](design/ui-conventions.md) |
 | Write or refactor code in any module | [Clean code](guides/clean-code.md) |
 
 ## Features

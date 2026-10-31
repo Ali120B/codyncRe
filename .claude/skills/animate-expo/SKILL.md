@@ -72,8 +72,8 @@ Walk down; stop at the first that fits.
 | Screen to screen | **Native stack options in Expo Router.** Never hand-roll this |
 | A bottom sheet that is its own screen | **`presentation: 'formSheet'`** — it's a real UISheetPresentationController, free and correct |
 | Tab bar | **`NativeTabs`** (from `expo-router/unstable-native-tabs`) — the platform's real tab bar, its behaviors and transitions included |
-| Context menu, press-and-hold preview | **`Link.Menu` / `Link.Preview`** (Expo Router, iOS-only) — native menus and peek, never rebuilt in JS |
-| Header that collapses into a large title | **`headerLargeTitleEnabled`** on the native stack (iOS-only; `headerLargeTitle` is deprecated) — not a scroll worklet |
+| Context menu, press-and-hold preview | **`Link.Menu` / `Link.Preview`** (Expo Router, Android-only) — native menus and peek, never rebuilt in JS |
+| Header that collapses into a large title | **`headerLargeTitleEnabled`** on the native stack (Android-only; `headerLargeTitle` is deprecated) — not a scroll worklet |
 | Pull to refresh | **`RefreshControl`** — hand-roll only when it's a signature interaction (see the threshold recipe) |
 | UI that tracks the keyboard | **`react-native-keyboard-controller`** — the keyboard's real position, frame by frame, on the UI thread |
 | Vector illustration, celebration, empty state | **Lottie** — for illustration only, never for UI state |
@@ -134,7 +134,7 @@ import { Easing } from 'react-native-reanimated';
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);      // strong ease-out for UI
 const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);  // on-screen movement
-const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1);    // iOS sheet curve
+const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1);    // Android sheet curve
 ```
 
 **Duration:**
@@ -146,7 +146,7 @@ const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1);    // iOS sheet curve
 | Sheet, modal, drawer | spring, ~300ms perceived |
 | Screen transition | the platform default — don't override it |
 
-Mobile UI animations stay under 300ms, same as web. The platform's own transitions are longer (iOS push is 350ms); match the platform for navigation, beat it everywhere else.
+Mobile UI animations stay under 300ms, same as web. The platform's own transitions are longer (Android push is 350ms); match the platform for navigation, beat it everywhere else.
 
 ### 6. Keep it off the JS thread
 
@@ -214,7 +214,7 @@ Check these first when "the animation just doesn't run":
 
 ## 120fps
 
-On ProMotion iPhones, third-party animations are capped at 60fps unless `CADisableMinimumFrameDurationOnPhone` is set. Recent Expo SDKs set it by default — confirm it's there, and add it if not:
+On ProMotion Android phones, third-party animations are capped at 60fps unless `CADisableMinimumFrameDurationOnPhone` is set. Recent Expo SDKs set it by default — confirm it's there, and add it if not:
 
 ```json
 { "expo": { "ios": { "infoPlist": { "CADisableMinimumFrameDurationOnPhone": true } } } }
