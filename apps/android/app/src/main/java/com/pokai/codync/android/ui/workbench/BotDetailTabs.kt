@@ -654,9 +654,9 @@ internal fun BotRoutinesTab(session: SessionStore, botId: String) {
                     Text("Run after another routine (optional)", color = colors.tertiary, style = CodyncType.caption)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         FilterChip("None", draft.afterRoutine == null, onClick = { draft = draft.copy(afterRoutine = null) })
-                        routines.filter { it.string("id") != draft.id }.forEach { r ->
-                            val rid = r.string("id").orEmpty()
-                            FilterChip(r.string("name").orEmpty(), draft.afterRoutine == rid, onClick = { draft = draft.copy(afterRoutine = rid) })
+                        routines.filter { it.text("id") != draft.id }.forEach { r ->
+                            val rid = r.text("id").orEmpty()
+                            FilterChip(r.text("name").orEmpty(), draft.afterRoutine == rid, onClick = { draft = draft.copy(afterRoutine = rid) })
                         }
                     }
                 }
@@ -898,7 +898,7 @@ private data class RoutineDraft(
                 at = first?.long("at") ?: System.currentTimeMillis() + 3_600_000L,
                 intervalSeconds = first?.long("seconds")?.toString() ?: "3600",
                 timeoutSeconds = routine.long("timeoutSeconds")?.toString() ?: "3600",
-                afterRoutine = routine.string("afterRoutine"),
+                afterRoutine = routine.text("afterRoutine"),
                 originalTriggers = triggers,
                 summary = summary,
             )
