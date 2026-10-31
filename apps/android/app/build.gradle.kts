@@ -47,8 +47,8 @@ android {
         applicationId = "com.pokai.Codync.android"
         minSdk = 31
         targetSdk = 36
-        versionCode = 35
-        versionName = "3.4.9"
+        versionCode = 36
+        versionName = "3.4.10"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "CLOUD_URL", "\"https://api.codync.dev\"")
