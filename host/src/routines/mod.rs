@@ -45,6 +45,8 @@ pub struct Routine {
     pub timeout_seconds: u64,
     #[serde(default)]
     pub last_error: Option<String>,
+    #[serde(default)]
+    pub after_routine: Option<String>,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -266,6 +268,8 @@ impl Routines {
                 timeout_seconds: timeout
                     .unwrap_or_else(|| old.as_ref().map_or_else(default_timeout, |r| r.timeout_seconds)),
                 last_error: None,
+                after_routine: body.get("afterRoutine").and_then(|v| v.as_str()).map(str::to_owned)
+                    .or_else(|| old.as_ref().and_then(|r| r.after_routine.clone())),
             };
             if !(1..=86_400).contains(&r.timeout_seconds) {
                 bail!("timeoutSeconds must be between 1 and 86400");

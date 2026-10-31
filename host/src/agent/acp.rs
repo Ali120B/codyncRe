@@ -134,6 +134,9 @@ impl Acp {
         env: &[(String, String)],
     ) -> Result<(Arc<Self>, mpsc::UnboundedReceiver<Incoming>)> {
         let mut process = crate::shell::exec(command).tokio();
+        if let Some(path) = crate::shell::user_path() {
+            process.env("PATH", path);
+        }
         process
             .envs(env.iter().map(|(k, v)| (k, v)))
             .current_dir(cwd)

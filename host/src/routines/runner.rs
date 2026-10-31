@@ -135,8 +135,9 @@ impl Routines {
         detail: Option<String>,
         text: Option<String>,
     ) -> Result<()> {
-        let bot = self.change(&hub.store, |s| {
+        let (bot, routine_id) = self.change(&hub.store, |s| {
             let r = s.runs.iter_mut().find(|r| r.id == id).context("routine run not found")?;
+            let rid = r.routine_id.clone();
             if r.status.active() {
                 r.status = status;
                 r.finished_at = Some(now_ms());
@@ -145,9 +146,20 @@ impl Routines {
                 r.report_pending = r.result.is_some() || matches!(status, Status::Failed | Status::Interrupted);
                 r.event = Value::Null;
             }
-            Ok(r.bot_id.clone())
+            Ok((r.bot_id.clone(), rid))
         })?;
         self.release(&bot);
+        if status == Status::Succeeded {
+            let dependents: Vec<_> = self.state.locked().routines.iter().filter(|r| !r.deleted && r.enabled && r.after_routine.as_deref() == Some(routine_id.as_str())).cloned().collect();
+            if !dependents.is_empty() {
+                let _ = self.change(&hub.store, |s| {
+                    for dep in &dependents {
+                        s.runs.push(new_run(dep, json!({"source":"routine","routineId":dep.id}), None));
+                    }
+                    Ok(())
+                });
+            }
+        }
         Ok(())
     }
 
