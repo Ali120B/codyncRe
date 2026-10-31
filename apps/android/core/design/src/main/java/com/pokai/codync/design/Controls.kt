@@ -99,6 +99,7 @@ fun SecondaryButton(
             .height(44.dp)
             .clip(CircleShape)
             .background(colors.bubbleUser)
+            .alpha(if (enabled) 1f else 0.45f)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,

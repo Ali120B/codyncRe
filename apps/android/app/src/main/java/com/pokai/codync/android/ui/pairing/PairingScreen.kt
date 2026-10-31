@@ -76,11 +76,24 @@ fun PairingScreen(
         val offer = PairUrl.parse(raw)
         if (offer == null) {
             localStatus = "Couldn't read that link. Copy it again from the computer."
+            connecting = false
         } else {
             localStatus = null
             connecting = true
             store.pairFromPaste(raw, deviceName)
         }
+    }
+
+    fun leave(next: () -> Unit) {
+        // A green/red Done button must not follow people back to this screen later.
+        localStatus = null
+        store.clearPairingMessage()
+        next()
+    }
+
+    LaunchedEffect(Unit) {
+        // Drop last visit's result before showing a fresh pairing screen.
+        store.clearPairingMessage()
     }
 
     LaunchedEffect(initialLink) {
@@ -100,7 +113,7 @@ fun PairingScreen(
             Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HeaderIconButton(CodyncIcons.Back, "Back", onBack)
+            HeaderIconButton(CodyncIcons.Back, "Back", onClick = { leave(onBack) })
             Column(Modifier.weight(1f)) {
                 Text("Pair a computer", color = colors.text, style = CodyncType.title)
                 Text("Scan the QR or paste a Codync link", color = colors.secondary, style = CodyncType.footnote)
@@ -143,7 +156,7 @@ fun PairingScreen(
                             )
                             Spacer(Modifier.height(12.dp))
                             PrimaryButton(
-                                text = "Continue",
+                                text = if (connecting) "Connecting…" else "Continue",
                                 onClick = { submit(paste) },
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = paste.isNotBlank() && !connecting,
@@ -154,15 +167,17 @@ fun PairingScreen(
                                 text = "Scan QR",
                                 onClick = { if (!connecting) scanning = true },
                                 modifier = Modifier.fillMaxWidth(),
+                                enabled = !connecting,
                                 leading = CodyncIcons.Camera,
                             )
                         }
                     }
                 }
             }
-            if (status != null) {
+            val statusText = if (connecting) "Connecting…" else status
+            if (statusText != null) {
                 Spacer(Modifier.height(14.dp))
-                Text(status, color = colors.secondary, style = CodyncType.body)
+                Text(statusText, color = colors.secondary, style = CodyncType.body)
             }
             Spacer(Modifier.height(20.dp))
             Text(
@@ -171,18 +186,13 @@ fun PairingScreen(
                 style = CodyncType.caption,
             )
             Spacer(Modifier.height(12.dp))
-            val doneColor = when {
-                status?.startsWith("Paired with") == true -> Color(0xFF2E7D32)
-                status != null && status != "Pairing…" && status?.startsWith("Paired with") != true -> Color(0xFFC62828)
-                else -> colors.bubbleUser
-            }
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(44.dp)
                     .clip(CircleShape)
-                    .background(doneColor)
-                    .clickable(enabled = !connecting) { onPaired() },
+                    .background(colors.bubbleUser)
+                    .clickable(enabled = !connecting) { leave(onPaired) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text("Done", color = Color.White, style = CodyncType.body.copy(fontWeight = FontWeight.Medium))

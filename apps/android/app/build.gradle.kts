@@ -22,11 +22,20 @@ val releaseStore = System.getenv("CODYNC_KEYSTORE_FILE") ?: localProperties.getP
 val releaseStorePassword = System.getenv("CODYNC_KEYSTORE_PASSWORD") ?: localProperties.getProperty("releaseStorePassword")
 val releaseKeyAlias = System.getenv("CODYNC_KEY_ALIAS") ?: localProperties.getProperty("releaseKeyAlias")
 val releaseKeyPassword = System.getenv("CODYNC_KEY_PASSWORD") ?: localProperties.getProperty("releaseKeyPassword")
-val clerkPublishableKey = (
-    providers.gradleProperty("clerkPublishableKey").orNull
-        ?: System.getenv("CLERK_PUBLISHABLE_KEY")
+// Public Clerk publishable keys: the live instance for prod, the test instance for dev.
+// CI does not have local.properties, so these defaults must be checked in.
+val prodClerkPublishableKey = (
+    System.getenv("CODYNC_CLERK_PUBLISHABLE_KEY")
+        ?: localProperties.getProperty("prodClerkPublishableKey")
+        ?: "pk_test_c3dlZXBpbmctbWFybW9zZXQtNjIwOC5jbGVyay5hY2NvdW50cy5kZXYk"
+    ).trim()
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+val devClerkPublishableKey = (
+    System.getenv("CLERK_PUBLISHABLE_KEY")
         ?: localProperties.getProperty("clerkPublishableKey")
-    ).orEmpty()
+        ?: "pk_test_c3dlZXBpbmctbWFybW9zZXQtNjIwOC5jbGVyay5hY2NvdW50cy5kZXYk"
+    ).trim()
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
 
@@ -43,7 +52,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "CLOUD_URL", "\"https://api.codync.dev\"")
-        buildConfigField("String", "CLERK_PUBLISHABLE_KEY", "\"$clerkPublishableKey\"")
         // Public Firebase client identifiers. CI does not have the untracked
         // google-services.json, so the app initializes Firebase from these values.
         buildConfigField("String", "FIREBASE_PROJECT_ID", "\"mybot-f2d34\"")
@@ -61,11 +69,14 @@ android {
             versionNameSuffix = "-dev"
             resValue("string", "app_name", "Codync Dev")
             buildConfigField("String", "CLOUD_URL", "\"https://codync-cloud-dev.codyncre.workers.dev\"")
+            buildConfigField("String", "CLERK_PUBLISHABLE_KEY", "\"$devClerkPublishableKey\"")
             buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"1:318342768846:android:1d3d5ee67906f071e5089f\"")
         }
         create("prod") {
             dimension = "channel"
             resValue("string", "app_name", "Codync")
+            buildConfigField("String", "CLOUD_URL", "\"https://codync-cloud-dev.codyncre.workers.dev\"")
+            buildConfigField("String", "CLERK_PUBLISHABLE_KEY", "\"$prodClerkPublishableKey\"")
         }
     }
 

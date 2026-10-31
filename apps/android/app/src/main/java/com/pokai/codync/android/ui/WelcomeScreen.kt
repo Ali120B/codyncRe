@@ -82,6 +82,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val scope = rememberCoroutineScope()
     var beat by remember { mutableStateOf(0) }
     var signingIn by remember { mutableStateOf(false) }
+    var authError by remember { mutableStateOf<String?>(null) }
     var replied by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -160,19 +161,29 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                         onClick = {
                             if (!configured || signingIn) return@SecondaryButton
                             signingIn = true
+                            authError = null
                             scope.launch {
-                                runCatching { Clerk.auth.startHostedAuth() }
-                                    .onFailure { signingIn = false }
+                                when (val result = runCatching { Clerk.auth.startHostedAuth() }.getOrNull()) {
+                                    is ClerkResult.Failure -> {
+                                        authError = result.error.toString().ifBlank { "Google sign-in failed. Try again." }
+                                        signingIn = false
+                                    }
+                                    null -> {
+                                        authError = "Couldn't open Google sign-in. Try again."
+                                        signingIn = false
+                                    }
+                                    else -> Unit
+                                }
                             }
                         },
                         enabled = configured && !signingIn,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    if (!configured) {
+                    if (authError != null) {
                         Text(
-                            "Sign-in isn't configured in this build. You can still use Codync on this phone.",
-                            color = colors.tertiary,
-                            style = CodyncType.footnote,
+                            authError.orEmpty(),
+                            color = colors.secondary,
+                            style = CodyncType.caption,
                         )
                     }
                     Text(

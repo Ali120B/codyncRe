@@ -598,6 +598,9 @@ impl Channel {
             return (close::NORMAL, "");
         }
         tracing::info!(device = self.key, platform, "device paired");
+        // Publish the new device to the relay before the phone's follow-up connection:
+        // otherwise its first relay socket is refused until some other ACL change lands.
+        self.hub.auth_changed();
         let name = crate::service::host_name();
         self.send(json!({"id": id, "ok": {"computerId": self.hub.identity.computer_id(), "name": name}})).await;
         (close::PAIRED, "paired")

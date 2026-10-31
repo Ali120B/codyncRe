@@ -86,9 +86,6 @@ export function AccountWelcomeView({ onContinue }: { onContinue: () => void }) {
               </span>
             )}
           </Button>
-          {!account.isConfigured ? (
-            <div style={{ ...font('footnote'), color: 'var(--tertiary)' }}>Sign-in isn't configured in this build. You can still use Codync on this {deviceName}.</div>
-          ) : null}
           {account.errorMessage ? <div style={{ ...font('footnote'), color: 'var(--warning)' }}>{account.errorMessage}</div> : null}
         </div>
       </div>

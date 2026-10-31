@@ -216,6 +216,18 @@ function ChatSplitView() {
   const composeStore = composeComputer ? app.store(composeComputer) : null
   const roster = useComputerRoster(app, shown)
   const visibleRoster = roster.items
+  // Hidden bots stay out of the sidebar but remain reachable from the command deck.
+  const paletteItems = [
+    ...visibleRoster,
+    ...stores
+      .filter((s) => shown.has(s.computer.id))
+      .flatMap((s) => s.hiddenBots.map((bot) => ({
+        ref: { computerId: s.computer.id, botId: bot.id },
+        bot,
+        computer: s.computer,
+        store: s,
+      }))),
+  ]
   const rosterMatches = useMemo(() => matchRoster(visibleRoster, sidebarQuery), [visibleRoster, sidebarQuery])
   const filtering = sidebarQuery.trim().length > 0
 
@@ -316,7 +328,7 @@ function ChatSplitView() {
       : [{ title: 'Edit Profile…', icon: 'square.and.pencil', divider: true, action: () => app.openSettings({ computerId: store.computer.id, botId: bot.id }) } as MenuItem]),
     { title: 'New chat', icon: 'bubble.left', action: () => { store.startNewChat(bot.id); app.select({ computerId: store.computer.id, botId: bot.id }) } },
     { title: 'Copy conversation ID', icon: 'square.on.square', divider: true, action: () => window.codync.app.copy(bot.id) },
-    { title: 'Hide from sidebar', icon: 'eye.slash', divider: true, action: () => store.setHidden(bot, true) },
+    { title: bot.hidden ? 'Show in sidebar' : 'Hide from sidebar', icon: bot.hidden ? 'eye' : 'eye.slash', divider: true, action: () => store.setHidden(bot, !bot.hidden) },
     { title: 'Delete', icon: 'trash', destructive: true, action: () => setConfirmDelete({ bot, store }) },
   ]
 
@@ -505,7 +517,7 @@ function ChatSplitView() {
         </div>
       ) : null}
 
-      <SearchPalette open={searching} items={visibleRoster} actions={paletteActions} onPick={(ref) => app.select(ref)} onClose={() => setSearching(false)} />
+      <SearchPalette open={searching} items={paletteItems} actions={paletteActions} onPick={(ref) => app.select(ref)} onClose={() => setSearching(false)} />
       <Sheet open={groupSettings !== null} onClose={() => setGroupSettings(null)} width={560} height={Math.min(760, sheetHeight)}>
         {groupSettings ? (
           <StoreContext.Provider value={groupSettings.store}>

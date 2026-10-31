@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fastModeRefusal, fastModeShown } from '@shared/fast-mode'
-import { draftOf, type BotDraft } from '@shared/models'
+import { draftOf, type Bot, type BotDraft } from '@shared/models'
 import { CharacterAvatar } from '../../components/Avatar'
 import { CardSection, ChoicePicker, IconButton, SearchField, ValueRow } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
-import { ModalHeader, useDismiss } from '../../components/Overlay'
+import { Dialog, ModalHeader, useDismiss } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { AVATAR_COLORS, AVATAR_SHAPES } from '../../lib/theme'
 import { useStore } from '../../store/context'
@@ -77,7 +77,7 @@ export function BotEditorView({ draft: initial }: { draft: BotDraft }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--background)' }}>
       <ModalHeader title={isNew ? 'New bot' : 'Settings'} close={false} />
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <BotSettingsForm draft={draft} onChange={setDraft} error={error} plugins={plugins} />
+        <BotSettingsForm draft={draft} onChange={setDraft} error={error} plugins={plugins} onDeleted={dismiss} />
       </div>
       <div className="editor-footer">
         <button className="editor-cancel" disabled={saving} onClick={() => dismiss()}>
@@ -123,17 +123,20 @@ export function BotSettingsPanel({ botId, opened }: { botId: string; opened?: st
 }
 
 /** Bot settings: a big avatar (Grok Bot's), then sections in the Settings style (`CardSection`). */
-function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
+function BotSettingsForm({ draft, onChange, error, plugins, opened, onDeleted }: {
   draft: BotDraft
   onChange: (update: (d: BotDraft) => BotDraft) => void
   error: string | null
   plugins: Plugins | null
   /** Start with this section open (the Details tab's rows). */
   opened?: string
+  /** Closes the editor after the bot is deleted (the side panel leaves it open). */
+  onDeleted?: () => void
 }) {
   const store = useStore()
   const [pickingAvatar, setPickingAvatar] = useState(false)
   const [viewingSkill, setViewingSkill] = useState<SkillRef | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Bot | null>(null)
   const avatarRef = useRef<HTMLButtonElement>(null)
   const set = <K extends keyof BotDraft>(key: K, value: BotDraft[K]) => onChange((d) => ({ ...d, [key]: value }))
   // Options belong to one model.
@@ -384,10 +387,38 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened }: {
         </Accordion> : null}
 
         {error ? <span className="fade-in" style={{ ...font('footnote'), color: 'var(--danger)' }}>{error}</span> : null}
+        {draft.id ? (
+          <button
+            className="editor-cancel press"
+            style={{ width: '100%', gap: 7 }}
+            onClick={() => saved && setConfirmDelete(saved)}
+          >
+            <Icon name="trash" size={13} weight="semibold" />
+            Delete bot
+          </button>
+        ) : null}
       </div>
       <FormSheet open={viewingSkill !== null} onClose={() => setViewingSkill(null)}>
         {viewingSkill ? <SkillSheet key={viewingSkill.name} skill={viewingSkill} /> : null}
       </FormSheet>
+      <Dialog
+        open={confirmDelete !== null}
+        title={`Delete ${confirmDelete?.name ?? 'bot'}?`}
+        message="Its conversation and any files it changed on your computer stay as they are."
+        actions={[
+          {
+            title: 'Delete bot',
+            destructive: true,
+            action: () => {
+              if (confirmDelete) {
+                store.delete(confirmDelete)
+                onDeleted?.()
+              }
+            },
+          },
+        ]}
+        onClose={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

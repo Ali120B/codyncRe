@@ -52,7 +52,7 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 - **Routines that fit the work.** Run a bot once, every few minutes, hourly, daily, on weekdays or a chosen day each week or month — or from a webhook. Set the time with a real time picker, choose the time zone, and see the next run before saving.
 - **Apps and skills when you need them.** Connect Gmail, Slack, GitHub, Notion and 1,000+ apps through Composio, or give bots reusable skills; the Marketplace leads with popular apps and expands only when you ask.
 - **Built in Rust.** `codync-host` is one small, fast Rust binary for Windows and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
-- **One app per kind of device.** Native SwiftUI on the Android phone, one desktop app for Linux, Windows and Linux (Electron), and a terminal UI for SSH.
+- **One app per kind of device.** Native Kotlin (Jetpack Compose) on Android, one desktop app for Linux and Windows (Electron), and a terminal UI for SSH.
 - **A Grok Bot, Muse and Dots alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
 - **Reach your computer from anywhere, free.** The hosted Cloudflare relay is included at no cost: no Tailscale, no VPN, no port forwarding. Traffic is end-to-end encrypted between your phone and your computer, so the relay only forwards ciphertext. Same Wi-Fi or Tailscale? The phone connects directly instead.
 - **Every computer, one app.** Your Android phone lists every computer you've paired — or signed in to, where account support is configured. Tap **Connect**, confirm a 6-digit code on that computer, and its bots show up next to the others. A new bot can live on any of them, and the Linux app reaches your SSH machines too. Each computer approves each device itself, so an account alone never unlocks a computer.
@@ -64,7 +64,6 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 
 | | Platform | App | Highlights |
 |---|---|---|---|
-| 📱 | **Android phone** | Native SwiftUI | Chat with bots, approvals, push notifications, Live Activity, widgets, remote screen, voice calls |
 | 🤖 | **Android** | Native Kotlin (Jetpack Compose) | Chat with bots, approvals, push notifications, computer panel, files, workspaces sync |
 | 🪟 | **Windows** | Desktop app (Electron), tray + window | Runs the host, chat window, Android phone pairing (no remote screen yet) |
 | 🐧 | **Linux** | Desktop app (Electron), tray + window | Chat window, Android phone pairing; the host runs on desktops and headless servers |
@@ -80,9 +79,9 @@ see the [changelog and source lookup commands](#changelog) and the
 ## How it works
 
 ```text
-Remote Apple client ⇄ encrypted channel (direct or Cloudflare cloud/) ⇄ codync-host ⇄ ACP agent
+Android client ⇄ encrypted channel (direct or Cloudflare cloud/) ⇄ codync-host ⇄ ACP agent
 Local / SSH client  ⇄ loopback HTTP + SSE                             ⇄ codync-host
-Host notifications → APNs worker (relay/) → Android phone
+Host notifications → push relay (relay/) → Android phone
 ```
 
 - **Bots** have a name, a character avatar, standing instructions, an agent backend, a project folder and a permission policy. Each bot has **a persistent main chat and optional reply threads**; the agent sessions underneath are an implementation detail (resumed with `session/load`, restarted with *New session*).
@@ -92,7 +91,7 @@ Host notifications → APNs worker (relay/) → Android phone
 - **Agents are detected automatically**: the host hydrates PATH from your login shell (plus Homebrew, ~/.local/bin, nvm, bun, volta, asdf, mise, pnpm…), finds every harness you have installed, and prefers its native ACP mode. Anything else in the official [ACP registry](https://agentclientprotocol.com/registry) can be picked too — Codync fetches it on first use (npx, uvx or a checksummed binary).
 - **codync-host** (Rust, Windows and Linux) runs on your computer. It speaks the [Agent Client Protocol](https://agentclientprotocol.com) to each agent, keeps transcripts in SQLite, and serves the phone. Every change carries a global `rev`, so the phone reconnects with `since: rev` and never misses anything.
 - **Usage limits** come from your local installs, with no extra login: Claude via `claude -p /usage` (a local command, no model call) plus Claude Code's status line, Codex via `~/.codex/sessions`. The phone, widgets and menu bar only see percentages.
-- **Push** goes through a tiny relay that holds the APNs key. The phone trades its device token for an encrypted ticket; the host only ever holds tickets.
+- **Push** goes through a tiny relay that holds the FCM credentials. The phone trades its device token for an encrypted ticket; the host only ever holds tickets.
 
 UI patterns (roster, character avatars, approval cards, trace sheet, "needs you / done" notifications) follow Grok Bot.
 
@@ -167,37 +166,9 @@ Data lives in `~/.codync`. The local bearer token authorizes loopback helpers an
 
 **Where does my data go?** Bots, chats and memory stay on your computer. The phone reaches it directly on the same network, or through an end-to-end encrypted relay that can't read your messages.
 
-**Do I need an account?** No. Pair your phone by scanning a QR code. Signing in with Apple or Google is optional; that path uses upstream's Codync Cloud, while local pairing never needs it.
+**Do I need an account?** No. Pair your phone by scanning a QR code. Signing in with Apple or Google is optional; local pairing never needs it.
 
 **Which computers can run it?** A Linux, a Windows PC, or a Linux desktop or headless server. The Android phone app and the terminal UI over SSH talk to the same host.
-
-## Repository
-
-| Path | |
-|---|---|
-| `host/` | `codync-host` — Rust daemon: ACP client, SQLite transcript, HTTP/SSE API, push, usage |
-| `apps/ios/Kit/` | The Android phone app's Swift package: `CodyncKit` (wire models, host client, theme, avatars; shared with the widgets) and `CodyncUI` (store + screens) |
-| `apps/ios/Widgets/` | Bots, usage and per-provider usage widgets + bot Live Activity |
-| `apps/desktop/` | Desktop app for Windows and Linux (Electron, React, TypeScript): menu bar/tray + chat window; installs/monitors the host |
-| `cloud/` | Cloudflare accounts, D1, encrypted channel relay and offline mailbox |
-| `apps/shared/Config/` | Environment configuration (Clerk key, cloud URL) for the Android phone and desktop apps |
-| `apps/screen-macos/`, `apps/screen-linux/` | Platform screen capture/input helpers |
-| `docs/` | [Documentation index](docs/README.md) and [file structure](docs/architecture/file-structure.md) |
-| `relay/` | Cloudflare Worker APNs relay with encrypted per-device tickets |
-| `web/` | Website (Next.js static export, deployed on Vercel) |
-| `packaging/` | Homebrew cask and formula templates (this fork publishes no tap yet) and `install.sh` (the curl installer) |
-
-Build, install, restart and full checks: [development guide](docs/guides/development.md).
-
-The Xcode project is generated: `xcodegen generate --spec apps/project.yml`.
-
-```bash
-cd host && cargo test            # host
-cd apps/desktop && npm test      # desktop app (also: npm run typecheck)
-cd cloud && npm test            # cloud API / channel relay
-cd relay && npm test             # relay tickets
-```
-
 
 ## Versioning
 

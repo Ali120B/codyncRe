@@ -100,6 +100,11 @@ class SessionStore(
 
     fun pairingMessage(): Flow<String?> = _pairing.asStateFlow()
 
+    /** Clears a stale "Paired with…" or error so the Done button starts neutral again. */
+    fun clearPairingMessage() {
+        _pairing.value = null
+    }
+
     fun approvalEntries(): Flow<List<Entry>> = snapshot
         .map { it.pendingApprovals }
         .distinctUntilChanged { old, new -> old === new }

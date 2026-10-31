@@ -63,6 +63,7 @@ import com.pokai.codync.android.ui.ThemeMode
 import com.pokai.codync.android.ui.relativeShort
 import com.pokai.codync.data.SessionStore
 import com.clerk.api.Clerk
+import com.clerk.api.network.serialization.ClerkResult
 import com.pokai.codync.design.CodyncIcon
 import com.pokai.codync.design.CodyncSwitch
 import com.pokai.codync.design.FilterChip
@@ -439,18 +440,24 @@ private fun AccountCard(account: AndroidAccountSession, active: Boolean) {
         ConfiguredAccountCard(account, state, active)
     } else {
         val colors = CodyncTheme.colors
-    val scope = rememberCoroutineScope()
+        var notice by remember { mutableStateOf(false) }
         SectionCard(Modifier.padding(horizontal = 16.dp)) {
             SettingsRow(
                 title = "Local device",
                 subtitle = "Sign in to discover cloud computers",
                 icon = CodyncIcons.Lock,
-                onClick = {
-                    if (Clerk.isInitialized.value) scope.launch { Clerk.auth.startHostedAuth() }
-                },
+                onClick = { notice = true },
                 showChevron = false,
                 trailing = { Pill("Local", fill = colors.bubbleAgent, color = colors.secondary) },
             )
+            if (notice) {
+                Text(
+                    "Sign-in isn't configured in this build. Install the latest Codync APK to use Google sign-in; local pairing still works.",
+                    color = colors.secondary,
+                    style = CodyncType.caption,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
         }
     }
 }
@@ -459,6 +466,7 @@ private fun AccountCard(account: AndroidAccountSession, active: Boolean) {
 private fun ConfiguredAccountCard(account: AndroidAccountSession, state: AndroidAccountState, active: Boolean) {
     val colors = CodyncTheme.colors
     val scope = rememberCoroutineScope()
+    var authError by remember { mutableStateOf<String?>(null) }
     val signedInUser by Clerk.userFlow.collectAsState(initial = null)
     val currentUser = signedInUser
     LaunchedEffect(active, currentUser?.id) {
@@ -472,7 +480,16 @@ private fun ConfiguredAccountCard(account: AndroidAccountSession, state: Android
                 title = "Sign in to Codync Cloud",
                 subtitle = "Use the account configured for Codync. Local QR pairing stays available.",
                 icon = CodyncIcons.Lock,
-                onClick = { scope.launch { Clerk.auth.startHostedAuth() } },
+                onClick = {
+                    scope.launch {
+                        when (val result = runCatching { Clerk.auth.startHostedAuth() }.getOrNull()) {
+                            is ClerkResult.Failure -> authError =
+                                result.error.toString().ifBlank { "Couldn't open Google sign-in. Try again." }
+                            null -> authError = "Couldn't open Google sign-in. Try again."
+                            else -> authError = null
+                        }
+                    }
+                },
             )
         } else {
             SettingsRow(
@@ -526,7 +543,7 @@ private fun ConfiguredAccountCard(account: AndroidAccountSession, state: Android
                 }
             }
         }
-        state.message?.let { message ->
+        (state.message ?: authError)?.let { message ->
             Text(message, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = colors.secondary, style = CodyncType.caption)
         }
     }

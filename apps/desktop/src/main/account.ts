@@ -126,8 +126,13 @@ export class AccountService extends EventEmitter {
     } catch {}
     try {
       if (this.deviceToken) await this.refreshClient()
-    } catch {
+    } catch (error) {
       // Offline at launch: the saved session still counts; the next call refreshes it.
+      // A rejected token is not a session: forget it so sign-in can start clean.
+      if (error instanceof ClerkError && error.status === 401) {
+        this.deviceToken = null
+        await this.persist()
+      }
     }
     this.set({ ready: true })
   }
@@ -141,7 +146,7 @@ export class AccountService extends EventEmitter {
     } catch {}
   }
 
-  private async request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: Record<string, string | boolean>, query?: Record<string, string>): Promise<T> {
+  private async request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: Record<string, string | boolean>, query?: Record<string, string>, retried = false): Promise<T> {
     if (!this.base) throw new ClerkError(0, "Sign-in isn't configured in this build.")
     const url = new URL(`${this.base}${path}`)
     url.searchParams.set('_is_native', 'true')
@@ -154,6 +159,13 @@ export class AccountService extends EventEmitter {
       payload = new URLSearchParams(Object.entries(body).map(([k, v]) => [k, String(v)])).toString()
     }
     const res = await fetch(url, { method, headers, body: payload, signal: AbortSignal.timeout(20_000) })
+    // A cached device token can outlive the Clerk session. Drop it and try once more
+    // without it instead of turning every later sign-in into "not authorized".
+    if (res.status === 401 && this.deviceToken && !retried) {
+      this.deviceToken = null
+      void this.persist()
+      return this.request(method, path, body, query, true)
+    }
     // A new device token comes back in `Authorization`; "Bearer" alone clears it.
     const auth = res.headers.get('authorization')?.trim()
     if (auth !== undefined) {
@@ -213,7 +225,13 @@ export class AccountService extends EventEmitter {
       await this.refreshClient()
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
-      if (!/timed out|Another sign-in/.test(message)) this.set({ error: "Couldn't sign in. Check your connection and try again." })
+      // Keep the real Clerk/Google explanation ("You are not authorized…", a blocked
+      // sign-in, …) instead of hiding every failure behind "check your connection".
+      if (message && !/timed out|Another sign-in|fetch failed|Failed to fetch|network/i.test(message)) {
+        this.set({ error: message })
+      } else {
+        this.set({ error: "Couldn't sign in. Check your connection and try again." })
+      }
     } finally {
       this.set({ busy: false })
     }

@@ -8,6 +8,7 @@ import com.pokai.codync.model.Computer
 import com.pokai.codync.model.PairOffer
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -102,11 +103,32 @@ internal object DirectPairingClient {
         offer: PairOffer,
         deviceKey: Ed25519PrivateKeyParameters,
         deviceName: String,
-    ): Computer = withTimeout(30_000) {
-        val listener = PairSocket()
-        val request = RelaySocketRequest.device(computer.id, offer.relay!!, deviceKey, offer.code)
-        val socket = client.newWebSocket(request, listener)
-        pairOnSocket(computer, offer, deviceKey, deviceName, listener, socket, waitForRelayPresence = true)
+    ): Computer {
+        var last: Throwable? = null
+        // The host publishes the one-time offer to the relay a beat after drawing the QR.
+        // A scan straight away can get a 403 before that ACL lands; retry briefly.
+        repeat(5) { attempt ->
+            try {
+                return withTimeout(30_000) {
+                    val listener = PairSocket()
+                    val request = RelaySocketRequest.device(computer.id, offer.relay!!, deviceKey, offer.code)
+                    val socket = client.newWebSocket(request, listener)
+                    pairOnSocket(computer, offer, deviceKey, deviceName, listener, socket, waitForRelayPresence = true)
+                }
+            } catch (error: Throwable) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                last = error
+                if (attempt == 4 || !relayPairingMaySettle(error)) throw error
+                delay(700L * (attempt + 1))
+            }
+        }
+        throw last ?: IOException("Can't reach the computer on the Codync relay")
+    }
+
+    private fun relayPairingMaySettle(error: Throwable): Boolean {
+        val message = error.message.orEmpty()
+        return message.contains("403") || message.contains("HTTP 101") ||
+            message.contains("Connection reset", ignoreCase = true)
     }
 
     private suspend fun pairOnSocket(
