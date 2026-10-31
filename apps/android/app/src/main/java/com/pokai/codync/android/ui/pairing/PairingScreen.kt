@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -59,7 +62,12 @@ fun PairingScreen(
     var paste by remember { mutableStateOf("") }
     var scanning by remember { mutableStateOf(false) }
     var localStatus by remember { mutableStateOf<String?>(null) }
+    var connecting by remember { mutableStateOf(false) }
     val status = pairingMessage ?: localStatus
+
+    LaunchedEffect(pairingMessage, localStatus) {
+        if (pairingMessage != null || localStatus != null) connecting = false
+    }
 
     fun submit(raw: String) {
         paste = raw
@@ -69,6 +77,7 @@ fun PairingScreen(
             localStatus = "Couldn't read that link. Copy it again from the computer."
         } else {
             localStatus = null
+            connecting = true
             store.pairFromPaste(raw, deviceName)
         }
     }
@@ -124,8 +133,10 @@ fun PairingScreen(
                             BoxField(
                                 value = paste,
                                 onValueChange = {
-                                    paste = it
-                                    localStatus = null
+                                    if (!connecting) {
+                                        paste = it
+                                        localStatus = null
+                                    }
                                 },
                                 placeholder = "codync://pair?…",
                             )
@@ -134,13 +145,13 @@ fun PairingScreen(
                                 text = "Continue",
                                 onClick = { submit(paste) },
                                 modifier = Modifier.fillMaxWidth(),
-                                enabled = paste.isNotBlank(),
+                                enabled = paste.isNotBlank() && !connecting,
                                 leading = CodyncIcons.QrCode,
                             )
                             Spacer(Modifier.height(8.dp))
                             SecondaryButton(
                                 text = "Scan QR",
-                                onClick = { scanning = true },
+                                onClick = { if (!connecting) scanning = true },
                                 modifier = Modifier.fillMaxWidth(),
                                 leading = CodyncIcons.Camera,
                             )
@@ -150,7 +161,7 @@ fun PairingScreen(
             }
             if (status != null) {
                 Spacer(Modifier.height(14.dp))
-                Text(status, color = colors.secondary, style = CodyncType.footnote)
+                Text(status, color = colors.secondary, style = CodyncType.body)
             }
             Spacer(Modifier.height(20.dp))
             Text(
@@ -159,7 +170,22 @@ fun PairingScreen(
                 style = CodyncType.caption,
             )
             Spacer(Modifier.height(12.dp))
-            SecondaryButton("Done", onPaired, modifier = Modifier.fillMaxWidth())
+            val doneColor = when {
+                status?.startsWith("Paired with") == true -> Color(0xFF2E7D32)
+                status != null && status != "Pairing…" && status?.startsWith("Paired with") != true -> Color(0xFFC62828)
+                else -> colors.bubbleUser
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(CircleShape)
+                    .background(doneColor)
+                    .clickable(enabled = !connecting) { onPaired() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("Done", color = Color.White, style = CodyncType.body.copy(fontWeight = FontWeight.Medium))
+            }
         }
     }
 }

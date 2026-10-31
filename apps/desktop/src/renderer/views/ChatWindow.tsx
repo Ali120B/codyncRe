@@ -303,7 +303,6 @@ function ChatSplitView() {
     { id: 'settings', title: 'Settings', subtitle: 'App, voice, notifications and updates', icon: 'gearshape', run: () => setSettings('general') },
     { id: 'computers', title: 'Computers', subtitle: 'Pair, connect and filter computers', icon: 'display', run: () => setSettings('computers') },
     { id: 'usage', title: 'Usage', subtitle: 'Usage and limits', icon: 'chart.bar', run: () => setSettings('usage') },
-    { id: 'team-map', title: 'Team map', subtitle: 'See how your bots work together', icon: 'point.3.connected.trianglepath.dotted', run: () => setTeamMap(true) },
     { id: 'account', title: 'Account', subtitle: 'Profile, sync and devices', icon: 'person.crop.circle', run: () => setShowAccount(true) },
     ...(app.approvals.length
       ? [{ id: 'approvals', title: 'Review approval requests', subtitle: `${app.approvals.length} waiting`, icon: 'lock.shield', run: () => app.reviewApprovals() } as PaletteAction]
@@ -473,7 +472,7 @@ function ChatSplitView() {
             </button>
           </div>
         ) : (
-          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={openMarketplace} onTeamMap={() => setTeamMap(true)} />
+          <SidebarFooter accountOpen={showAccount} onAccount={() => setShowAccount((s) => !s)} onExtensions={openMarketplace} onTeamMap={() => {}} />
         )}
       </aside>
       <div className="sidebar-divider" onPointerDown={onDividerDown} onPointerMove={onDividerMove} onPointerUp={() => (dragStart.current = null)} role="separator" aria-label="Resize sidebar" aria-valuenow={width} />
@@ -509,9 +508,6 @@ function ChatSplitView() {
       ) : null}
 
       <SearchPalette open={searching} items={visibleRoster} actions={paletteActions} onPick={(ref) => app.select(ref)} onClose={() => setSearching(false)} />
-      <Sheet open={teamMap} onClose={() => setTeamMap(false)} width={680} height={Math.min(640, window.innerHeight - 60)}>
-        {selectedStore ? <TeamMapView store={selectedStore} close={() => setTeamMap(false)} /> : null}
-      </Sheet>
       <Sheet open={groupSettings !== null} onClose={() => setGroupSettings(null)} width={560} height={Math.min(760, sheetHeight)}>
         {groupSettings ? (
           <StoreContext.Provider value={groupSettings.store}>

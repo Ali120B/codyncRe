@@ -262,21 +262,6 @@ fun SettingsScreen(
                         }
                     }
                     DividerLine(inset = 14.dp)
-                    SettingsRow(
-                        title = "Text size",
-                        subtitle = "Follows the Android system setting",
-                        icon = CodyncIcons.Tune,
-                        showChevron = false,
-                        trailing = { Text("System", color = colors.tertiary, style = CodyncType.footnote) },
-                    )
-                    DividerLine(inset = 54.dp)
-                    SettingsRow(
-                        title = "Reduced motion",
-                        subtitle = "Follows the system accessibility setting",
-                        icon = CodyncIcons.Speed,
-                        showChevron = false,
-                        trailing = { Text("System", color = colors.tertiary, style = CodyncType.footnote) },
-                    )
                 }
             }
 
@@ -404,7 +389,6 @@ fun SettingsScreen(
             item {
                 Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Codync for Android", color = colors.tertiary, style = CodyncType.caption)
-                    Text("One complete v1 · no voice, screen or widgets", color = colors.tertiary, style = CodyncType.caption2)
                 }
             }
         }
@@ -454,11 +438,15 @@ private fun AccountCard(account: AndroidAccountSession, active: Boolean) {
         ConfiguredAccountCard(account, state, active)
     } else {
         val colors = CodyncTheme.colors
+    val scope = rememberCoroutineScope()
         SectionCard(Modifier.padding(horizontal = 16.dp)) {
             SettingsRow(
                 title = "Local device",
-                subtitle = "QR pairing works without an account. Add a Clerk publishable key to enable cloud computer discovery.",
+                subtitle = "Sign in to discover cloud computers",
                 icon = CodyncIcons.Lock,
+                onClick = {
+                    if (Clerk.isInitialized) scope.launch { Clerk.auth.startHostedAuth() }
+                },
                 showChevron = false,
                 trailing = { Pill("Local", fill = colors.bubbleAgent, color = colors.secondary) },
             )

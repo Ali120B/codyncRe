@@ -85,8 +85,10 @@ fun LiveBotsScreen(
     val connections by session.computerConnections().collectAsState(initial = emptyMap())
     val actionError by session.actionError().collectAsState(initial = null)
     val colors = CodyncTheme.colors
-    var filter by rememberSaveable { mutableStateOf(HomeFilter.All) }
-    var selectedComputerId by rememberSaveable { mutableStateOf<String?>(null) }
+    var filter by remember { mutableStateOf(HomeFilterState.filter) }
+    var selectedComputerId by remember { mutableStateOf(HomeFilterState.selectedComputerId) }
+    LaunchedEffect(filter) { HomeFilterState.filter = filter }
+    LaunchedEffect(selectedComputerId) { HomeFilterState.selectedComputerId = selectedComputerId }
     var showNewChat by remember { mutableStateOf(false) }
     var createMenuOpen by remember { mutableStateOf(false) }
     var computerMenuOpen by remember { mutableStateOf(false) }
@@ -239,7 +241,7 @@ fun LiveBotsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, top = 6.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
                 if (scopeId == null && computers.size > 1) {
@@ -253,8 +255,8 @@ fun LiveBotsScreen(
                         }
                     }
                 } else {
-                    val groups = visible.filter { it.kind == "group" }
-                    val singles = visible.filter { it.kind != "group" }
+                    val groups = visible.filter { it.kind == "group" }.sortedByDescending { it.lastAt }
+                    val singles = visible.filter { it.kind != "group" }.sortedByDescending { it.lastAt }
                     item { CollapsibleHeader("BOTS", singles.size, botsExpanded) { botsExpanded = !botsExpanded } }
                     if (botsExpanded) rosterItems(singles, hostBots, onOpenChat, onOpenBotDetails, keyPrefix = "bot")
                     item { CollapsibleHeader("GROUPS", groups.size, groupsExpanded) { groupsExpanded = !groupsExpanded } }

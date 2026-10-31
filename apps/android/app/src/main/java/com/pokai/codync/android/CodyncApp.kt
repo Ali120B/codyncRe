@@ -327,7 +327,7 @@ fun CodyncApp(
                             onOpenBotDetails = { id -> openBotDetails(id) },
                             onCreateBot = { computerId -> nav.navigate(Routes.newBot(computerId)) },
                             onCreateGroup = { computerId -> nav.navigate(Routes.newGroup(computerId)) },
-                            onOpenTeamMap = { nav.navigate(Routes.TeamMap) },
+                            onOpenTeamMap = { },
                             onOpenExtensions = { nav.navigate(Routes.Extensions) },
                         )
                     }
@@ -464,7 +464,7 @@ fun CodyncApp(
                             onOpenPairing = { nav.navigate(Routes.Pairing) },
                             onOpenWorkbench = { nav.navigate(Routes.Workbench) },
                             onOpenExtensions = { nav.navigate(Routes.Extensions) },
-                            onOpenTeamMap = { nav.navigate(Routes.TeamMap) },
+                            onOpenTeamMap = { },
                         )
                     }
                     composable(Routes.Workbench) {
@@ -473,20 +473,13 @@ fun CodyncApp(
                             onBack = { nav.popBackStack() },
                             onOpenBotDetails = { id -> openBotDetails(id) },
                             onOpenExtensions = { nav.navigate(Routes.Extensions) },
-                            onOpenTeamMap = { nav.navigate(Routes.TeamMap) },
+                            onOpenTeamMap = { },
                         )
                     }
                     composable(Routes.Extensions) {
                         LiveExtensionsScreen(
                             session = hostSession.store,
                             onBack = { nav.popBackStack() },
-                        )
-                    }
-                    composable(Routes.TeamMap) {
-                        com.pokai.codync.android.ui.workbench.LiveTeamMapScreen(
-                            session = hostSession.store,
-                            onBack = { nav.popBackStack() },
-                            onOpenBotDetails = { id -> openBotDetails(id) },
                         )
                     }
                     composable(

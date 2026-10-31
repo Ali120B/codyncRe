@@ -50,16 +50,6 @@ fun WorkbenchHomeScreen(
                 item {
                     SectionCard(Modifier.padding(bottom = 8.dp)) {
                         SettingsRow(
-                            title = "Team map",
-                            subtitle = "Agents, rooms and membership",
-                            icon = CodyncIcons.Groups,
-                            onClick = onOpenTeamMap,
-                        )
-                    }
-                }
-                item {
-                    SectionCard(Modifier.padding(bottom = 8.dp)) {
-                        SettingsRow(
                             title = "Extensions",
                             subtitle = "MCP servers, apps, skills and credentials",
                             icon = CodyncIcons.Extension,

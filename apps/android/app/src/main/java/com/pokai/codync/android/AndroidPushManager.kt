@@ -79,7 +79,8 @@ class AndroidPushManager(
                     // Each host owns its own ticket and must know when this phone is reachable.
                     if (target.connected && request.enabled && ticket != null) {
                         runCatching {
-                            store.callOn(computerId, "registerDevice", buildJsonObject {
+                            store.selectComputer(computerId)
+                            store.call("registerDevice", buildJsonObject {
                                 put("ticket", ticket)
                                 put("relay", RELAY_URL)
                                 put("name", identity.deviceName)
@@ -91,7 +92,10 @@ class AndroidPushManager(
                             android.util.Log.w(TAG, "Couldn't register push on $computerId", failure)
                         }
                     } else if (target.connected && !request.enabled) {
-                        store.callOn(computerId, "unregisterDevice", buildJsonObject {}).onFailure {
+                        runCatching {
+                            store.selectComputer(computerId)
+                            store.call("unregisterDevice", buildJsonObject {}).getOrThrow()
+                        }.onFailure {
                             android.util.Log.w(TAG, "Couldn't unregister push on $computerId", it)
                         }
                     }

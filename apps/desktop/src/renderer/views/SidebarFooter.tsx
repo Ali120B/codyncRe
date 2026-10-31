@@ -32,7 +32,6 @@ export function SidebarFooter({ accountOpen, onAccount, onExtensions, onTeamMap 
             <span className="profile-name">{name}</span>
           </button>
           <IconButton title="Plugins" icon="puzzlepiece" size={34} onClick={onExtensions} />
-          <IconButton title="Team map" icon="point.3.connected.trianglepath.dotted" size={34} onClick={onTeamMap} />
         </div>
         <UpdateBadge size={38} />
       </div>

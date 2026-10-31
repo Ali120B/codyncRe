@@ -150,7 +150,6 @@ fun CommandDeckScreen(
             Action("Account", "Codync Cloud account and devices", CodyncIcons.Lock, onOpenSettings),
             Action("Workbench", "Choose a bot to open its details", CodyncIcons.Build, onOpenWorkbench),
             Action("Extensions", "Connect MCP servers, apps and skills", CodyncIcons.Extension, onOpenExtensions),
-            Action("Team map", "Agents, rooms and membership", CodyncIcons.Groups, onOpenTeamMap),
             Action("Pair a computer", "Scan its QR code or paste a Codync link", CodyncIcons.QrCode, onOpenPairing),
         ).filter { query.isBlank() || it.title.contains(query, ignoreCase = true) || it.subtitle.contains(query, ignoreCase = true) }
     }

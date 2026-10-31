@@ -67,16 +67,13 @@ jobs:
       - name: Install SDK packages
         run: yes | sdkmanager --licenses && sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Prepare keystore
-        run: |
-          keytool -genkeypair -v -keystore codync-release.jks -alias codync -keyalg RSA -keysize 2048 -validity 10000 -storepass codync-release -keypass codync-release -dname "CN=codync,OU=codync,O=codync,L=Sharjah,ST=Sharjah,C=AE"
       - name: Assemble prod release
         env:
           CODYNC_KEYSTORE_PASSWORD: codync-release
           CODYNC_KEY_ALIAS: codync
           CODYNC_KEY_PASSWORD: codync-release
         run: |
-          export CODYNC_KEYSTORE_FILE="$(pwd)/codync-release.jks"
+          export CODYNC_KEYSTORE_FILE="$(pwd)/release.keystore"
           ./gradlew :app:assembleProdRelease
       - name: Locate APK
         run: find . -name "*.apk" -print
