@@ -63,6 +63,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.DisposableEffect
@@ -152,6 +153,7 @@ fun LiveChatScreen(
     val connection by session.connectionForBot(botId).collectAsState(initial = com.pokai.codync.transport.ConnectionState())
     val actionError by session.actionError().collectAsState(initial = null)
     val context = LocalContext.current
+    BackHandler { onBack() }
     val colors = CodyncTheme.colors
     val startingNewChat = chatId == "new"
     var loadedThread by remember(botId, chatId) { mutableStateOf<List<Entry>>(emptyList()) }
@@ -569,7 +571,14 @@ fun LiveChatScreen(
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
                             ) {
                                 Text(text, color = colors.text, style = CodyncType.body)
-                                if (entry.data.status == "queued") {
+                                if (!threadMode && (entry.data.thread?.count ?: 0) > 0) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        CodyncIcon(CodyncIcons.Chat, tint = colors.tertiary, size = 12.dp)
+                        Spacer(Modifier.width(3.dp))
+                        Text("${entry.data.thread?.count} replies", color = colors.tertiary, style = CodyncType.caption2)
+                    }
+                }
+                if (entry.data.status == "queued") {
                                     Text(
                                         "Waiting for the computer to reconnect",
                                         modifier = Modifier.padding(top = 4.dp),
