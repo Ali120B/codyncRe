@@ -110,6 +110,8 @@ import com.pokai.codync.model.Attachment
 import com.pokai.codync.model.WireJson
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
@@ -223,7 +225,8 @@ fun LiveChatScreen(
             layout.totalItemsCount == 0 || (layout.visibleItemsInfo.lastOrNull()?.index ?: 0) >= layout.totalItemsCount - 2
         }
     }
-    val scope = rememberCoroutineScope()
+    val scope = remember { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate) }
+    DisposableEffect(Unit) { onDispose { scope.cancel() } }
     var initialScrollDone by remember(botId, chatId) { mutableStateOf(false) }
     val finalListItemIndex = entries.lastIndex + if (threadMode && rootEntry != null) 1 else 0
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
