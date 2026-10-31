@@ -23,6 +23,8 @@ export function RoutineEditorView({ botId, routine, saved }: {
   const [instruction, setInstruction] = useState(routine?.instruction ?? '')
   const [schedule, setSchedule] = useState<RoutineScheduleDraft>(emptyDraft)
   const [timeout, setTimeoutText] = useState(String(routine?.timeoutSeconds ?? 3600))
+  const [afterRoutine, setAfterRoutine] = useState(routine?.afterRoutine ?? '')
+  const [routines, setRoutines] = useState<Routine[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [advanced, setAdvanced] = useState(false)
@@ -34,6 +36,11 @@ export function RoutineEditorView({ botId, routine, saved }: {
   const [started, setStarted] = useState(false)
   const latest = useRef(schedule)
   latest.current = schedule
+  useEffect(() => {
+    let cancelled = false
+    store.ready().then((client) => client.call<{ routines: Routine[] }>('routines', { botId })).then((res) => { if (!cancelled) setRoutines(res.routines ?? []) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [store, botId])
 
   // Events and several triggers stay as they are until replaced; times and repeats are editable.
   const keepsOriginal = routine
@@ -112,6 +119,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
         instruction,
         schedule,
         timeoutSeconds: timeout,
+        afterRoutine: afterRoutine || null,
       })
       saved(result.routine)
     } catch (e) {
@@ -441,6 +449,13 @@ export function RoutineEditorView({ botId, routine, saved }: {
               />
             </>
           ) : null}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+            <span style={{ ...caption, color: 'var(--secondary)' }}>Run after another routine (optional)</span>
+            <select value={afterRoutine} onChange={(e) => setAfterRoutine(e.target.value)} style={{ padding: 8, borderRadius: 8 }}>
+              <option value="">None</option>
+              {routines.filter((r) => r.id !== routine?.id).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          </div>
           <button className="editor-cancel" disabled={busy} onClick={() => dismiss()}>
             Cancel
           </button>

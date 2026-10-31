@@ -24,6 +24,7 @@ export interface Routine {
   triggerDescriptions: string[]
   nextRunAt?: number | null
   timeoutSeconds?: number | null
+  afterRoutine?: string | null
   lastError?: string | null
 }
 
