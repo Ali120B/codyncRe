@@ -80,7 +80,6 @@ class CodyncMessagingService : FirebaseMessagingService() {
             .setGroup(computerId ?: "codync")
             .setSortKey("$computerId:$botId")
         subtitle?.let { builder.setTicker("$title · $it") }
-        NotificationIcon.render(alert)?.let(builder::setLargeIcon)
         val notification = builder.build()
         runCatching {
             NotificationManagerCompat.from(this).notify(("$computerId:$botId").hashCode(), notification)
