@@ -1,6 +1,7 @@
 name: codync-host
 
 on:
+  workflow_dispatch:
   push:
     tags: ["v*"]  # one version tag ships the host and the desktop app (release-desktop.yml)
   pull_request:
