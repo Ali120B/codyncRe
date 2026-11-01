@@ -150,7 +150,7 @@ export class Updates extends EventEmitter {
     const interval = this.state.waitingForApp ? 3600_000 : 24 * 3600_000
     if (this.state.lastCheck && Date.now() - this.state.lastCheck < interval - 60_000) return
     this.userInitiated = false
-    void autoUpdater.checkForUpdates().catch(() => {})
+    try { void autoUpdater.checkForUpdates().catch(() => {}) } catch (e) { this.failed(e) }
   }
 
   /** Checks, downloads, or once a release is staged, restarts into it. */
@@ -160,7 +160,7 @@ export class Updates extends EventEmitter {
     if (this.state.downloadPercent !== null) return
     this.userInitiated = true
     this.set({ error: null })
-    void autoUpdater.checkForUpdates().catch(() => {})
+    try { void autoUpdater.checkForUpdates().catch(() => {}) } catch (e) { this.failed(e) }
   }
 
   /** The sidebar's Update badge: restarts into the available release, downloading it first. */

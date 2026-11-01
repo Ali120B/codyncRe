@@ -48,7 +48,7 @@ android {
         minSdk = 31
         targetSdk = 36
         versionCode = 38
-        versionName = "3.5.1"
+        versionName = "3.5.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "CLOUD_URL", "\"https://api.codync.dev\"")

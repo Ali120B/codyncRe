@@ -43,6 +43,22 @@ function userName() {
 // UI checks drive the renderer over the DevTools protocol (development builds only).
 if (!app.isPackaged && process.env.CODYNC_REMOTE_DEBUG) app.commandLine.appendSwitch('remote-debugging-port', process.env.CODYNC_REMOTE_DEBUG)
 
+// AppImages are launched without a controlling terminal, so stdout/stderr can be closed and a
+// console write throws EIO; keep logging from crashing the process (electron-updater logs there).
+for (const stream of [process.stdout, process.stderr]) {
+  if (!stream) continue
+  const original = stream.write.bind(stream)
+  stream.write = ((...args: any[]) => {
+    try { return (original as any)(...args) } catch { return true }
+  }) as typeof stream.write
+}
+for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+  const original = (console as any)[method].bind(console)
+  ;(console as any)[method] = (...args: any[]) => {
+    try { return original(...args) } catch {}
+  }
+}
+
 const host = new HostController()
 registerErrorReports(host)
 const account = new AccountService()
