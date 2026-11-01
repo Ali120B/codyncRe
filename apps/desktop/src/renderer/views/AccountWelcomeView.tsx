@@ -4,7 +4,6 @@ import { Button, Spinner } from '../components/Controls'
 import { font } from '../lib/fonts'
 import { useReduceMotion } from '../lib/theme'
 import { useAccount } from '../store/account'
-import { EmailSignInForm } from './settings/EmailSignInForm'
 import googleLogo from '../assets/google.svg'
 
 const deviceName = window.codync.platform === 'darwin' ? 'Mac' : 'computer'
@@ -77,7 +76,9 @@ export function AccountWelcomeView({ onContinue }: { onContinue: () => void }) {
               </span>
             )}
           </Button>
-          <EmailSignInForm />
+          <Button kind="secondary" onClick={() => void account.signInWithEmail()} disabled={!account.isConfigured || account.isBusy} style={{ ...font('headline'), minHeight: 50, width: '100%' }}>
+            Continue with email
+          </Button>
           {account.errorMessage ? <div style={{ ...font('footnote'), color: 'var(--warning)' }}>{account.errorMessage}</div> : null}
         </div>
       </div>

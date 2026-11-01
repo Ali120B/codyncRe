@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
@@ -8,9 +9,13 @@ import { buildConfig, identity } from './environment'
 
 /**
  * The Codync account through Clerk's Frontend API, the way ClerkKit drives it on the native
- * apps: a device token in the `Authorization` header (`_is_native=true`), OAuth in the system
+ * apps: a device token in the `Authorization` header (`_is_native=true`), sign-in in the system
  * browser returning to `com.pokai.Codync://callback`, the token kept encrypted with the OS
  * keychain. An account never grants access to a computer by itself (spec §4.2).
+ *
+ * Every sign-in — Google, a password, an emailed code, a new account — is Clerk's hosted page
+ * in the system browser. The desktop app renders no form of its own, so it opens the same page
+ * the phone opens and lets Clerk own the rest.
  */
 
 const SCHEME = identity.appId
@@ -59,18 +64,9 @@ interface ClerkClient {
   last_active_session_id?: string | null
 }
 
-interface Verification {
-  status?: string
-  external_verification_redirect_url?: string | null
-  error?: { long_message?: string; message?: string } | null
-}
-
-interface SignInResource {
-  id: string
-  status: string
-  created_session_id?: string | null
-  first_factor_verification?: Verification | null
-  second_factor_verification?: Verification | null
+/** `POST /v1/client/hosted_auth`: the URL of Clerk's own sign-in page for this device. */
+interface HostedAuth {
+  url?: string
 }
 
 class ClerkError extends Error {
@@ -88,7 +84,6 @@ export class AccountService extends EventEmitter {
   private deviceToken: string | null = null
   private client: ClerkClient | null = null
   private cachedToken: { sessionId: string; jwt: string; until: number } | null = null
-  private pendingSignUpId: string | null = null
   state: AccountState = {
     ready: !this.base,
     configured: !!this.base && !!this.config.cloudURL,
@@ -96,8 +91,6 @@ export class AccountService extends EventEmitter {
     error: null,
     user: null,
     cloudURL: this.config.cloudURL,
-    emailVerificationPending: false,
-    pendingEmail: null,
   }
 
   private get storePath() {
@@ -107,10 +100,7 @@ export class AccountService extends EventEmitter {
   register(windows: () => BrowserWindow[]) {
     ipcMain.handle('account:state', () => this.state)
     ipcMain.handle('account:signIn', (_e, provider: 'apple' | 'google') => this.signIn(provider))
-    ipcMain.handle('account:signInEmail', (_e, email: string, password: string) => this.signInWithEmail(email, password))
-    ipcMain.handle('account:signUpEmail', (_e, email: string, password: string) => this.signUpWithEmail(email, password))
-    ipcMain.handle('account:verifyEmail', (_e, code: string) => this.verifyEmail(code))
-    ipcMain.handle('account:cancelEmail', () => this.cancelEmailAuth())
+    ipcMain.handle('account:signInEmail', () => this.signInWithEmail())
     ipcMain.handle('account:signOut', () => this.signOut())
     ipcMain.handle('account:token', () => this.sessionToken())
     this.on('change', () => {
@@ -205,38 +195,42 @@ export class AccountService extends EventEmitter {
     this.applyClient(client)
   }
 
-  async signIn(provider: 'apple' | 'google') {
+  /**
+   * Clerk's hosted page in the system browser: Google, a password, an emailed code and a new
+   * account all live there, so this app never reimplements them. `mode` only picks the page it
+   * opens first; the page itself moves between sign-in and sign-up.
+   */
+  private async hostedSignIn(mode: 'sign-in' | 'sign-up') {
     if (this.state.busy) return
     if (!this.base) return this.set({ error: "Sign-in setup isn't finished yet. You can continue using local pairing." })
-    const name = provider === 'apple' ? 'Apple' : 'Google'
     this.set({ busy: true, error: null })
     try {
-      const strategy = `oauth_${provider}`
-      const created = await this.request<SignInResource>('POST', '/v1/client/sign_ins', { strategy, redirect_url: REDIRECT })
-      const prepared = await this.request<SignInResource>('POST', `/v1/client/sign_ins/${created.id}/prepare_first_factor`, { strategy, redirect_url: REDIRECT })
-      const redirect = prepared.first_factor_verification?.external_verification_redirect_url
-      if (!redirect) throw new ClerkError(0, 'Redirect URL is missing. Unable to start the sign-in.')
-      const callback = new URL(await authenticate(redirect, SCHEME))
+      // PKCE: the verifier stays here, the challenge goes to Clerk, the nonce comes back.
+      const verifier = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '')
+      const challenge = createHash('sha256').update(verifier).digest('base64url')
+      const state = randomUUID()
+      const hosted = await this.request<HostedAuth>('POST', '/v1/client/hosted_auth', {
+        redirect_url: REDIRECT,
+        code_challenge: challenge,
+        state,
+        mode,
+      })
+      if (!hosted?.url) throw new ClerkError(0, 'Redirect URL is missing. Unable to start the sign-in.')
+      const callback = new URL(await authenticate(hosted.url, SCHEME))
+      // The browser came back to this app: Clerk's rotating nonce redeems the session it made.
+      if (callback.searchParams.get('state') !== state) throw new ClerkError(0, 'The sign-in response did not match this request. Try again.')
       const nonce = callback.searchParams.get('rotating_token_nonce')
-      const signIn = await this.request<SignInResource>('GET', `/v1/client/sign_ins/${created.id}`, undefined, nonce ? { rotating_token_nonce: nonce } : undefined)
-      const transferable = signIn.first_factor_verification?.status === 'transferable' || signIn.second_factor_verification?.status === 'transferable'
-      if (!nonce && transferable) {
-        // A new account: Clerk's transfer flow turns the sign-in into a sign-up.
-        const signUp = await this.request<{ status: string }>('POST', '/v1/client/sign_ups', { transfer: true })
-        if (signUp.status !== 'complete') this.set({ error: `${name} sign-up needs additional account information. Your account is not signed in yet.` })
-      } else if (signIn.status !== 'complete') {
-        const error = signIn.first_factor_verification?.error
-        if (error) throw new ClerkError(0, error.long_message ?? error.message ?? 'Sign-in failed.')
-        this.set({ error: `${name} sign-in needs additional verification. Your account is not signed in yet.` })
-      }
+      if (!nonce) throw new ClerkError(0, 'Sign-in did not complete. Try again.')
+      await this.request<ClerkClient | null>('POST', '/v1/client', { _method: 'GET', rotating_token_nonce: nonce, code_verifier: verifier })
       await this.refreshClient()
+      if (!this.activeSession) throw new ClerkError(0, 'Sign-in did not complete. Try again.')
     } catch (error) {
       const message = error instanceof Error ? error.message : ''
       // Keep the real Clerk/Google explanation ("You are not authorized…", a blocked
       // sign-in, …) instead of hiding every failure behind "check your connection".
-      if (message && !/timed out|Another sign-in|fetch failed|Failed to fetch|network/i.test(message)) {
+      if (message && !/timed out|fetch failed|Failed to fetch|network/i.test(message)) {
         this.set({ error: message })
-      } else {
+      } else if (!/Another sign-in/i.test(message)) {
         this.set({ error: "Couldn't sign in. Check your connection and try again." })
       }
     } finally {
@@ -244,75 +238,16 @@ export class AccountService extends EventEmitter {
     }
   }
 
-  async signInWithEmail(email: string, password: string) {
-    if (this.state.busy) return
-    if (!this.base) return this.set({ error: "Sign-in isn't configured in this build." })
-    this.set({ busy: true, error: null })
-    try {
-      const created = await this.request<SignInResource>('POST', '/v1/client/sign_ins', { strategy: 'password', identifier: email, password })
-      if (created.status !== 'complete') {
-        const err = created.first_factor_verification?.error
-        throw new ClerkError(0, err?.long_message ?? err?.message ?? 'Sign-in failed.')
-      }
-      await this.refreshClient()
-      this.set({ emailVerificationPending: false, pendingEmail: null })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : ''
-      if (message && !/timed out|fetch failed|Failed to fetch|network/i.test(message)) this.set({ error: message })
-      else this.set({ error: "Couldn't sign in. Check your connection and try again." })
-    } finally {
-      this.set({ busy: false })
-    }
+  /** "Continue with Google": the hosted page opens straight to Google's account picker. */
+  async signIn(provider: 'apple' | 'google') {
+    // Clerk's page offers whatever the instance enables; the provider only picks the wording.
+    void provider
+    await this.hostedSignIn('sign-in')
   }
 
-  async signUpWithEmail(email: string, password: string) {
-    if (this.state.busy) return
-    if (!this.base) return this.set({ error: "Sign-in isn't configured in this build." })
-    this.set({ busy: true, error: null })
-    try {
-      const created = await this.request<{ id: string; status: string; verifications?: { email_address?: { status: string } } }>('POST', '/v1/client/sign_ups', { email_address: email, password })
-      if (created.status === 'complete') {
-        await this.refreshClient()
-        this.set({ emailVerificationPending: false, pendingEmail: null })
-        return
-      }
-      this.pendingSignUpId = created.id
-      await this.request('POST', `/v1/client/sign_ups/${created.id}/prepare_verification`, { strategy: 'email_code' })
-      this.set({ emailVerificationPending: true, pendingEmail: email })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : ''
-      // If the account already exists, Clerk returns an error; surface it.
-      if (message && !/timed out|fetch failed|Failed to fetch|network/i.test(message)) this.set({ error: message })
-      else this.set({ error: "Couldn't create the account. Check your connection and try again." })
-    } finally {
-      this.set({ busy: false })
-    }
-  }
-
-  async verifyEmail(code: string) {
-    if (this.state.busy || !this.pendingSignUpId) return
-    this.set({ busy: true, error: null })
-    try {
-      const res = await this.request<{ status: string }>('POST', `/v1/client/sign_ups/${this.pendingSignUpId}/attempt_verification`, { strategy: 'email_code', code })
-      if (res.status !== 'complete') throw new ClerkError(0, 'Verification failed.')
-      this.pendingSignUpId = null
-      await this.refreshClient()
-      this.set({ emailVerificationPending: false, pendingEmail: null })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : ''
-      if (message && !/timed out|fetch failed|Failed to fetch|network/i.test(message)) this.set({ error: message })
-      else this.set({ error: "Couldn't verify the code. Try again." })
-    } finally {
-      this.set({ busy: false })
-    }
-  }
-
-  async cancelEmailAuth() {
-    if (this.pendingSignUpId) {
-      try { await this.request('DELETE', `/v1/client/sign_ups/${this.pendingSignUpId}`) } catch {}
-      this.pendingSignUpId = null
-    }
-    this.set({ emailVerificationPending: false, pendingEmail: null, error: null })
+  /** "Continue with email": the same hosted page, where a password or an emailed code works. */
+  async signInWithEmail() {
+    await this.hostedSignIn('sign-in')
   }
 
   async signOut() {

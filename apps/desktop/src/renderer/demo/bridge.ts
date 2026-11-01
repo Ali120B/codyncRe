@@ -16,7 +16,7 @@ const snapshot: HostSnapshot = {
   dev: false,
   logPath: '',
 }
-const account: AccountState = { ready: true, configured: false, busy: false, error: null, user: null, cloudURL: null, emailVerificationPending: false, pendingEmail: null }
+const account: AccountState = { ready: true, configured: false, busy: false, error: null, user: null, cloudURL: null }
 const updates: UpdateState = {
   supported: false, checking: false, availableVersion: null, downloadPercent: null, staged: false, installing: false,
   autoCheck: false, autoDownload: false, lastCheck: null, error: null, waitingForApp: null,
@@ -55,9 +55,6 @@ const bridge: CodyncBridge = {
     onChange: none,
     signIn: unavailable,
     signInEmail: unavailable,
-    signUpEmail: unavailable,
-    verifyEmail: unavailable,
-    cancelEmail: async () => {},
     signOut: async () => {},
     token: unavailable,
   },

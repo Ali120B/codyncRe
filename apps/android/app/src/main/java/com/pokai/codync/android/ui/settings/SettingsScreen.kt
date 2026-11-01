@@ -478,14 +478,15 @@ private fun ConfiguredAccountCard(account: AndroidAccountSession, state: Android
         if (currentUser == null) {
             SettingsRow(
                 title = "Sign in to Codync Cloud",
-                subtitle = "Use the account configured for Codync. Local QR pairing stays available.",
+                subtitle = "Google, or an email address and password. Local QR pairing stays available.",
                 icon = CodyncIcons.Lock,
                 onClick = {
+                    // Clerk's own page: the same one the welcome screen and the desktop open.
                     scope.launch {
                         when (val result = runCatching { Clerk.auth.startHostedAuth() }.getOrNull()) {
                             is ClerkResult.Failure -> authError =
-                                result.error.toString().ifBlank { "Couldn't open Google sign-in. Try again." }
-                            null -> authError = "Couldn't open Google sign-in. Try again."
+                                result.error.toString().ifBlank { "Couldn't open sign-in. Try again." }
+                            null -> authError = "Couldn't open sign-in. Try again."
                             else -> authError = null
                         }
                     }

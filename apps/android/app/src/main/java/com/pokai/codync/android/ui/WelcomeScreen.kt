@@ -13,7 +13,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,8 +28,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,9 +42,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.clerk.api.Clerk
 import com.clerk.api.network.serialization.ClerkResult
-import com.clerk.api.signup.SignUp
-import com.clerk.api.signup.prepareVerification
-import com.clerk.api.signup.attemptVerification
 import com.pokai.codync.android.BuildConfig
 import com.pokai.codync.design.AvatarMood
 import com.pokai.codync.design.CharacterAvatar
@@ -87,9 +81,30 @@ fun WelcomeScreen(onContinue: () -> Unit) {
     val configured = BuildConfig.CLERK_PUBLISHABLE_KEY.isNotBlank()
     val scope = rememberCoroutineScope()
     var beat by remember { mutableStateOf(0) }
-    var signingIn by remember { mutableStateOf(false) }
+    var signingIn by remember { mutableStateOf<String?>(null) }
     var authError by remember { mutableStateOf<String?>(null) }
     var replied by remember { mutableStateOf(false) }
+
+    // Clerk's own page in the browser: Google, a password and an emailed code all live there,
+    // so the phone opens the same page as the desktop app and renders no form of its own.
+    fun startHostedSignIn(via: String) {
+        if (!configured || signingIn != null) return
+        signingIn = via
+        authError = null
+        scope.launch {
+            when (val result = runCatching { Clerk.auth.startHostedAuth() }.getOrNull()) {
+                is ClerkResult.Failure -> {
+                    authError = result.error.toString().ifBlank { "Sign-in failed. Try again." }
+                    signingIn = null
+                }
+                null -> {
+                    authError = "Couldn't open sign-in. Try again."
+                    signingIn = null
+                }
+                else -> Unit
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         listOf(120L, 380L, 640L, 900L).forEachIndexed { index, at ->
@@ -108,7 +123,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
         if (result is ClerkResult.Success) onContinue()
     }
     LaunchedEffect(signingIn) {
-        if (!signingIn) return@LaunchedEffect
+        if (signingIn == null) return@LaunchedEffect
         repeat(60) {
             delay(1_000)
             val result = runCatching { Clerk.auth.getToken() }.getOrNull()
@@ -117,7 +132,7 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                 return@LaunchedEffect
             }
         }
-        signingIn = false
+        signingIn = null
     }
 
     Box(
@@ -163,26 +178,15 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                     SecondaryButton(
-                        text = if (signingIn) "Waiting for Google…" else "Continue with Google",
-                        onClick = {
-                            if (!configured || signingIn) return@SecondaryButton
-                            signingIn = true
-                            authError = null
-                            scope.launch {
-                                when (val result = runCatching { Clerk.auth.startHostedAuth() }.getOrNull()) {
-                                    is ClerkResult.Failure -> {
-                                        authError = result.error.toString().ifBlank { "Google sign-in failed. Try again." }
-                                        signingIn = false
-                                    }
-                                    null -> {
-                                        authError = "Couldn't open Google sign-in. Try again."
-                                        signingIn = false
-                                    }
-                                    else -> Unit
-                                }
-                            }
-                        },
-                        enabled = configured && !signingIn,
+                        text = if (signingIn == "google") "Waiting for Google…" else "Continue with Google",
+                        onClick = { startHostedSignIn("google") },
+                        enabled = configured && signingIn == null,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    SecondaryButton(
+                        text = if (signingIn == "email") "Waiting for sign-in…" else "Continue with email",
+                        onClick = { startHostedSignIn("email") },
+                        enabled = configured && signingIn == null,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     if (authError != null) {
@@ -192,7 +196,6 @@ fun WelcomeScreen(onContinue: () -> Unit) {
                             style = CodyncType.caption,
                         )
                     }
-                    EmailAuthSection(configured = configured, onSignedIn = onContinue)
                     Text(
                         "You can sign in later from Settings. Pairing a computer never needs an account.",
                         color = colors.tertiary,
@@ -292,116 +295,6 @@ private fun WelcomeChatGlimpse(shown: Boolean, replied: Boolean) {
                 }
                 Spacer(Modifier.size(0.dp))
             }
-        }
-    }
-}
-
-@Composable
-fun EmailAuthSection(configured: Boolean, onSignedIn: () -> Unit) {
-    val colors = CodyncTheme.colors
-    val scope = rememberCoroutineScope()
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var mode by remember { mutableStateOf("signin") }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var currentSignUp by remember { mutableStateOf<com.clerk.api.signup.SignUp?>(null) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Sign in with email", color = colors.text, style = CodyncType.headline)
-        OutlinedTextField(
-            value = email, onValueChange = { email = it }, label = { Text("Email") }, singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, focusedLabelColor = colors.accent, cursorColor = colors.accent),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = password, onValueChange = { password = it }, label = { Text("Password") }, singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, focusedLabelColor = colors.accent, cursorColor = colors.accent),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        if (mode == "verify") {
-            OutlinedTextField(
-                value = code, onValueChange = { code = it }, label = { Text("Verification code") }, singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = colors.accent, unfocusedBorderColor = colors.border, focusedLabelColor = colors.accent, cursorColor = colors.accent),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        SecondaryButton(
-            text = if (busy) "Working…" else if (mode == "verify") "Verify" else if (mode == "signup") "Create account" else "Sign in with email",
-            onClick = {
-                if (busy) return@SecondaryButton
-                error = null
-                busy = true
-                scope.launch {
-                    try {
-                        if (mode == "verify") {
-                            val su = currentSignUp
-                            if (su != null) {
-                                val res = su.attemptVerification(com.clerk.api.signup.SignUp.AttemptVerificationParams.EmailCode(code))
-                                if (res is ClerkResult.Success && res.value.status == com.clerk.api.signup.SignUp.Status.COMPLETE) {
-                                    onSignedIn()
-                                } else if (res is ClerkResult.Failure) {
-                                    error = res.error.toString().ifBlank { "Verification failed." }
-                                }
-                            }
-                        } else if (mode == "signin") {
-                            val res = Clerk.auth.signInWithPassword {
-                                identifier = email
-                                password = password
-                            }
-                            if (res is ClerkResult.Success) {
-                                onSignedIn()
-                            } else if (res is ClerkResult.Failure) {
-                                error = res.error.toString().ifBlank { "Sign-in failed." }
-                            }
-                        } else {
-                            val res = Clerk.auth.signUp {
-                                this.email = email
-                                this.password = password
-                            }
-                            if (res is ClerkResult.Success) {
-                                val su = res.value
-                                if (su.status == com.clerk.api.signup.SignUp.Status.COMPLETE) {
-                                    onSignedIn()
-                                } else {
-                                    currentSignUp = su
-                                    val prep = su.prepareVerification(com.clerk.api.signup.SignUp.PrepareVerificationParams.Strategy.EmailCode())
-                                    if (prep is ClerkResult.Failure) {
-                                        error = prep.error.toString().ifBlank { "Couldn't send code." }
-                                    } else {
-                                        mode = "verify"
-                                    }
-                                }
-                            } else if (res is ClerkResult.Failure) {
-                                error = res.error.toString().ifBlank { "Sign-up failed." }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        error = e.message ?: "Failed."
-                    } finally {
-                        busy = false
-                    }
-                }
-            },
-            enabled = configured && !busy && email.isNotBlank() && password.isNotBlank() && (mode != "verify" || code.isNotBlank()),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            text = if (mode == "signin") "Need an account? Sign up" else "Have an account? Sign in",
-            color = colors.secondary,
-            style = CodyncType.caption,
-            modifier = Modifier.clickable(enabled = !busy) { mode = if (mode == "signin") "signup" else "signin" }.padding(8.dp),
-        )
-        if (mode == "verify") {
-            Text(
-                text = "Cancel",
-                color = colors.secondary,
-                style = CodyncType.caption,
-                modifier = Modifier.clickable(enabled = !busy) { mode = "signin"; currentSignUp = null }.padding(8.dp),
-            )
-        }
-        if (error != null) {
-            Text(error.orEmpty(), color = colors.secondary, style = CodyncType.caption)
         }
     }
 }

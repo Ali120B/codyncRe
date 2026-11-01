@@ -72,8 +72,9 @@ impl Environment {
 
     pub const fn cloud_url(self) -> &'static str {
         match self {
-            Self::Main => "https://api.codync.dev",
-            Self::Dev => "https://codync-cloud-dev.codyncre.workers.dev",
+            // Both builds use this fork's own cloud: an upstream cloud would issue sessions
+            // and grants this fork does not own (AGENTS.md).
+            Self::Main | Self::Dev => "https://codync-cloud-dev.codyncre.workers.dev",
         }
     }
 
@@ -112,11 +113,13 @@ mod tests {
             (Main.systemd_unit(), Dev.systemd_unit()),
             (Main.windows_value(), Dev.windows_value()),
             (Main.supervisor(), Dev.supervisor()),
-            (Main.cloud_url(), Dev.cloud_url()),
             (Main.url_scheme(), Dev.url_scheme()),
         ] {
             assert_ne!(main, dev);
         }
+        // This fork runs one cloud it owns; neither build may point at upstream's.
+        assert_eq!(Main.cloud_url(), Dev.cloud_url());
+        assert_eq!(Main.cloud_url(), "https://codync-cloud-dev.codyncre.workers.dev");
         assert!(Dev.require_release_updates().is_err());
         assert!(Main.require_release_updates().is_ok());
     }

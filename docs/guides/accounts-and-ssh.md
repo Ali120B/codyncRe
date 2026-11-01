@@ -10,17 +10,21 @@ The Android app uses `apps/ios/App/AccountSession.swift`. Public keys and cloud 
 
 Confirm Apple and Google sign-in, Native API and the native app registrations in the intended Clerk instance. The desktop app uses `com.pokai.Codync`, Android uses `com.pokai.Codync.ios`, with their matching `://callback` URLs. Dashboard configuration and actual OAuth consent must be verified independently of the checked-in plist. Do not bundle Clerk secret keys.
 
-### Desktop Sign in with Apple
+### Desktop sign-in
 
 The welcome screen (`apps/desktop/src/renderer/views/AccountWelcomeView.tsx`) offers
-**Continue with Apple** and **Continue with Google**; **Settings → General → Account**
-has Sign out.
+**Continue with Google**, **Continue with email** and a no-account path;
+**Settings → General → Account** has Google and Email, plus Sign out once signed in.
 
-On the desktop, `AccountService.signIn('apple')` starts Clerk's `oauth_apple` sign-in
-and opens its redirect in the system browser, which returns to
-`com.pokai.Codync://callback` (`apps/desktop/src/main/auth.ts`). This uses Clerk's
-Apple Services ID and needs no native Sign in with Apple entitlement. Android continues
-using Clerk's native Apple authorization.
+Both buttons call Clerk's hosted page in the system browser — the same page the phone
+opens — and return to `com.pokai.Codync://callback` (`apps/desktop/src/main/auth.ts`).
+The app renders no sign-in form of its own, so Google, a password, an emailed code and a
+new account all work from that one page; `AccountService.signInWithEmail()` is the
+"Continue with email" entry point. Signing in redeems the callback's rotating nonce with
+the PKCE verifier the app kept, then stores Clerk's device token encrypted.
+
+The welcome screen has no Apple button: the fork's Clerk instance enables Google, a
+password and emailed codes, so the hosted page offers exactly those.
 
 The production Services ID `com.pokai.Codync.signin` is associated with primary
 App ID `com.pokai.Codync.ios` in Apple Developer. Keep that association: Apple's

@@ -524,6 +524,7 @@ mod tests {
             webhook_key: "secret".into(),
             deleted: false,
             timeout_seconds: default_timeout(),
+            after_routine: None,
             last_error: None,
         }
     }
