@@ -218,6 +218,12 @@ if (!app.requestSingleInstanceLock()) {
     if (url) handleURL(url)
     else openChat()
   })
+  // A cold start (app fully quit) launched by the browser with a callback URL: the URL is
+  // in argv, not in a second-instance event. Handle it once the window is ready.
+  const coldStartUrl = urlFromArgv(process.argv)
+  if (coldStartUrl) {
+    app.whenReady().then(() => handleURL(coldStartUrl))
+  }
   app.on('activate', () => openChat())
   app.on('window-all-closed', () => {
     // A menu bar app: it keeps running with no window.

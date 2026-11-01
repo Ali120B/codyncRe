@@ -450,7 +450,6 @@ fn clip(text: &str, max: usize) -> String {
     text.chars().take(max).collect::<String>() + "…"
 }
 
-
 fn members(hub: &Hub, group: &BotConfig) -> Vec<BotConfig> {
     group
         .members

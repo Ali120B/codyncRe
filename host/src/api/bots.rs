@@ -145,9 +145,7 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
                     .await??;
             json!({"data": base64::engine::general_purpose::STANDARD.encode(data), "size": size})
         }
-        "rewind" => {
-            crate::chat::rewind::rewind(hub, str_arg(&b, "botId")?, str_arg(&b, "entryId")?).await?
-        }
+        "rewind" => crate::chat::rewind::rewind(hub, str_arg(&b, "botId")?, str_arg(&b, "entryId")?).await?,
         "send" => {
             let bot = str_arg(&b, "botId")?;
             let text = b["text"].as_str().unwrap_or_default().trim();

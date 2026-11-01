@@ -81,14 +81,8 @@ impl Actor {
             && self.active_request.is_none()
             && self.active_group.is_none()
             && self.active_routine.is_none()
-            && let Err(error) = crate::agent::checkpoint::capture(
-                &self.lane.chat,
-                &self.lane,
-                turn,
-                &self.cfg.id,
-                &self.cfg.cwd,
-            )
-            .await
+            && let Err(error) =
+                crate::agent::checkpoint::capture(&self.lane.chat, &self.lane, turn, &self.cfg.id, &self.cfg.cwd).await
         {
             tracing::warn!(bot = %self.cfg.id, error = format!("{error:#}"), "couldn't save a turn checkpoint");
         }

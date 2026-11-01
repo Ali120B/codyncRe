@@ -268,7 +268,10 @@ impl Routines {
                 timeout_seconds: timeout
                     .unwrap_or_else(|| old.as_ref().map_or_else(default_timeout, |r| r.timeout_seconds)),
                 last_error: None,
-                after_routine: body.get("afterRoutine").and_then(|v| v.as_str()).map(str::to_owned)
+                after_routine: body
+                    .get("afterRoutine")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_owned)
                     .or_else(|| old.as_ref().and_then(|r| r.after_routine.clone())),
             };
             if !(1..=86_400).contains(&r.timeout_seconds) {

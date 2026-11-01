@@ -265,7 +265,8 @@ impl Store {
     }
 
     /// Chat-visible messages (the user's, final replies) in `lane` after `after_seq`, oldest first.
-    pub fn messages_after(&self, lane: &Lane, after_seq: i64, limit: i64) -> Result<Vec<Entry>> {        let c = self.db.locked();
+    pub fn messages_after(&self, lane: &Lane, after_seq: i64, limit: i64) -> Result<Vec<Entry>> {
+        let c = self.db.locked();
         let mut st = c.prepare(&format!(
             "SELECT {ENTRY_COLS} FROM entries WHERE bot_id = ?1 AND thread_id IS ?2 AND seq > ?3 AND
                (kind = 'user' OR (kind = 'agent' AND json_extract(data, '$.final') = 1))
@@ -405,9 +406,7 @@ impl Store {
     pub fn tombstones_since(&self, since: i64) -> Result<Vec<(i64, String, String)>> {
         let c = self.db.locked();
         let mut st = c.prepare("SELECT rev, bot_id, id FROM entry_tombstones WHERE rev > ?1 ORDER BY rev")?;
-        Ok(st
-            .query_map([since], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-            .collect::<rusqlite::Result<_>>()?)
+        Ok(st.query_map([since], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<rusqlite::Result<_>>()?)
     }
 }
 

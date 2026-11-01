@@ -51,20 +51,14 @@ fn capture_sync(chat: &str, lane: &Lane, turn: i64, bot: &str, cwd: &str) -> Res
     let cwd = Path::new(cwd);
     ensure!(cwd.is_dir(), "workspace folder does not exist: {}", cwd.display());
     let data = service::data_dir();
-    ensure!(
-        !data.starts_with(cwd),
-        "can't checkpoint a folder that contains Codync's own data"
-    );
+    ensure!(!data.starts_with(cwd), "can't checkpoint a folder that contains Codync's own data");
     let dest = turn_dir(chat, lane, turn).join(safe(bot));
     if dest.exists() {
         fs::remove_dir_all(&dest)?;
     }
     fs::create_dir_all(&dest)?;
-    let result = if let Some(root) = git_root(cwd)? {
-        capture_git(&root, cwd, &dest)
-    } else {
-        capture_copy(cwd, &dest)
-    };
+    let result =
+        if let Some(root) = git_root(cwd)? { capture_git(&root, cwd, &dest) } else { capture_copy(cwd, &dest) };
     if let Err(error) = result {
         let _ = fs::remove_dir_all(&dest);
         return Err(error);
@@ -92,9 +86,8 @@ fn restore_sync(chat: &str, lane: &Lane, turn: i64) -> Result<usize> {
 }
 
 fn restore_one(dir: &Path) -> Result<()> {
-    let meta: Value = serde_json::from_slice(
-        &fs::read(dir.join("checkpoint.json")).context("checkpoint metadata is missing")?,
-    )?;
+    let meta: Value =
+        serde_json::from_slice(&fs::read(dir.join("checkpoint.json")).context("checkpoint metadata is missing")?)?;
     let cwd = PathBuf::from(meta["cwd"].as_str().unwrap_or_default());
     ensure!(cwd.is_dir(), "the checkpoint's folder no longer exists: {}", cwd.display());
     let tree = dir.join("tree");
@@ -140,11 +133,8 @@ fn restore_one(dir: &Path) -> Result<()> {
 
 fn capture_git(root: &Path, cwd: &Path, dest: &Path) -> Result<()> {
     let relative = cwd.strip_prefix(root).unwrap_or(Path::new(""));
-    let pathspec = if relative.as_os_str().is_empty() {
-        ".".to_owned()
-    } else {
-        relative.to_string_lossy().replace('\\', "/")
-    };
+    let pathspec =
+        if relative.as_os_str().is_empty() { ".".to_owned() } else { relative.to_string_lossy().replace('\\', "/") };
     let diff = git(root, &["diff", "--binary", "HEAD", "--", &pathspec])?;
     ensure!(diff.status.success(), "couldn't read the workspace diff: {}", stderr(&diff));
     ensure!(diff.stdout.len() <= MAX_PATCH, "the workspace diff is too large to checkpoint");
@@ -198,7 +188,8 @@ fn turn_dir(chat: &str, lane: &Lane, turn: i64) -> PathBuf {
 }
 
 fn prune(chat: &str, lane: &Lane, current: i64) {
-    let root = service::data_dir().join("checkpoints").join(safe(chat)).join(safe(lane.thread.as_deref().unwrap_or("main")));
+    let root =
+        service::data_dir().join("checkpoints").join(safe(chat)).join(safe(lane.thread.as_deref().unwrap_or("main")));
     let Ok(entries) = fs::read_dir(root) else { return };
     let mut turns: Vec<(i64, PathBuf, bool)> = entries
         .flatten()
@@ -206,9 +197,9 @@ fn prune(chat: &str, lane: &Lane, current: i64) {
             let turn = entry.file_name().to_string_lossy().parse::<i64>().ok()?;
             let path = entry.path();
             let copy = path.join(".copy").is_file()
-                || fs::read_dir(&path).ok().is_some_and(|dirs| {
-                    dirs.flatten().any(|dir| dir.path().join(".copy").is_file())
-                });
+                || fs::read_dir(&path)
+                    .ok()
+                    .is_some_and(|dirs| dirs.flatten().any(|dir| dir.path().join(".copy").is_file()));
             Some((turn, path, copy))
         })
         .collect();
@@ -230,10 +221,7 @@ fn prune(chat: &str, lane: &Lane, current: i64) {
 }
 
 fn safe(value: &str) -> String {
-    value
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
-        .collect()
+    value.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect()
 }
 
 fn safe_relative(path: &Path) -> bool {
@@ -353,11 +341,7 @@ mod tests {
         let root = dir.join("repo");
         let dest = dir.join("checkpoint");
         fs::create_dir_all(&root).unwrap();
-        for args in [
-            &["init", "-q"][..],
-            &["config", "user.email", "a@b"][..],
-            &["config", "user.name", "a"][..],
-        ] {
+        for args in [&["init", "-q"][..], &["config", "user.email", "a@b"][..], &["config", "user.name", "a"][..]] {
             let out = git(&root, args).unwrap();
             assert!(out.status.success());
         }

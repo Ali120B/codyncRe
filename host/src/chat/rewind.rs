@@ -26,9 +26,7 @@ pub async fn rewind(hub: &Arc<Hub>, bot_id: &str, entry_id: &str) -> Result<Valu
     } else {
         Lane::main(bot_id)
     };
-    let restored = checkpoint::restore(bot_id, &lane, target.turn)
-        .await
-        .context("this turn has no file checkpoint")?;
+    let restored = checkpoint::restore(bot_id, &lane, target.turn).await.context("this turn has no file checkpoint")?;
 
     let mut ids = BTreeSet::new();
     if chat_root {

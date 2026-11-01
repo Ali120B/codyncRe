@@ -220,6 +220,10 @@ impl Hub {
         }
         if cfg.is_group() {
             cfg.members = crate::chat::group::valid_members(&self.store, &cfg.id, &cfg.members)?;
+            // Reopen an existing group with the same members instead of making a duplicate.
+            if let Some(existing) = crate::chat::group::with_members(&self.store, &cfg.members).ok().flatten() {
+                cfg.id = existing;
+            }
         }
         validate(&cfg)?;
         crate::agent::workspace::prepare(&mut cfg)?;
@@ -519,7 +523,6 @@ impl Hub {
         }
         Ok(entries.len())
     }
-
 
     /// Toggles the user's `emoji` reaction on a chat message (`data.reactions`, oldest first).
     /// A message keeps `reactions: []` once reacted to, so it never turns unread again.

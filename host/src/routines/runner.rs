@@ -150,7 +150,14 @@ impl Routines {
         })?;
         self.release(&bot);
         if status == Status::Succeeded {
-            let dependents: Vec<_> = self.state.locked().routines.iter().filter(|r| !r.deleted && r.enabled && r.after_routine.as_deref() == Some(routine_id.as_str())).cloned().collect();
+            let dependents: Vec<_> = self
+                .state
+                .locked()
+                .routines
+                .iter()
+                .filter(|r| !r.deleted && r.enabled && r.after_routine.as_deref() == Some(routine_id.as_str()))
+                .cloned()
+                .collect();
             if !dependents.is_empty() {
                 let _ = self.change(&hub.store, |s| {
                     for dep in &dependents {
