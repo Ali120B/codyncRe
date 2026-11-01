@@ -58,6 +58,10 @@ const LOCAL_ONLY: &[&str] = &[
     "connectorCall",
     "claimSign",
     "unclaim",
+    // Device management is the computer owner's job; paired phones only use the computer.
+    "pairing",
+    "devices",
+    "revokeDevice",
 ];
 const SCREEN: &[&str] = &["screenPrepare", "screenOffer", "screenClose", "screenTakeover"];
 

@@ -221,8 +221,12 @@ impl Hub {
         if cfg.is_group() {
             cfg.members = crate::chat::group::valid_members(&self.store, &cfg.id, &cfg.members)?;
             // Reopen an existing group with the same members instead of making a duplicate.
-            if let Some(existing) = crate::chat::group::with_members(&self.store, &cfg.members).ok().flatten() {
+            // Keep the existing group's member order so a reopen doesn't reorder speakers.
+            if let Some(existing) = crate::chat::group::with_members(&self.store, &cfg.members).ok().flatten()
+                && let Some(row) = self.store.bot(&existing).ok().flatten()
+            {
                 cfg.id = existing;
+                cfg.members = row.config.members;
             }
         }
         validate(&cfg)?;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChoicePicker, IconButton } from '../../components/Controls'
+import { ChoicePicker } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
 import { Dialog, ModalHeader, useDismiss } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
@@ -24,6 +24,9 @@ export function RoutineEditorView({ botId, routine, saved }: {
   const [schedule, setSchedule] = useState<RoutineScheduleDraft>(emptyDraft)
   const [timeout, setTimeoutText] = useState(String(routine?.timeoutSeconds ?? 3600))
   const [afterRoutine, setAfterRoutine] = useState(routine?.afterRoutine ?? '')
+  useEffect(() => {
+    if (afterRoutine) setSchedule((s) => ({ ...s, kind: 'keep', original: [] }))
+  }, [afterRoutine])
   const [routines, setRoutines] = useState<Routine[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +36,6 @@ export function RoutineEditorView({ botId, routine, saved }: {
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [checkedSchedule, setCheckedSchedule] = useState<RoutineScheduleDraft | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [started, setStarted] = useState(false)
   const latest = useRef(schedule)
   latest.current = schedule
   useEffect(() => {
@@ -63,6 +65,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
       const result = await client.call<RoutineSchedulePreview>('routineSchedule', {
         triggers: routine?.triggers ?? [],
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        afterRoutine: routine?.afterRoutine ?? null,
       })
       // The host recognises daily/weekly/monthly cron too; keep that friendly style.
       const draft = result.draft
@@ -83,7 +86,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
     setPreviewError(null)
     setCheckedSchedule(null)
     try {
-      const result = await (await store.ready()).call<RoutineSchedulePreview>('routineSchedule', { draft: requested })
+      const result = await (await store.ready()).call<RoutineSchedulePreview>('routineSchedule', { draft: requested, afterRoutine: afterRoutine || null })
       if (latest.current !== requested) return
       setPreview(result)
       setCheckedSchedule(requested)
@@ -361,22 +364,45 @@ export function RoutineEditorView({ botId, routine, saved }: {
             </Field>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Field label="When to run">
-              <ChoicePicker
-                selection={schedule.kind}
-                options={options}
-                onChange={(kind) => update(kind === 'once' && !schedule.at ? { kind, at: Date.now() + 3_600_000 } : { kind })}
-                fits
-              />
+            <Field label="Run after another routine (optional)">
+              <select
+                value={afterRoutine}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setAfterRoutine(v)
+                  if (!v) setSchedule((s) => ({ ...s, kind: 'cron', calendarStyle: 'daily' }))
+                }}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 12, border: 'none', background: 'var(--bubble-user)', color: 'var(--text)', font: 'inherit', outline: 'none' }}
+              >
+                <option value="">None</option>
+                {routines.filter((r) => r.id !== routine?.id).map((r) => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </select>
             </Field>
-            {loaded ? (
-              triggerFields()
-            ) : (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--secondary)' }}>
-                <Icon name="clock" size={12} />
-                Loading schedule…
-              </span>
-            )}
+            {afterRoutine ? (
+              <span style={{ ...caption, color: 'var(--secondary)' }}>Runs after the selected routine; its own schedule and time are disabled.</span>
+            ) : null}
+            {!afterRoutine ? (
+              <>
+                <Field label="When to run">
+                  <ChoicePicker
+                    selection={schedule.kind}
+                    options={options}
+                    onChange={(kind) => update(kind === 'once' && !schedule.at ? { kind, at: Date.now() + 3_600_000 } : { kind })}
+                    fits
+                  />
+                </Field>
+                {loaded ? (
+                  triggerFields()
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--secondary)' }}>
+                    <Icon name="clock" size={12} />
+                    Loading schedule…
+                  </span>
+                )}
+              </>
+            ) : null}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <button
@@ -431,31 +457,6 @@ export function RoutineEditorView({ botId, routine, saved }: {
           </span>
         ) : null}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {routine ? (
-            <>
-              <IconButton title="Delete routine" icon="trash" onClick={() => setConfirmDelete(true)} />
-              <IconButton
-                title={started ? 'Started' : 'Test run'}
-                icon="play.circle"
-                disabled={started || store.isOffline}
-                onClick={async () => {
-                  try {
-                    await (await store.ready()).call('runRoutine', { botId, id: routine.id })
-                    setStarted(true)
-                  } catch (e) {
-                    setError(errorText(e))
-                  }
-                }}
-              />
-            </>
-          ) : null}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-            <span style={{ ...caption, color: 'var(--secondary)' }}>Run after another routine (optional)</span>
-            <select value={afterRoutine} onChange={(e) => setAfterRoutine(e.target.value)} style={{ padding: 8, borderRadius: 8 }}>
-              <option value="">None</option>
-              {routines.filter((r) => r.id !== routine?.id).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </div>
           <button className="editor-cancel" disabled={busy} onClick={() => dismiss()}>
             Cancel
           </button>

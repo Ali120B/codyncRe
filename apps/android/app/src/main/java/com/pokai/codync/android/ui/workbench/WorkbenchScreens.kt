@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -107,7 +108,7 @@ fun TeamMapScreen(fake: FakeHostState, onBack: () -> Unit, onOpenChat: (botId: S
     val colors = CodyncTheme.colors
     val agents = fake.visibleBots().filter { it.kind != "group" }
     WorkbenchScaffold("Team map", "Ask edges, groups and handoffs", onBack) {
-        LazyColumn(contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 32.dp)) {
+        LazyColumn(contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp)) {
             item {
                 SectionCard {
                     Box(Modifier.fillMaxWidth().height(220.dp).padding(12.dp)) {
@@ -243,7 +244,7 @@ fun RoutinesScreen(fake: FakeHostState, onBack: () -> Unit) {
                 onTest = { fake.testRoutine(it.id); editing = fake.routines.firstOrNull { r -> r.id == it.id } },
             )
         } else {
-            LazyColumn(contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 32.dp)) {
+            LazyColumn(contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp)) {
                 items(fake.routines, key = { it.id }) { rtn ->
                     val bot = fake.bot(rtn.botId)
                     SectionCard(Modifier.padding(bottom = 10.dp)) {
@@ -290,6 +291,7 @@ private fun RoutineEditor(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
             .padding(16.dp),
     ) {
         SectionCard {

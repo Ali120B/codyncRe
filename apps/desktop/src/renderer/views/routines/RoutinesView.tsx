@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Hairline, IconButton, Switch } from '../../components/Controls'
-import { Sheet } from '../../components/Overlay'
+import { Dialog, Sheet } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import { useStore } from '../../store/context'
 import { errorText, isActiveRun, type Routine, type RoutineListing, type RoutineRun } from './routine'
@@ -37,6 +37,7 @@ export function RoutinesView({ botId, initialId, onClose }: { botId: string; ini
   const [routines, setRoutines] = useState<Routine[]>([])
   const [runs, setRuns] = useState<RoutineRun[]>([])
   const [editing, setEditing] = useState<EditorTarget | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Routine | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -141,11 +142,26 @@ export function RoutinesView({ botId, initialId, onClose }: { botId: string; ini
           {routines.map((routine, i) => (
             <Fragment key={routine.id}>
               {i > 0 ? <Hairline /> : null}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button className="routine-row" onClick={() => open(routine.id)}>
                   <span style={{ color: 'var(--text)' }}>{routine.name}</span>
                   <span style={{ ...font('caption'), color: routine.lastError ? 'var(--danger)' : 'var(--secondary)' }}>{summary(routine)}</span>
                 </button>
+                <IconButton
+                  title="Test run"
+                  icon="play.circle"
+                  disabled={busy || store.isOffline}
+                  onClick={async () => {
+                    try { await (await store.ready()).call('runRoutine', { botId, id: routine.id }); setError(null); await load() }
+                    catch (e) { setError(errorText(e)) }
+                  }}
+                />
+                <IconButton
+                  title="Delete routine"
+                  icon="trash"
+                  disabled={busy || store.isOffline}
+                  onClick={() => setConfirmDelete(routine)}
+                />
                 <span aria-label={routine.name} style={{ display: 'flex' }}>
                   <Switch on={routine.enabled} disabled={busy || store.isOffline} onChange={(on) => void action('setRoutineEnabled', routine, on)} />
                 </span>
@@ -165,6 +181,28 @@ export function RoutinesView({ botId, initialId, onClose }: { botId: string; ini
           />
         ) : null}
       </Sheet>
+      <Dialog
+        open={confirmDelete !== null}
+        title="Delete routine?"
+        message="This deletes the routine and stops its future runs. This can't be undone."
+        actions={[
+          {
+            title: 'Delete routine',
+            destructive: true,
+            action: async () => {
+              if (!confirmDelete) return
+              try {
+                await (await store.ready()).call('deleteRoutine', { botId, id: confirmDelete.id })
+                setConfirmDelete(null)
+                await load()
+              } catch (e) {
+                setError(errorText(e))
+              }
+            },
+          },
+        ]}
+        onClose={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

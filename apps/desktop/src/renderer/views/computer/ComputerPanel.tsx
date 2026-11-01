@@ -43,12 +43,11 @@ const GROUP_TABS: Tab[] = [
 const PER_MEMBER: TabId[] = ['browser', 'skills', 'vault']
 
 /** The panel beside a chat: the bot's computer, browser, files and routines (Maus's ComputerPanel). */
-export function ComputerPanel({ bot: initialBot, store: rawStore, width, onWidth, settings, close }: {
+export function ComputerPanel({ bot: initialBot, store: rawStore, width, onWidth, close }: {
   bot: Bot
   store: BotStore
   width: number
   onWidth: (width: number) => void
-  settings: () => void
   close: () => void
 }) {
   // Follow the store so a settings change shows up here without reopening the panel.
@@ -90,7 +89,6 @@ export function ComputerPanel({ bot: initialBot, store: rawStore, width, onWidth
       <div className="computer-head">
         <span style={{ ...font(15, 'semibold') }}>Computer</span>
         <span style={{ ...font('caption'), color: 'var(--tertiary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bot.name}</span>
-        <MacChatButton title={group ? 'Group settings' : `${bot.name} settings`} icon="gearshape" direction={[0, 0]} onClick={settings} />
         <MacChatButton title="Close" icon="chevron.right.2" direction={[1, 0]} onClick={close} />
       </div>
       <div className="computer-tabs" role="tablist">

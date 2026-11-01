@@ -535,13 +535,28 @@ internal fun BotRoutinesTab(session: SessionStore, botId: String) {
                     Text(if (draft.id == null) "New routine" else "Edit routine", color = colors.text, style = CodyncType.title)
                     DetailField("Name", draft.name) { draft = draft.copy(name = it) }
                     DetailField("Prompt", draft.instruction, multiline = true) { draft = draft.copy(instruction = it) }
-                    Text("Schedule", color = colors.tertiary, style = CodyncType.caption)
+                    Text("Run after another routine (optional)", color = colors.tertiary, style = CodyncType.caption)
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("Keep", "Once", "Daily", "Weekdays", "Minutes", "Hourly", "Monthly", "Cron", "Interval", "Webhook").forEach { kind ->
-                            FilterChip(kind, draft.scheduleKind == kind, onClick = { draft = draft.copy(scheduleKind = kind) })
+                        FilterChip("None", draft.afterRoutine == null, onClick = { draft = draft.copy(afterRoutine = null) })
+                        routines.filter { it.text("id") != draft.id }.forEach { r ->
+                            val rid = r.text("id").orEmpty()
+                            FilterChip(r.text("name").orEmpty(), draft.afterRoutine == rid, onClick = { draft = draft.copy(afterRoutine = rid) })
                         }
                     }
-                    when (draft.scheduleKind) {
+                    if (draft.afterRoutine != null) {
+                        Text("Runs after the selected routine; its own schedule and time are disabled.", color = colors.secondary, style = CodyncType.footnote)
+                    }
+                    Text("Schedule", color = colors.tertiary, style = CodyncType.caption)
+                    if (draft.afterRoutine == null) {
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("Keep", "Once", "Daily", "Weekdays", "Minutes", "Hourly", "Monthly", "Cron", "Interval", "Webhook").forEach { kind ->
+                                FilterChip(kind, draft.scheduleKind == kind, onClick = { draft = draft.copy(scheduleKind = kind) })
+                            }
+                        }
+                    } else {
+                        Text("Schedule disabled while running after another routine.", color = colors.tertiary, style = CodyncType.caption)
+                    }
+                    if (draft.afterRoutine == null) when (draft.scheduleKind) {
                         "Once" -> {
                             val at = Calendar.getInstance().apply { timeInMillis = draft.at }
                             SecondaryButton(
@@ -651,14 +666,6 @@ internal fun BotRoutinesTab(session: SessionStore, botId: String) {
                             onCheckedChange = { draft = draft.copy(enabled = it) },
                         )
                     }
-                    Text("Run after another routine (optional)", color = colors.tertiary, style = CodyncType.caption)
-                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip("None", draft.afterRoutine == null, onClick = { draft = draft.copy(afterRoutine = null) })
-                        routines.filter { it.text("id") != draft.id }.forEach { r ->
-                            val rid = r.text("id").orEmpty()
-                            FilterChip(r.text("name").orEmpty(), draft.afterRoutine == rid, onClick = { draft = draft.copy(afterRoutine = rid) })
-                        }
-                    }
                 }
             }
             if (error != null) DetailError(error!!)
@@ -675,7 +682,7 @@ internal fun BotRoutinesTab(session: SessionStore, botId: String) {
                             put("enabled", draft.enabled)
                             put("timeoutSeconds", draft.timeoutSeconds.toLongOrNull() ?: 3600L)
                             draft.afterRoutine?.let { put("afterRoutine", it) }
-                            put("triggers", draft.triggerArray())
+                            put("triggers", if (draft.afterRoutine != null) buildJsonArray { } else draft.triggerArray())
                         }
                         session.call("saveRoutine", args)
                             .onSuccess { editing = null; load() }

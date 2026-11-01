@@ -388,7 +388,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             store={store}
             width={panelWidth}
             onWidth={setPanelWidth}
-            settings={openSettingsPanel}
             close={() => setShowComputer(false)}
           />
         ) : (
@@ -428,7 +427,6 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
             store={store}
             width={panelWidth}
             onWidth={setPanelWidth}
-            settings={openSettingsPanel}
             close={() => setShowComputer(false)}
           />
         ) : null}

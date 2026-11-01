@@ -215,7 +215,11 @@ impl Routines {
         } else {
             serde_json::from_value(body["triggers"].clone()).context("invalid triggers")?
         };
-        if triggers.is_empty() || triggers.len() > 20 {
+        let after_routine = body.get("afterRoutine").and_then(|v| v.as_str()).map(str::to_owned);
+        if triggers.is_empty() && after_routine.is_none() {
+            bail!("a routine requires 1 to 20 triggers");
+        }
+        if triggers.len() > 20 {
             bail!("a routine requires 1 to 20 triggers");
         }
         let timeout = body
