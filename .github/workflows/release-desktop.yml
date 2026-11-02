@@ -1,8 +1,7 @@
 name: Release desktop
 
-# The Electron app (apps/desktop) for macOS, Linux and Windows. A v* tag publishes it; anything else is a
-# dry run that builds and signs but publishes nothing. Notarizing (minutes of waiting on Apple) runs on
-# tags and on release PRs into main, so a notarization problem still shows before the tag.
+# The Electron app (apps/desktop) for Linux and Windows. A v* tag publishes it; anything else is a
+# dry run that builds but publishes nothing.
 on:
   push:
     tags: ["v*"]
@@ -80,7 +79,7 @@ jobs:
           curl -sf -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:19333/api/refreshBackends
       - name: Update feed
         working-directory: apps/desktop/dist
-        # Windows bundles the host like the Mac: PCs with iPhones wait until the App Store has the app it needs.
+        # Windows bundles the host: PCs with iPhones wait until the App Store has the app it needs.
         run: |
           MIN_APP=$(win-unpacked/resources/codync-host.exe compat | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).minApp')
           printf 'minApp: %s\n' "$MIN_APP" >> latest.yml
