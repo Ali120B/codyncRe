@@ -7,14 +7,10 @@
 **The open-source Grok Bot alternative.**<br>
 Your coding agents, as teammates you can message.
 
-> **Fork note** — this is [Ali120B](https://github.com/Ali120B)'s fork of [Codync](https://github.com/leepokai/Codync).
-> Builds, releases and app updates come from [Ali120B/codyncRe](https://github.com/Ali120B/codyncRe/releases);
-> the Android phone app, optional account sign-in and the wired-in cloud relay are upstream's for now.
 
-[Website](https://www.codync.dev) · [Compare](https://www.codync.dev/compare) · [Launch film](https://youtu.be/QAhyZWpV70U)
 
 [![Star Codync on GitHub](https://img.shields.io/github/stars/Ali120B/codyncRe?style=social&label=Star)](https://github.com/Ali120B/codyncRe/stargazers)<br>
-<sub>Free, open source, no paid tier. A ⭐ is how others find it.</sub>
+
 
 [![Download for Windows](https://img.shields.io/badge/Download-Windows_x64-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Ali120B/codyncRe/releases/latest/download/codync-windows-x64.exe)
 [![Download for Linux x86_64](https://img.shields.io/badge/Download-Linux_x86__64-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/Ali120B/codyncRe/releases/latest/download/codync-linux-x86_64.AppImage)
@@ -30,7 +26,6 @@ Windows: x64 installer · Linux: AppImage (x86_64 + arm64) — [all downloads](h
 ![Rust](https://img.shields.io/badge/host-Rust-B7410E?logo=rust)
 ![Electron](https://img.shields.io/badge/desktop-Electron-47848F?logo=electron&logoColor=white)
 
-<a href="https://youtu.be/QAhyZWpV70U"><img src="docs/screenshots/launch-film.jpg" width="760" alt="Watch the Codync launch film on YouTube (1:45)"></a>
 
 <img src="docs/screenshots/desktop-macos.png" width="760" alt="Codync desktop app: four bots in the sidebar and the welcome screen with no bot selected">
 
@@ -158,11 +153,9 @@ Data lives in `~/.codync`. The local bearer token authorizes loopback helpers an
 
 **Can I use my Claude or ChatGPT plan?** Yes. Codync runs the agents already signed in on your computer: Claude Code with your Claude plan, Codex with your ChatGPT plan, and so on. It never calls a provider's API with your login.
 
-**Is there a Claude Code or Codex app for Android phone?** Codync is one, free: Claude Code or Codex keeps running on your Linux or Linux machine, and you chat with it, approve its edits and get notified from the Android phone. Guides: [Claude Code on Android phone](https://www.codync.dev/claude-code-iphone) · [Codex on Android phone](https://www.codync.dev/codex-iphone).
-
 **Which agents can it run?** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode and about 40 more through the [ACP registry](https://agentclientprotocol.com/registry). Each bot picks its own.
 
-**How is it different from Grok Bot, Muse or Dots?** The same bot-based way of working (named bots, group chats, threads, approvals, memory), but open source, free, running on your own computer and with any coding agent. Side-by-side pages: [codync.dev/compare](https://www.codync.dev/compare).
+**How is it different from Grok Bot, Muse or Dots?** The same bot-based way of working (named bots, group chats, threads, approvals, memory), but open source, free, running on your own computer and with any coding agent.
 
 **Where does my data go?** Bots, chats and memory stay on your computer. The phone reaches it directly on the same network, or through an end-to-end encrypted relay that can't read your messages.
 
@@ -176,18 +169,14 @@ Clients and the host each name the oldest version of the other they still work w
 
 ## Contact
 
-- Email: [kevin@codync.dev](mailto:kevin@codync.dev)
+- Email: [kevin@codync.dev](mailto:github.com.unbolted194@passinbox.com)
 - Questions and bug reports: [GitHub Issues](https://github.com/Ali120B/codyncRe/issues)
 - Security issues: report privately as described in [SECURITY.md](SECURITY.md) (GitHub private reporting or email)
 - Community rules: [Code of Conduct](CODE_OF_CONDUCT.md)
 
-## Credits
-
-The desktop notch island's design is inspired by the work of [@novra.design](https://www.instagram.com/novra.design/).
-
 ## License
 
-Apache 2.0 for the code (see [NOTICE](NOTICE)); versions up to 2.11.0 were MIT. The Codync name, logo and the Codync Cloud relay are not covered, and hosted or multi-tenant services must run their own relay and accounts: see [TRADEMARK.md](TRADEMARK.md).
+Apache 2.0 for the code (see [NOTICE](NOTICE)); versions up to 2.11.0 were MIT.
 
 ## Star History
 
