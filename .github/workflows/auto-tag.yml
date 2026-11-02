@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/Codync.xcodeproj/project.pbxproj"
       - "apps/android/app/build.gradle.kts"
       - "apps/desktop/package.json"
       - "host/Cargo.toml"
