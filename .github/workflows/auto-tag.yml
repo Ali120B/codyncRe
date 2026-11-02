@@ -8,9 +8,17 @@ on:
       - "apps/android/app/build.gradle.kts"
       - "apps/desktop/package.json"
       - "host/Cargo.toml"
+  # Repair path: rebuild an existing version whose tag never started the release workflows.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (e.g. 3.5.3); empty reads build.gradle.kts"
+        required: false
 
 permissions:
   contents: write
+  # `gh workflow run` needs Actions: write to start the build workflows.
+  actions: write
   pull-requests: read
 
 jobs:
@@ -23,43 +31,86 @@ jobs:
           # TAP_TOKEN when configured (upstream), the workflow token in a fork without it.
           token: ${{ secrets.TAP_TOKEN || github.token }}
 
-      - name: Read version from pbxproj
+      - name: Read version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ -f apps/android/app/build.gradle.kts ]; then
+          VERSION="$INPUT_VERSION"
+          if [ -z "$VERSION" ] && [ -f apps/android/app/build.gradle.kts ]; then
             VERSION=$(grep -m1 'versionName = ' apps/android/app/build.gradle.kts | sed 's/.*= "//;s/"//')
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if [ -z "$VERSION" ]; then
+            echo "::error::Couldn't read a version to tag"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Detected version: $VERSION"
 
-      - name: Create tag and release if not exists
+      - name: Tag, release and announce
+        id: publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
           DISCORD_RELEASES_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
           DISCORD_MENTIONS_SECRET: ${{ secrets.DISCORD_MENTIONS_SECRET }}
         run: |
           TAG="v${{ steps.version.outputs.version }}"
+          # A tag pushed with GITHUB_TOKEN starts no workflow runs (GitHub suppresses recursive
+          # triggers). With a PAT the tag push starts them; without one the next step asks directly.
+          if [ -n "${TAP_TOKEN:-}" ]; then
+            echo "pushed_by_pat=true" >> "$GITHUB_OUTPUT"
+          fi
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping"
+            echo "Tag $TAG already exists"
           else
             echo "Creating tag $TAG"
             git tag "$TAG"
             git push origin "$TAG"
-            # Created here, before the build jobs upload to it, so it carries a description.
-            tools/release-notes.sh "$TAG" > notes.md
-            gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md --generate-notes
-            # Announce it in the Discord server's #releases channel. A release created with
-            # GITHUB_TOKEN triggers no `release` workflow, so this happens here. The Discord Worker turns
-            # each @login linked to a member into a mention, which the message pings (discord/README.md).
-            sig=$(openssl dgst -sha256 -hmac "$DISCORD_MENTIONS_SECRET" -r notes.md | cut -d' ' -f1) || true
-            mentions=$(curl -fsS -X POST -H "X-Signature: $sig" --data-binary @notes.md https://discord.codync.dev/mentions) ||
-              { echo "::warning::Couldn't look up Discord mentions"; mentions='{"users": []}'; }
-            jq -n --arg tag "$TAG" --arg url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" \
-              --rawfile notes notes.md --argjson mentions "$mentions" \
-              '($mentions.text // $notes) as $notes | $mentions.users as $users |
-              {embeds: [{title: "Codync \($tag)", url: $url, color: 16777215,
-                description: (if ($notes | test("\\S")) then $notes[0:4000] else "See the release notes." end)}]} +
-              if ($users | length) > 0 then {content: ($users | map("<@\(.)>") | join(" ")), allowed_mentions: {users: $users}} else {} end' |
-              curl -fsS -X POST -H "Content-Type: application/json" --data @- "$DISCORD_RELEASES_WEBHOOK" ||
-              echo "::warning::Couldn't post $TAG to Discord"
           fi
+          if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
+            echo "Release $TAG already exists"
+            exit 0
+          fi
+          # Created here, before the build jobs upload to it, so it carries a description.
+          tools/release-notes.sh "$TAG" > notes.md
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md --generate-notes
+          # Announce it in the Discord server's #releases channel. A release created with
+          # GITHUB_TOKEN triggers no `release` workflow, so this happens here. The Discord Worker turns
+          # each @login linked to a member into a mention, which the message pings (discord/README.md).
+          sig=$(openssl dgst -sha256 -hmac "$DISCORD_MENTIONS_SECRET" -r notes.md | cut -d' ' -f1) || true
+          mentions=$(curl -fsS -X POST -H "X-Signature: $sig" --data-binary @notes.md https://discord.codync.dev/mentions) ||
+            { echo "::warning::Couldn't look up Discord mentions"; mentions='{"users": []}'; }
+          jq -n --arg tag "$TAG" --arg url "https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" \
+            --rawfile notes notes.md --argjson mentions "$mentions" \
+            '($mentions.text // $notes) as $notes | $mentions.users as $users |
+            {embeds: [{title: "Codync \($tag)", url: $url, color: 16777215,
+              description: (if ($notes | test("\\S")) then $notes[0:4000] else "See the release notes." end)}]} +
+            if ($users | length) > 0 then {content: ($users | map("<@\(.)>") | join(" ")), allowed_mentions: {users: $users}} else {} end' |
+            curl -fsS -X POST -H "Content-Type: application/json" --data @- "$DISCORD_RELEASES_WEBHOOK" ||
+            echo "::warning::Couldn't post $TAG to Discord"
+
+      - name: Start the release builds on the tag
+        # GITHUB_TOKEN never triggers workflows, so a fresh tag would only run the main-branch
+        # path filters (the checks). Dispatch the executable builds explicitly instead. With a PAT
+        # the push already started them, and this step stays out of the way.
+        if: always() && steps.publish.outputs.pushed_by_pat != 'true' && steps.version.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          for workflow in host.yml release-desktop.yml android.yml; do
+            for attempt in 1 2 3; do
+              if gh workflow run "$workflow" --ref "$TAG"; then
+                echo "Started $workflow on $TAG"
+                break
+              fi
+              if [ "$attempt" = 3 ]; then
+                echo "::error::Couldn't start $workflow on $TAG"
+                exit 1
+              fi
+              # A just-pushed tag can take a moment to be visible to the dispatch API.
+              echo "::warning::Retrying $workflow in 10s"
+              sleep 10
+            done
+          done
