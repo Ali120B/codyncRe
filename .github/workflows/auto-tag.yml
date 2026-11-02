@@ -56,17 +56,24 @@ jobs:
         run: |
           TAG="v${{ steps.version.outputs.version }}"
           # A tag pushed with GITHUB_TOKEN starts no workflow runs (GitHub suppresses recursive
-          # triggers). With a PAT the tag push starts them; without one the next step asks directly.
-          if [ -n "${TAP_TOKEN:-}" ]; then
-            echo "pushed_by_pat=true" >> "$GITHUB_OUTPUT"
-          fi
+          # triggers). With a PAT the tag push starts them; otherwise the next step asks directly,
+          # but only for a fresh tag — an existing tag already had its builds, and re-dispatching on
+          # every main push would run them twice. A manual run always asks (that is the repair path).
+          WANTS_DISPATCH=false
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists"
           else
             echo "Creating tag $TAG"
             git tag "$TAG"
             git push origin "$TAG"
+            if [ -z "${TAP_TOKEN:-}" ]; then
+              WANTS_DISPATCH=true
+            fi
           fi
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            WANTS_DISPATCH=true
+          fi
+          echo "dispatch=$WANTS_DISPATCH" >> "$GITHUB_OUTPUT"
           if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
             echo "Release $TAG already exists"
             exit 0
@@ -93,7 +100,7 @@ jobs:
         # GITHUB_TOKEN never triggers workflows, so a fresh tag would only run the main-branch
         # path filters (the checks). Dispatch the executable builds explicitly instead. With a PAT
         # the push already started them, and this step stays out of the way.
-        if: always() && steps.publish.outputs.pushed_by_pat != 'true' && steps.version.outputs.version != ''
+        if: always() && steps.publish.outputs.dispatch == 'true' && steps.version.outputs.version != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
