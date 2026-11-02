@@ -33,6 +33,11 @@ export function RoutineEditorView({ botId, routine, saved }: {
   const [advanced, setAdvanced] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [preview, setPreview] = useState<RoutineSchedulePreview | null>(null)
+  const advancedRef = useRef<HTMLDivElement>(null)
+  // Opening Run settings near the bottom of the form lifts it into view instead of under the footer.
+  useEffect(() => {
+    if (advanced) advancedRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [advanced])
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [checkedSchedule, setCheckedSchedule] = useState<RoutineScheduleDraft | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -350,11 +355,12 @@ export function RoutineEditorView({ botId, routine, saved }: {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 700, minHeight: 0, background: 'var(--background)', color: 'var(--text)', ...font(13) }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'min(780px, calc(100vh - 48px))', maxHeight: 780, minHeight: 0, background: 'var(--background)', color: 'var(--text)', ...font(13) }}>
       <ModalHeader title={routine ? 'Edit routine' : 'Set up a routine'} close={false} />
-      {/* The card fits the form; it scrolls only when taller than the window allows. */}
-      <fieldset className="routine-form" disabled={busy || !loaded} style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: 20 }}>
+      {/* The form scrolls in its own box so the footer never covers a field. */}
+      <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
+      <fieldset className="routine-form" disabled={busy || !loaded} style={{ margin: 0, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: '20px 20px 28px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <Field label="Name">
               <input className="routine-input" value={name} placeholder="e.g. Morning summary" onChange={(e) => setName(e.target.value)} />
@@ -419,7 +425,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
               {!advanced ? <span style={{ color: 'var(--tertiary)' }}>Timeout {timeout}s</span> : null}
             </button>
             {advanced ? (
-              <div className="routine-fade" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div ref={advancedRef} className="routine-fade" style={{ display: 'flex', flexDirection: 'column', gap: 12, scrollMarginBottom: 16 }}>
                 <Field label="Timeout (seconds)">
                   <input className="routine-input" value={timeout} placeholder="3600" onChange={(e) => setTimeoutText(e.target.value)} />
                 </Field>
@@ -429,6 +435,7 @@ export function RoutineEditorView({ botId, routine, saved }: {
           </div>
         </div>
       </fieldset>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 20, flex: 'none' }}>
         {previewError !== null ? (

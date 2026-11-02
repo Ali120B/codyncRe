@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -118,15 +120,18 @@ private fun GlassMenuOverlay(request: GlassMenuRequest, backdrop: Backdrop) {
     )
     val margin = with(density) { 10.dp.roundToPx() }.toFloat()
     val gap = with(density) { request.offset.y.roundToPx() }.toFloat()
-    val maxHeight = with(density) { (window.height / density.density - 48).dp }
+    // The open keyboard covers the window's bottom: menus must sit over the visible part.
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val floor = (window.height - imeBottom).coerceAtLeast(0)
+    val maxHeight = with(density) { (floor.toFloat() / density.density - 48f).coerceAtLeast(120f).dp }
     val width = menuSize.width.toFloat()
     val height = menuSize.height.toFloat()
     val x = (request.anchor.right - width)
         .coerceIn(margin, (window.width - width - margin).coerceAtLeast(margin))
     val below = request.anchor.bottom + gap
     val above = request.anchor.top - height - gap
-    val maxY = (window.height - height - margin).coerceAtLeast(margin)
-    val y = if (height > 0 && below + height > window.height - margin && above >= margin) {
+    val maxY = (floor - height - margin).coerceAtLeast(margin)
+    val y = if (height > 0 && below + height > floor - margin && above >= margin) {
         above.coerceIn(margin, maxY)
     } else {
         below.coerceIn(margin, maxY)

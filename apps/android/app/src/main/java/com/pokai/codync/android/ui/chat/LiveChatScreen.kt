@@ -808,7 +808,10 @@ fun LiveChatScreen(
             ) {
                 attachedFiles.forEach { file ->
                     val imageExt = file.name.substringAfterLast('.', "").lowercase() in setOf("png","jpg","jpeg","heic","gif","webp","tiff","bmp")
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // A small x sits on the preview's corner, not under it.
+                    Box(
+                        Modifier.size(58.dp).clip(RoundedCornerShape(10.dp)).background(colors.surface),
+                    ) {
                         if (imageExt) {
                             val bmp by produceState<android.graphics.Bitmap?>(null, file.uri) {
                                 value = withContext(Dispatchers.IO) {
@@ -816,13 +819,41 @@ fun LiveChatScreen(
                                 }
                             }
                             if (bmp != null) {
-                                Image(bmp!!.asImageBitmap(), contentDescription = file.name, modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+                                Image(
+                                    bmp!!.asImageBitmap(),
+                                    contentDescription = file.name,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                )
                             }
+                        } else {
+                            CodyncIcon(
+                                CodyncIcons.File,
+                                tint = colors.secondary,
+                                size = 20.dp,
+                                modifier = Modifier.align(Alignment.Center),
+                            )
                         }
-                        SecondaryButton("×", onClick = {
-                            attachedFiles = attachedFiles - file
-                            retryNonce = null
-                        })
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(3.dp)
+                                .size(18.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .clickable {
+                                    attachedFiles = attachedFiles - file
+                                    retryNonce = null
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CodyncIcon(
+                                CodyncIcons.Close,
+                                tint = Color.White,
+                                size = 11.dp,
+                                contentDescription = "Remove ${file.name}",
+                            )
+                        }
                     }
                 }
             }

@@ -87,23 +87,23 @@ export function ComputerPanel({ bot: initialBot, store: rawStore, width, onWidth
         }}
       />
       <div className="computer-head">
-        <span style={{ ...font(15, 'semibold') }}>Computer</span>
-        <span style={{ ...font('caption'), color: 'var(--tertiary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bot.name}</span>
-        <MacChatButton title="Close" icon="chevron.right.2" direction={[1, 0]} onClick={close} />
-      </div>
-      <div className="computer-tabs" role="tablist">
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            role="tab"
-            aria-selected={tab === item.id}
-            className={`computer-tab ${tab === item.id ? 'active' : ''}`}
-            onClick={() => setTab(item.id)}
-          >
-            <Icon name={item.icon} size={12} weight="semibold" />
-            {item.title}
-          </button>
-        ))}
+        <div className="computer-tabs" role="tablist">
+          {tabs.map((item) => (
+            <button
+              key={item.id}
+              role="tab"
+              aria-selected={tab === item.id}
+              className={`computer-tab ${tab === item.id ? 'active' : ''}`}
+              onClick={() => setTab(item.id)}
+            >
+              <Icon name={item.icon} size={12} weight="semibold" />
+              {item.title}
+            </button>
+          ))}
+        </div>
+        <span className="computer-close">
+          <MacChatButton title="Close" icon="chevron.right.2" direction={[1, 0]} onClick={close} />
+        </span>
       </div>
       {group && member && PER_MEMBER.includes(tab) && members.length > 1 ? (
         <MemberPicker members={members} value={member.id} onChange={setMemberId} />
@@ -116,25 +116,27 @@ export function ComputerPanel({ bot: initialBot, store: rawStore, width, onWidth
               browserOn(member) ? (
                 <BrowserTab bot={member} store={store} working={isWorkingIn(member, bot.id, null)} />
               ) : (
-                <div className="computer-pad">
-                  <p className="computer-hint" style={font('footnote')}>
-                    The browser is off for {member.name} in this room and in its own settings. Turn it on above or in the bot's settings.
-                  </p>
+                <div className="computer-scroll">
+                  <div className="computer-pad">
+                    <p className="computer-hint" style={font('footnote')}>
+                      The browser is off for {member.name} in this room and in its own settings. Turn it on above or in the bot's settings.
+                    </p>
+                  </div>
                 </div>
               )
             ) : null}
             {tab === 'files' ? <GroupFilesTab group={bot} store={store} /> : null}
-            {tab === 'skills' && member ? <SkillsTab bot={member} /> : null}
-            {tab === 'vault' && member ? <VaultTab bot={member} /> : null}
-            {tab === 'routines' ? <RoutinesView botId={bot.id} initialId={null} /> : null}
+            {tab === 'skills' && member ? <div className="computer-scroll"><SkillsTab bot={member} /></div> : null}
+            {tab === 'vault' && member ? <div className="computer-scroll"><VaultTab bot={member} /></div> : null}
+            {tab === 'routines' ? <div className="computer-scroll"><div className="computer-pad"><RoutinesView botId={bot.id} initialId={null} /></div></div> : null}
           </>
         ) : (
           <>
-            {tab === 'computer' ? <ComputerTab bot={bot} store={store} /> : null}
+            {tab === 'computer' ? <div className="computer-scroll"><ComputerTab bot={bot} store={store} /></div> : null}
             {tab === 'browser' ? <BrowserTab bot={bot} store={store} /> : null}
             {tab === 'files' ? <FilesTab bot={bot} store={store} /> : null}
-            {tab === 'routines' ? <RoutinesView botId={bot.id} initialId={null} /> : null}
-            {tab === 'cloud' ? <CloudTab store={store} /> : null}
+            {tab === 'routines' ? <div className="computer-scroll"><div className="computer-pad"><RoutinesView botId={bot.id} initialId={null} /></div></div> : null}
+            {tab === 'cloud' ? <div className="computer-scroll"><CloudTab store={store} /></div> : null}
           </>
         )}
         </div>

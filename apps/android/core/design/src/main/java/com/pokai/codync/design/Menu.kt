@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -113,13 +115,20 @@ fun CodyncMenu(
     val popupOffset = with(density) {
         IntOffset(offset.x.roundToPx(), offset.y.roundToPx())
     }
-    val positionProvider = remember(popupOffset) {
+    // Edge-to-edge windows keep their height under the keyboard, so keep the menu above the IME.
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val positionProvider = remember(popupOffset, imeBottom) {
         FitMenuInWindow(
             offset = popupOffset,
             margin = with(density) { 8.dp.roundToPx() },
+            bottomInset = imeBottom,
         )
     }
-    val maxMenuHeight = (LocalConfiguration.current.screenHeightDp - 32).coerceAtLeast(120).dp
+    val maxMenuHeight = with(density) {
+        (LocalConfiguration.current.screenHeightDp.dp.toPx() - imeBottom - 24.dp.toPx())
+            .coerceAtLeast(120.dp.toPx())
+            .toDp()
+    }
 
     Popup(
         popupPositionProvider = positionProvider,
@@ -222,6 +231,7 @@ fun CodyncMenu(
 private class FitMenuInWindow(
     private val offset: IntOffset,
     private val margin: Int,
+    private val bottomInset: Int = 0,
 ) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -237,17 +247,19 @@ private class FitMenuInWindow(
         }
         val x = rawX.coerceIn(margin, maxX)
 
+        // The keyboard covers the bottom of the window: treat its top edge as the floor.
+        val floor = (windowSize.height - bottomInset).coerceAtLeast(margin)
         val below = anchorBounds.bottom + offset.y
         val above = anchorBounds.top - popupContentSize.height - offset.y
-        val availableBelow = windowSize.height - anchorBounds.bottom - margin
+        val availableBelow = floor - anchorBounds.bottom - margin
         val availableAbove = anchorBounds.top - margin
         val rawY = when {
-            below + popupContentSize.height <= windowSize.height - margin -> below
+            below + popupContentSize.height <= floor - margin -> below
             above >= margin -> above
             availableBelow >= availableAbove -> below
             else -> above
         }
-        val maxY = (windowSize.height - popupContentSize.height - margin).coerceAtLeast(margin)
+        val maxY = (floor - popupContentSize.height - margin).coerceAtLeast(margin)
         return IntOffset(x, rawY.coerceIn(margin, maxY))
     }
 }

@@ -79,6 +79,8 @@ class CodyncMessagingService : FirebaseMessagingService() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setGroup(computerId ?: "codync")
             .setSortKey("$computerId:$botId")
+        // The real bot (or the room's two leading members) on the left, drawn from the sealed alert.
+        NotificationIcon.render(alert)?.let { builder.setLargeIcon(it) }
         subtitle?.let { builder.setTicker("$title · $it") }
         val notification = builder.build()
         runCatching {

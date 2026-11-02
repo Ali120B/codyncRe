@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { isWorkingIn, type Bot } from '@shared/models'
-import { Spinner } from '../../components/Controls'
+import { BotAvatar } from '../../components/Avatar'
+import { Spinner, Switch } from '../../components/Controls'
 import { Icon } from '../../components/Icon'
+import { AnchoredMenu } from '../../components/Overlay'
 import { font } from '../../lib/fonts'
 import type { BotStore } from '../../store/bot-store'
-import { SwitchRow } from '../bots/parts'
 import { BrowserClient, FRAME_HEIGHT, FRAME_WIDTH, engineName, frameSrc, type BrowserFrame, type BrowserState } from './browser-model'
 
 const FRAME_MS = 400
@@ -28,6 +29,8 @@ export function BrowserTab({ bot, store, working }: { bot: Bot; store: BotStore;
   const [busy, setBusy] = useState<'start' | 'restart' | 'stop' | null>(null)
   /** Near-fullscreen: the browser fills the window (not the OS full screen). */
   const [expanded, setExpanded] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
   const [address, setAddress] = useState('')
   const addressFocused = useRef(false)
   const view = useRef<HTMLDivElement>(null)
@@ -179,59 +182,75 @@ export function BrowserTab({ bot, store, working }: { bot: Bot; store: BotStore;
     }
   }
 
+  // The browser's own on/off, always the first thing in the card.
+  const switchRow = (
+    <div className="browser-switch">
+      <Icon name="safari" size={15} weight="semibold" color="var(--secondary)" />
+      <span className="browser-switch-title" style={font(13, 'medium')}>Let {bot.name} use a browser</span>
+      <Switch on={bot.browser} onChange={(on) => store.setBrowser(bot, on)} label={`Let ${bot.name} use a browser`} />
+    </div>
+  )
+
   if (!enabled) {
     return (
-      <div className="computer-pad">
-        <SwitchRow
-          title="Use a browser"
-          detail={`Let ${bot.name} open pages in its own private browser on this computer — its own profile, its own logins. You can watch and take over from this panel.`}
-          on={bot.browser}
-          onChange={(on) => store.setBrowser(bot, on)}
-        />
-        <p className="computer-hint" style={font('footnote')}>
-          While on, {bot.name} gets browser tools (open, read, click, type, screenshot) and everything it does stays in its own browser.
-        </p>
+      <div className="browser-tab">
+        {switchRow}
+        <div className="browser-empty">
+          <span className="browser-empty-icon"><Icon name="safari" size={26} color="var(--tertiary)" /></span>
+          <span style={{ ...font(13, 'medium'), color: 'var(--text)' }}>The browser is off for {bot.name}</span>
+          <p className="browser-empty-text" style={font('footnote')}>
+            Turn it on to give {bot.name} its own private browser — its own profile, its own logins — with tools to open, read, click, type and screenshot. You can watch and take over here.
+          </p>
+        </div>
       </div>
     )
   }
   if (state?.engineError) {
     return (
-      <div className="computer-pad">
-        <p className="computer-hint" style={font('body')}>{state.engineError}</p>
-        <button className="browser-stop" disabled={busy !== null} onClick={stopForBot}>Turn it off for {bot.name}</button>
+      <div className="browser-tab">
+        {switchRow}
+        <div className="browser-empty">
+          <span className="browser-empty-icon"><Icon name="exclamationmark.circle" size={26} color="var(--danger)" /></span>
+          <p className="browser-empty-text" style={font('footnote')}>{state.engineError}</p>
+          <button className="browser-start" disabled={busy !== null} onClick={stopForBot}>Turn it off for {bot.name}</button>
+        </div>
       </div>
     )
   }
 
+  const statusText = error
+    ?? (busy === 'start' || busy === 'restart'
+      ? `Starting ${engineName(engine)}…`
+      : running
+        ? 'Connecting to the browser view…'
+        : `${engineName(engine)} is not running.`)
+
   const chrome = (
-    <>
-      <div className="browser-toolbar">
-        <button className="browser-nav" title="Back" aria-label="Back" onClick={() => void perform((b) => b.back())}>
-          <Icon name="chevron.left" size={13} weight="semibold" />
+    <div className="browser-shell">
+      <div className="browser-tabstrip">
+        {(state?.tabs ?? []).length === 0 ? (
+          <span className="browser-tab-pill active">
+            <button className="browser-tab-open" title="New tab" onClick={() => void perform((b) => { setWatch(true); return b.newTab() })}>
+              <Icon name="safari" size={11} weight="semibold" />
+              <span className="browser-tab-title">New tab</span>
+            </button>
+          </span>
+        ) : null}
+        {(state?.tabs ?? []).map((tab) => (
+          <span key={tab.id} className={`browser-tab-pill ${tab.id === state?.activeTab ? 'active' : ''}`}>
+            <button className="browser-tab-open" title={tab.url || 'New tab'} onClick={() => void perform((b) => b.selectTab(tab.id))}>
+              <Icon name="safari" size={11} weight="semibold" />
+              <span className="browser-tab-title">{tab.title || (tab.url === 'about:blank' || !tab.url ? 'New tab' : tab.url)}</span>
+            </button>
+            <button className="browser-tab-close" title="Close tab" aria-label={`Close ${tab.title || 'tab'}`} onClick={() => void perform((b) => b.closeTab(tab.id))}>
+              <Icon name="xmark" size={9} weight="semibold" />
+            </button>
+          </span>
+        ))}
+        <button className="browser-tab-add" title="New tab" aria-label="New tab" onClick={() => void perform((b) => { setWatch(true); return b.newTab() })}>
+          <Icon name="plus" size={12} weight="semibold" />
         </button>
-        <button className="browser-nav" title="Forward" aria-label="Forward" onClick={() => void perform((b) => b.forward())}>
-          <Icon name="chevron.right" size={13} weight="semibold" />
-        </button>
-        <button className="browser-nav" title="Reload" aria-label="Reload" onClick={() => void perform((b) => b.reload())}>
-          <Icon name="arrow.clockwise" size={13} weight="semibold" />
-        </button>
-        <input
-          className="browser-address"
-          value={address}
-          spellCheck={false}
-          placeholder="example.com"
-          aria-label="Address"
-          onFocus={() => (addressFocused.current = true)}
-          onBlur={() => (addressFocused.current = false)}
-          onChange={(e) => setAddress(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-              e.preventDefault()
-              ;(e.target as HTMLInputElement).blur()
-              navigate(address)
-            }
-          }}
-        />
+        <span style={{ flex: 1 }} />
         {user ? (
           <button className="browser-control on" onClick={release} title="Hand the browser back to the bot">
             <Icon name="hand.raised" size={12} weight="semibold" />
@@ -246,39 +265,92 @@ export function BrowserTab({ bot, store, working }: { bot: Bot; store: BotStore;
         <button className="browser-nav" title={expanded ? 'Exit full view' : 'Full view'} aria-label={expanded ? 'Exit full view' : 'Full view'} onClick={() => setExpanded((x) => !x)}>
           <Icon name={expanded ? 'arrow.down.right.and.arrow.up.left' : 'arrow.up.left.and.arrow.down.right'} size={13} weight="semibold" />
         </button>
+        <BotAvatar bot={bot} size={24} animated={false} />
       </div>
-      <div className="browser-tabstrip">
-        {(state?.tabs ?? []).map((tab) => (
-          <span key={tab.id} className={`browser-tab-pill ${tab.id === state?.activeTab ? 'active' : ''}`}>
-            <button className="browser-tab-open" title={tab.url || 'New tab'} onClick={() => void perform((b) => b.selectTab(tab.id))}>
-              <span className="browser-tab-title">{tab.title || (tab.url === 'about:blank' || !tab.url ? 'New tab' : tab.url)}</span>
-            </button>
-            <button className="browser-tab-close" title="Close tab" aria-label={`Close ${tab.title || 'tab'}`} onClick={() => void perform((b) => b.closeTab(tab.id))}>
-              <Icon name="xmark" size={9} weight="semibold" />
-            </button>
-          </span>
-        ))}
-        <button className="browser-nav browser-new-tab" title="New tab" aria-label="New tab" onClick={() => void perform((b) => { setWatch(true); return b.newTab() })}>
-          <Icon name="plus" size={12} weight="semibold" />
+      <div className="browser-toolbar">
+        <button className="browser-nav" title="Back" aria-label="Back" onClick={() => void perform((b) => b.back())}>
+          <Icon name="chevron.left" size={13} weight="semibold" />
         </button>
+        <button className="browser-nav" title="Forward" aria-label="Forward" onClick={() => void perform((b) => b.forward())}>
+          <Icon name="chevron.right" size={13} weight="semibold" />
+        </button>
+        <button className="browser-nav" title="Reload" aria-label="Reload" onClick={() => void perform((b) => b.reload())}>
+          <Icon name="arrow.clockwise" size={13} weight="semibold" />
+        </button>
+        <input
+          className="browser-address"
+          value={address}
+          spellCheck={false}
+          placeholder="Search or enter address"
+          aria-label="Address"
+          onFocus={() => (addressFocused.current = true)}
+          onBlur={() => (addressFocused.current = false)}
+          onChange={(e) => setAddress(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              ;(e.target as HTMLInputElement).blur()
+              navigate(address)
+            }
+          }}
+        />
+        <button
+          ref={menuButton}
+          className="browser-nav"
+          title="Browser menu"
+          aria-label="Browser menu"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <Icon name="ellipsis" size={14} weight="semibold" />
+        </button>
+        <AnchoredMenu
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          anchor={menuButton}
+          width={230}
+          items={() => [
+            { title: 'Reload the page', icon: 'arrow.clockwise', action: () => void perform((b) => b.reload()) },
+            { title: 'Restart the browser', icon: 'arrow.counterclockwise', action: restart },
+            running
+              ? { title: `Stop for ${bot.name}`, icon: 'power', action: stopForBot }
+              : { title: 'Start the browser', icon: 'play', action: start },
+            { title: expanded ? 'Exit full view' : 'Full view', icon: expanded ? 'arrow.down.right.and.arrow.up.left' : 'arrow.up.left.and.arrow.down.right', action: () => setExpanded((x) => !x) },
+          ]}
+        />
       </div>
+      {error !== null || frame === null ? (
+        <div className="browser-statusbar">
+          <Icon name={error !== null ? 'exclamationmark.circle' : 'circle'} size={11} weight="semibold" color={error !== null ? 'var(--danger)' : 'var(--tertiary)'} />
+          <span className="browser-statusbar-text" style={font('caption')}>{statusText}</span>
+          <button className="browser-reconnect" disabled={busy !== null} onClick={running ? restart : start}>
+            {running ? 'Reconnect' : 'Start'}
+          </button>
+        </div>
+      ) : null}
       <div className="browser-view" ref={view} tabIndex={0} onKeyDown={onKeyDown} role="application" aria-label={`${bot.name}'s browser`}>
         {frame ? (
           <img className="browser-frame" src={frameSrc(frame)} alt="" draggable={false} onClick={(e) => user && void perform((b) => { const at = point(e, e.currentTarget); return b.click(at.x, at.y) })} onWheel={onFrameWheel} />
         ) : (
-          <div className="browser-blank" style={font('footnote')}>
+          <div className="browser-blank">
             {busy === 'start' || busy === 'restart' ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Spinner size={13} /> Starting {engineName(engine)}…
-              </span>
+              <>
+                <Spinner size={26} />
+                <span style={{ ...font('footnote'), color: 'var(--secondary)' }}>Starting {engineName(engine)}…</span>
+              </>
+            ) : running ? (
+              <>
+                <Spinner size={26} />
+                <span style={{ ...font('footnote'), color: 'var(--secondary)' }}>Reconnecting…</span>
+              </>
             ) : (
-              <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                {running ? 'No page yet.' : `${engineName(engine)} is not running.`}
+              <>
+                <Icon name="safari" size={26} color="var(--tertiary)" />
+                <span style={{ ...font('footnote'), color: 'var(--secondary)' }}>{engineName(engine)} is not running.</span>
                 <button className="browser-start" onClick={start} disabled={busy !== null}>
                   <Icon name="play" size={11} weight="semibold" />
                   Start browser
                 </button>
-              </span>
+              </>
             )}
           </div>
         )}
@@ -288,33 +360,12 @@ export function BrowserTab({ bot, store, working }: { bot: Bot; store: BotStore;
           </button>
         )}
       </div>
-      <div className="browser-status" style={font('caption')}>
-        <span>{engineName(engine)}</span>
-        <span>·</span>
-        <span>{running ? 'running' : busy === 'stop' ? 'stopping' : 'stopped'}</span>
-        <span>·</span>
-        {user ? <span>You have control — {bot.name} can't act · releases in {state?.secondsLeft ?? 0}s</span> : botWorking && !watch ? <span>{bot.name} is working — watching</span> : running ? <span>{bot.name} is driving</span> : <span>Starts only when you ask{botWorking ? ' or the bot works here' : ''}</span>}
-        <span style={{ flex: 1 }} />
-        {running ? (
-          <button className="browser-restart" disabled={busy !== null} onClick={restart}>
-            Restart
-          </button>
-        ) : null}
-      </div>
-      {error ? <div className="browser-error" style={font('footnote')}>{error}</div> : null}
-    </>
+    </div>
   )
 
   return (
     <div className="browser-tab">
-      <div className="browser-owner">
-        <span style={{ ...font('caption'), color: 'var(--tertiary)' }}>Browser</span>
-        <span style={{ flex: 1 }} />
-        <button className="browser-stop" disabled={busy === 'stop'} title={`Close the browser and take the tools away from ${bot.name}. Its profile is kept.`} onClick={stopForBot}>
-          <Icon name="power" size={11} weight="semibold" />
-          Stop for {bot.name}
-        </button>
-      </div>
+      {switchRow}
       {expanded ? null : chrome}
       {expanded ? (
         <div className="browser-overlay" onClick={(e) => e.target === e.currentTarget && setExpanded(false)}>
