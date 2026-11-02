@@ -40,7 +40,8 @@ export const FRAME_HEIGHT = 800
 
 export const frameSrc = (frame: BrowserFrame) => `data:image/${frame.format};base64,${frame.data}`
 
-export const engineName = (engine: string | null | undefined) => (engine === 'firefox' ? 'Firefox' : 'Chrome')
+export const engineName = (engine: string | null | undefined) =>
+  engine === 'firefox' ? 'Firefox' : engine === 'lightpanda' ? 'Lightpanda' : 'Chrome'
 
 /** Typed calls for one bot's browser, over the store's host link. */
 export class BrowserClient {

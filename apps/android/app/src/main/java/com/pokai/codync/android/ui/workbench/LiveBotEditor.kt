@@ -619,10 +619,17 @@ fun LiveBotEditor(
                                     trailing = { CodyncSwitch(browser, onCheckedChange = { browser = it }) },
                                 )
                                 if (browser) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                        listOf("" to "Auto", "chrome" to "Chrome", "firefox" to "Firefox").forEach { (value, label) ->
-                                            FilterChip(label, browserEngine == value, onClick = { browserEngine = value })
-                                        }
+                                    // Lightpanda is only offered once the user has installed it on the computer.
+                                    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                        listOf("" to "Auto", "chrome" to "Chrome", "firefox" to "Firefox", "lightpanda" to "Lightpanda")
+                                            .chunked(2)
+                                            .forEach { row ->
+                                                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                                    row.forEach { (value, label) ->
+                                                        FilterChip(label, browserEngine == value, onClick = { browserEngine = value })
+                                                    }
+                                                }
+                                            }
                                     }
                                 }
                             }

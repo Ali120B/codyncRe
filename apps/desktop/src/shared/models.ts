@@ -44,9 +44,9 @@ export interface Bot {
   memberSettings?: Record<string, { browser: boolean; computer: boolean }>
   /** The bot can see and operate the computer's desktop. */
   computer: boolean
-  /** The bot gets its own headless browser (private Chrome/Firefox profile). */
+  /** The bot gets its own headless browser (private Chrome/Firefox/Lightpanda profile). */
   browser: boolean
-  /** Which browser engine it uses: empty picks automatically (`chrome` / `firefox` pin it). */
+  /** Which browser engine it uses: empty picks automatically (`chrome` / `firefox` / `lightpanda` pin it). */
   browserEngine: string
   autoName: boolean
   createdAt: number

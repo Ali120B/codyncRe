@@ -1,5 +1,5 @@
-//! Per-bot headless browsers: a bot with **Use a browser** on gets its own Chrome or Firefox
-//! profile under `~/.codync/browser/<bot>/`, the `browser` MCP tools drive it, and the
+//! Per-bot headless browsers: a bot with **Use a browser** on gets its own Chrome, Firefox or
+//! Lightpanda profile under `~/.codync/browser/<bot>/`, the `browser` MCP tools drive it, and the
 //! desktop's Computer panel can watch, take over and hand it back.
 
 mod chrome;
@@ -25,7 +25,7 @@ pub struct TabInfo {
     pub url: String,
 }
 
-/// A captured frame: JPEG from Chrome, PNG from Firefox.
+/// A captured frame: JPEG from Chrome, PNG from Firefox and Lightpanda.
 pub struct Screenshot {
     pub data: Vec<u8>,
     pub format: &'static str,
@@ -97,7 +97,7 @@ pub fn normalize_url(raw: &str) -> Result<String> {
 }
 
 /// The engine a bot's browser uses: its own choice when it made one, else the automatic pick.
-/// `CODYNC_BROWSER_ENGINE=chrome|firefox` overrides both (for testing or a box with both).
+/// `CODYNC_BROWSER_ENGINE=chrome|firefox|lightpanda` overrides both (for testing or a box with all).
 pub fn engine_for(preference: &str) -> Result<&'static str> {
     if let Ok(forced) = std::env::var("CODYNC_BROWSER_ENGINE")
         && !forced.is_empty()
@@ -113,8 +113,11 @@ pub fn engine_for(preference: &str) -> Result<&'static str> {
     if firefox::binary().is_some() {
         return Ok("firefox");
     }
+    if chrome::lightpanda_binary().is_some() {
+        return Ok("lightpanda");
+    }
     Err(anyhow!(
-        "No Chrome or Firefox found on this computer. Install Google Chrome (or Chromium, or Firefox) and try again."
+        "No Chrome, Firefox or Lightpanda found on this computer. Install Google Chrome (or Chromium), Firefox, or Lightpanda and try again."
     ))
 }
 
@@ -128,17 +131,24 @@ fn installed(engine: &str) -> Result<&'static str> {
     match engine {
         "chrome" if chrome::binary().is_some() => Ok("chrome"),
         "firefox" if firefox::binary().is_some() => Ok("firefox"),
+        "lightpanda" if chrome::lightpanda_binary().is_some() => Ok("lightpanda"),
         "chrome" => Err(anyhow!("Chrome isn't installed on this computer.")),
         "firefox" => Err(anyhow!("Firefox isn't installed on this computer.")),
-        other => Err(anyhow!("Unknown browser engine `{other}` (chrome or firefox).")),
+        "lightpanda" => Err(anyhow!("Lightpanda isn't installed on this computer.")),
+        other => Err(anyhow!("Unknown browser engine `{other}` (chrome, firefox or lightpanda).")),
     }
 }
 
-/// Picks the engine for a new session: Chrome when present (CDP covers every action), else Firefox.
+/// Picks the engine for a new session: Chrome when present (CDP covers every action), else Firefox,
+/// else the installed Lightpanda.
 pub(super) async fn launch_engine(profile_root: &Path, engine: &str) -> Result<(Engine, &'static str)> {
     match engine {
         "chrome" => Ok((Engine::Chrome(chrome::Chrome::launch(&profile_root.join("chrome")).await?), "chrome")),
         "firefox" => Ok((Engine::Firefox(firefox::Firefox::launch(&profile_root.join("firefox")).await?), "firefox")),
+        "lightpanda" => Ok((
+            Engine::Lightpanda(chrome::Chrome::launch_lightpanda(&profile_root.join("lightpanda")).await?),
+            "lightpanda",
+        )),
         other => Err(anyhow!("unknown browser engine `{other}`")),
     }
 }
@@ -147,96 +157,97 @@ pub(super) async fn launch_engine(profile_root: &Path, engine: &str) -> Result<(
 pub(super) enum Engine {
     Chrome(chrome::Chrome),
     Firefox(firefox::Firefox),
+    Lightpanda(chrome::Chrome),
 }
 
 impl Engine {
     pub(super) fn alive(&mut self) -> bool {
         match self {
-            Self::Chrome(c) => c.alive(),
+            Self::Chrome(c) | Self::Lightpanda(c) => c.alive(),
             Self::Firefox(f) => f.alive(),
         }
     }
 
     pub(super) fn stop(&mut self) {
         match self {
-            Self::Chrome(c) => c.stop(),
+            Self::Chrome(c) | Self::Lightpanda(c) => c.stop(),
             Self::Firefox(f) => f.stop(),
         }
     }
 
     pub(super) async fn list(&self) -> Result<Vec<TabInfo>> {
         match self {
-            Self::Chrome(c) => c.list().await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.list().await,
             Self::Firefox(f) => f.list().await,
         }
     }
 
     pub(super) async fn create(&self, url: &str) -> Result<TabInfo> {
         match self {
-            Self::Chrome(c) => c.create(url).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.create(url).await,
             Self::Firefox(f) => f.create(url).await,
         }
     }
 
     pub(super) async fn close(&self, id: &str) -> Result<()> {
         match self {
-            Self::Chrome(c) => c.close(id).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.close(id).await,
             Self::Firefox(f) => f.close(id).await,
         }
     }
 
     pub(super) async fn navigate(&self, id: &str, url: &str) -> Result<()> {
         match self {
-            Self::Chrome(c) => c.navigate(id, url).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.navigate(id, url).await,
             Self::Firefox(f) => f.navigate(id, url).await,
         }
     }
 
     pub(super) async fn reload(&self, id: &str) -> Result<()> {
         match self {
-            Self::Chrome(c) => c.reload(id).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.reload(id).await,
             Self::Firefox(f) => f.reload(id).await,
         }
     }
 
     pub(super) async fn screenshot(&self, id: &str) -> Result<Screenshot> {
         match self {
-            Self::Chrome(c) => c.screenshot(id).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.screenshot(id).await,
             Self::Firefox(f) => f.screenshot(id).await,
         }
     }
 
     pub(super) async fn click(&self, id: &str, x: f64, y: f64) -> Result<()> {
         match self {
-            Self::Chrome(c) => c.click(id, x, y).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.click(id, x, y).await,
             Self::Firefox(f) => f.click(id, x, y).await,
         }
     }
 
     pub(super) async fn type_text(&self, id: &str, text: &str) -> Result<()> {
         match self {
-            Self::Chrome(c) => c.type_text(id, text).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.type_text(id, text).await,
             Self::Firefox(f) => f.type_text(id, text).await,
         }
     }
 
     pub(super) async fn press(&self, id: &str, key: &str) -> Result<()> {
         match self {
-            Self::Chrome(c) => c.press(id, key).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.press(id, key).await,
             Self::Firefox(f) => f.press(id, key).await,
         }
     }
 
     pub(super) async fn scroll(&self, id: &str, x: f64, y: f64, delta_y: f64) -> Result<()> {
         match self {
-            Self::Chrome(c) => c.scroll(id, x, y, delta_y).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.scroll(id, x, y, delta_y).await,
             Self::Firefox(f) => f.scroll(id, x, y, delta_y).await,
         }
     }
 
     pub(super) async fn evaluate(&self, id: &str, js: &str) -> Result<serde_json::Value> {
         match self {
-            Self::Chrome(c) => c.evaluate(id, js).await,
+            Self::Chrome(c) | Self::Lightpanda(c) => c.evaluate(id, js).await,
             Self::Firefox(f) => f.evaluate(id, js).await,
         }
     }

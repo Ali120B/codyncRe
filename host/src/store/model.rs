@@ -134,12 +134,12 @@ pub struct BotConfig {
     /// The bot gets the built-in `computer` MCP server (see `screen`).
     #[serde(default)]
     pub computer: bool,
-    /// The bot gets the built-in `browser` MCP server: its own headless Chrome/Firefox with
-    /// its own profile (see `browser`).
+    /// The bot gets the built-in `browser` MCP server: its own headless Chrome/Firefox/Lightpanda
+    /// with its own profile (see `browser`).
     #[serde(default)]
     pub browser: bool,
-    /// Which engine the bot's browser uses: empty picks automatically (Chrome, else Firefox);
-    /// `chrome` / `firefox` pin it.
+    /// Which engine the bot's browser uses: empty picks automatically (Chrome, then Firefox,
+    /// then Lightpanda); `chrome` / `firefox` / `lightpanda` pin it.
     #[serde(default)]
     pub browser_engine: String,
     /// Created without a name: the host names it from its first conversations (see `naming`)

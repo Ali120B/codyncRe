@@ -349,13 +349,14 @@ function BotSettingsForm({ draft, onChange, error, plugins, opened, onDeleted }:
             onChange={(on) => set('browser', on)}
           />
           {draft.browser ? (
-            <ValueRow label="Browser" detail="Which browser this bot runs. Automatic picks Chrome when it's installed, then Firefox.">
+            <ValueRow label="Browser" detail="Which browser this bot runs. Automatic picks Chrome when it's installed, then Firefox, then Lightpanda. Lightpanda must already be installed on this computer.">
               <ChoicePicker
                 selection={draft.browserEngine ?? ''}
                 options={[
                   { id: '', label: 'Automatic' },
                   { id: 'chrome', label: 'Chrome' },
                   { id: 'firefox', label: 'Firefox' },
+                  { id: 'lightpanda', label: 'Lightpanda' },
                 ]}
                 onChange={(id) => set('browserEngine', id)}
               />

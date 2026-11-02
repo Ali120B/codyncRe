@@ -27,12 +27,19 @@ pub fn binary() -> Option<PathBuf> {
         .find_map(crate::agent::backends::which)
 }
 
-/// Headless Chrome with its own profile under `profile`.
+/// Lightpanda on this computer (the user installs it themselves).
+pub fn lightpanda_binary() -> Option<PathBuf> {
+    crate::agent::backends::which("lightpanda")
+}
+
+/// Headless Chrome with its own profile under `profile`, or a Lightpanda CDP server.
 pub struct Chrome {
     child: tokio::process::Child,
     cdp: Cdp,
     /// targetId -> attached sessionId.
     attachments: Mutex<HashMap<String, String>>,
+    /// Lightpanda renders PNG only; Chrome's frames are JPEG.
+    png: bool,
 }
 
 impl Chrome {
@@ -66,9 +73,31 @@ impl Chrome {
             .kill_on_drop(true)
             .spawn()
             .with_context(|| format!("starting {}", bin.display()))?;
-        let mut chrome = Self { child, cdp: Cdp::detached(), attachments: Mutex::new(HashMap::new()) };
+        let mut chrome =
+            Self { child, cdp: Cdp::detached(), attachments: Mutex::new(HashMap::new()), png: false };
         chrome.cdp = Cdp::connect(&wait_for_ws(&active_port, &mut chrome.child).await?).await?;
         Ok(chrome)
+    }
+
+    /// Lightpanda speaks the same CDP over `lightpanda serve`; it has no profile flag, and the
+    /// server binds a free local port. Everything else (tabs, input, evaluate) is shared.
+    pub async fn launch_lightpanda(_profile: &Path) -> Result<Self> {
+        let bin = lightpanda_binary().ok_or_else(|| anyhow!("Lightpanda isn't installed on this computer"))?;
+        let port = free_port()?;
+        let child = tokio::process::Command::new(&bin)
+            .args(["serve", "--host", "127.0.0.1", "--port", &port.to_string()])
+            .args(["--log-level", "error", "--disable-metrics"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .with_context(|| format!("starting {}", bin.display()))?;
+        let mut lightpanda =
+            Self { child, cdp: Cdp::detached(), attachments: Mutex::new(HashMap::new()), png: true };
+        wait_for_lightpanda(port, &mut lightpanda.child).await?;
+        lightpanda.cdp = Cdp::connect(&format!("ws://127.0.0.1:{port}/")).await?;
+        Ok(lightpanda)
     }
 
     pub fn alive(&mut self) -> bool {
@@ -149,13 +178,17 @@ impl Chrome {
 
     pub async fn screenshot(&self, id: &str) -> Result<Screenshot> {
         let session = self.session(id).await?;
-        let res =
-            self.cdp.send("Page.captureScreenshot", json!({"format": "jpeg", "quality": 70}), Some(&session)).await?;
+        let (format, params) = if self.png {
+            ("png", json!({"format": "png"}))
+        } else {
+            ("jpeg", json!({"format": "jpeg", "quality": 70}))
+        };
+        let res = self.cdp.send("Page.captureScreenshot", params, Some(&session)).await?;
         let data = base64::Engine::decode(
             &base64::engine::general_purpose::STANDARD,
-            res["data"].as_str().ok_or_else(|| anyhow!("Chrome sent no frame"))?,
+            res["data"].as_str().ok_or_else(|| anyhow!("The browser sent no frame"))?,
         )?;
-        Ok(Screenshot { data, format: "jpeg" })
+        Ok(Screenshot { data, format })
     }
 
     pub async fn click(&self, id: &str, x: f64, y: f64) -> Result<()> {
@@ -246,6 +279,32 @@ fn key_codes(key: &str) -> Result<(&'static str, &'static str, i64)> {
             "unsupported key `{other}` (Enter, Tab, Escape, Backspace, Delete, arrows, PageUp/Down, Home, End, space)"
         ),
     })
+}
+
+/// A local port for Lightpanda's CDP server (it cannot pick 0 itself).
+fn free_port() -> Result<u16> {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").context("finding a port for Lightpanda")?;
+    Ok(listener.local_addr()?.port())
+}
+
+/// Waits for Lightpanda's `/json/version` to answer, then the WebSocket is ready.
+async fn wait_for_lightpanda(port: u16, child: &mut tokio::process::Child) -> Result<()> {
+    let deadline = tokio::time::Instant::now() + LAUNCH_TIMEOUT;
+    let url = format!("http://127.0.0.1:{port}/json/version");
+    loop {
+        if let Ok(response) = reqwest::get(&url).await
+            && response.status().is_success()
+        {
+            return Ok(());
+        }
+        if let Ok(Some(status)) = child.try_wait() {
+            bail!("Lightpanda exited while starting ({status})");
+        }
+        if tokio::time::Instant::now() > deadline {
+            bail!("Lightpanda didn't start within {} s", LAUNCH_TIMEOUT.as_secs());
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }
 
 /// Waits for Chrome to write `DevToolsActivePort` (port on line 1, WebSocket path on line 2).
