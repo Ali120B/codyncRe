@@ -7,9 +7,6 @@
 **The open-source Grok Bot alternative.**<br>
 Your coding agents, as teammates you can message.
 
-> **Fork note** — this is [Ali120B](https://github.com/Ali120B)'s fork of [Codync](https://github.com/leepokai/Codync).
-> Builds, releases and app updates come from [Ali120B/codyncRe](https://github.com/Ali120B/codyncRe/releases);
-> the Android phone app, optional account sign-in and the wired-in cloud relay are upstream's for now.
 
 
 [![Star Codync on GitHub](https://img.shields.io/github/stars/Ali120B/codyncRe?style=social&label=Star)](https://github.com/Ali120B/codyncRe/stargazers)<br>
