@@ -44,6 +44,8 @@ data class Bot(
     val workingChat: String? = null,
     val workingThread: String? = null,
     val unread: Int = 0,
+    /** The chat last written to (`main` or a chat root id), shared by every device. */
+    val latestChat: String = "main",
     val lastMessage: String? = null,
     val lastAt: Long = 0,
 )

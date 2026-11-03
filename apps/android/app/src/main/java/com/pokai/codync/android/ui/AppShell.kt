@@ -169,7 +169,7 @@ fun TabsScreen(
                 )
                 AppTab.Needs -> LiveNeedsScreen(
                     session = session,
-                    onOpenChat = { botId -> onOpenChat(botId, "main", null) },
+                    onOpenChat = { botId -> onOpenChat(botId, session.latestChatFor(botId), null) },
                 )
                 AppTab.Settings -> SettingsScreen(
                     session = session,

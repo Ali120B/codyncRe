@@ -20,7 +20,14 @@ impl Hub {
         } else {
             self.runtime.locked().get(&cfg.id).cloned().unwrap_or_default()
         };
-        let last = self.store.last_message(&cfg.id);
+        // The chat last written to; every device follows it to show the same conversation.
+        let latest = self.store.latest_chat(&cfg.id);
+        // The roster previews that chat's last line, like the open conversation does.
+        let last = if latest == "main" {
+            self.store.last_message(&cfg.id)
+        } else {
+            self.store.last_message_in(&cfg.id, Some(&latest)).or_else(|| self.store.last_message(&cfg.id))
+        };
         v["rev"] = row.rev.into();
         v["deleted"] = row.deleted.into();
         v["status"] = json!(rt.status);
@@ -31,6 +38,7 @@ impl Hub {
         v["fastModeIssue"] = rt.fast_mode.issue().into();
         v["workingThread"] = rt.lane.and_then(|l| l.thread).into();
         v["unread"] = self.store.unread(&cfg.id, row.read_rev, ReadScope::All).into();
+        v["latestChat"] = latest.into();
         let preview = last.as_ref().map(|l| match &l.author {
             // A group names who spoke.
             Some(author) if cfg.is_group() => format!("{}: {}", self.bot_name(author), l.text),

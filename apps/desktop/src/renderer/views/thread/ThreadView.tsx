@@ -135,6 +135,19 @@ export function ThreadView({ botId, openPlugins }: { botId: string; openPlugins?
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newChatRoot])
 
+  // The latest chat is shared: a message sent on another device switches this one to that
+  // chat too, unless this device is already in it or the user just started a new chat here.
+  const latestChat = bot?.latestChat ?? 'main'
+  const pendingNewChat = store.pendingNewChat.has(botId) || store.newChatRoot.has(botId)
+  useEffect(() => {
+    // Starting a chat here is a deliberate choice the host's latest chat hasn't seen yet.
+    if (pendingNewChat) return
+    if (latestChat === activeChat) return
+    if (latestChat !== 'main' && !chats.some((chat) => chat.id === latestChat)) return
+    setActiveChat(latestChat)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestChat, pendingNewChat])
+
   // The agent names a chat in the background; while the panel is open, keep pulling names
   // in until every chat has one (or two minutes pass).
   const unnamedChats = chats.some((chat) => !store.chatTitles.get(botId)?.[chat.id])

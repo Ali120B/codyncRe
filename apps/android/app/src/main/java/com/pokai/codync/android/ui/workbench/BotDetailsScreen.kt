@@ -349,7 +349,7 @@ private fun BotDetailsPanel(
                             if (member != null) {
                                 SectionCard {
                                     Row(
-                                        Modifier.fillMaxWidth().clickable { onOpenChat(member.id, "main") }.padding(horizontal = 14.dp, vertical = 10.dp),
+                                        Modifier.fillMaxWidth().clickable { onOpenChat(member.id, session.latestChatFor(member.id)) }.padding(horizontal = 14.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         com.pokai.codync.design.CharacterAvatar(member.name, member.avatarColor, member.avatarShape, size = 38.dp)
@@ -381,7 +381,7 @@ private fun BotDetailsPanel(
                                 title = "Open conversation",
                                 subtitle = current.lastMessage ?: "Continue with ${current.name}",
                                 icon = CodyncIcons.Chat,
-                                onClick = { onOpenChat(current.id, "main") },
+                                onClick = { onOpenChat(current.id, session.latestChatFor(current.id)) },
                             )
                         }
                     }

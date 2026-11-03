@@ -377,6 +377,14 @@ impl Hub {
         self.bot_value(id).unwrap_or(Value::Null)
     }
 
+    /// The chat a thread root lives in: the root's own chat, or `main` for the first chat.
+    pub fn chat_of(&self, bot: &str, root: &str) -> String {
+        self.store
+            .entry(root)
+            .filter(|e| e.bot_id == bot && e.data["chat"] == true)
+            .map_or_else(|| "main".to_owned(), |e| e.id)
+    }
+
     fn bot_value(&self, id: &str) -> Option<Value> {
         self.store.bot(id).ok().flatten().map(|r| self.bot_json(&r))
     }

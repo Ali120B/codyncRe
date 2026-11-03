@@ -201,6 +201,23 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
             if let Err(error) = hub.mark_read(bot, scope) {
                 tracing::warn!(%error, bot, "couldn't mark bot read after send");
             }
+            // The chat that just got a message is the latest one on every device. A thread
+            // reply stays in the chat that owns its root.
+            let chat = if new_chat {
+                e.id.clone()
+            } else {
+                match lane.thread.as_deref() {
+                    None => "main".to_owned(),
+                    Some(root) => hub.chat_of(bot, root),
+                }
+            };
+            if hub.store.latest_chat(bot) != chat {
+                if let Err(error) = hub.store.set_latest_chat(bot, &chat) {
+                    tracing::warn!(%error, bot, "couldn't remember the latest chat");
+                }
+                // Every other device follows the chat the message landed in.
+                hub.emit_bot(bot);
+            }
             let turn_lane = if new_chat { Lane { chat: bot.to_owned(), thread: Some(e.id.clone()) } } else { lane };
             let main_chat = turn_lane.thread.is_none();
             if row.config.is_group() {
@@ -256,6 +273,10 @@ pub(super) async fn call(hub: &Arc<Hub>, method: &str, b: Value) -> Result<Contr
                 bail!("not a chat");
             }
             hub.store.delete_chat(bot, chat)?;
+            // The deleted chat can't stay the one every device opens.
+            if hub.store.latest_chat(bot) == chat {
+                let _ = hub.store.set_latest_chat(bot, "main");
+            }
             // Other devices drop the rows without waiting for a reload.
             let _ = hub.events.send(json!({"type": "chatDeleted", "botId": bot, "chatId": chat}));
             // Refresh the roster's last-message preview on every connected client.

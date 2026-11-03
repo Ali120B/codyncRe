@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,6 +77,8 @@ private object HomeFilterState {
     var filter: HomeFilter = HomeFilter.All
     var selectedComputerId: String? = null
     var collapsedComputers: Set<String> = emptySet()
+    /** One list state for the app's lifetime, so coming back from a chat lands where you left. */
+    val rosterScroll: LazyListState = LazyListState()
 }
 
 @Composable
@@ -107,6 +110,8 @@ fun LiveBotsScreen(
     var filterMenuOpen by remember { mutableStateOf(false) }
     var botsExpanded by rememberSaveable { mutableStateOf(true) }
     var groupsExpanded by rememberSaveable { mutableStateOf(true) }
+    // The chat a tap opens is the one last written to on any device (`latestChat`).
+    val latestChat: (Bot) -> String = { bot -> session.latestChatFor(bot.id) }
 
     LaunchedEffect(computers) {
         // The computers flow starts empty on every remount, so only drop a selection once the
@@ -274,6 +279,7 @@ fun LiveBotsScreen(
             )
         } else {
             LazyColumn(
+                state = HomeFilterState.rosterScroll,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(
                     start = 16.dp,
@@ -293,6 +299,7 @@ fun LiveBotsScreen(
                                 name = computer?.name ?: "Other computers",
                                 connection = computer?.let { connections[it.id] },
                                 count = bots.size,
+                                unread = bots.sumOf { it.unread },
                                 expanded = expanded,
                                 onToggle = {
                                     collapsedComputers =
@@ -301,16 +308,16 @@ fun LiveBotsScreen(
                             )
                         }
                         if (expanded) {
-                            rosterItems(bots, hostBots, onOpenChat, onOpenBotDetails, keyPrefix = "computer_$computerId")
+                            rosterItems(bots, hostBots, onOpenChat, onOpenBotDetails, latestChat, keyPrefix = "computer_$computerId")
                         }
                     }
                 } else {
                     val groups = visible.filter { it.kind == "group" }.sortedByDescending { it.lastAt }
                     val singles = visible.filter { it.kind != "group" }.sortedByDescending { it.lastAt }
                     item { CollapsibleHeader("BOTS", singles.size, botsExpanded) { botsExpanded = !botsExpanded } }
-                    if (botsExpanded) rosterItems(singles, hostBots, onOpenChat, onOpenBotDetails, keyPrefix = "bot")
+                    if (botsExpanded) rosterItems(singles, hostBots, onOpenChat, onOpenBotDetails, latestChat, keyPrefix = "bot")
                     item { CollapsibleHeader("GROUPS", groups.size, groupsExpanded) { groupsExpanded = !groupsExpanded } }
-                    if (groupsExpanded) rosterItems(groups, hostBots, onOpenChat, onOpenBotDetails, keyPrefix = "group")
+                    if (groupsExpanded) rosterItems(groups, hostBots, onOpenChat, onOpenBotDetails, latestChat, keyPrefix = "group")
                 }
             }
         }
@@ -335,6 +342,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.rosterItems(
     roster: List<Bot>,
     onOpenChat: (String, String) -> Unit,
     onOpenBotDetails: (String) -> Unit,
+    latestChat: (Bot) -> String,
     keyPrefix: String,
 ) {
     items(bots, key = { "${keyPrefix}_${it.id}" }) { bot ->
@@ -342,7 +350,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.rosterItems(
             BotRosterRow(
                 bot = bot,
                 roster = roster,
-                onOpenChat = { onOpenChat(bot.id, "main") },
+                // Open the chat last written to on any device, not always the main one.
+                onOpenChat = { onOpenChat(bot.id, latestChat(bot)) },
                 onOpenDetails = { onOpenBotDetails(bot.id) },
             )
         }
@@ -411,6 +420,7 @@ private fun ComputerSectionHeader(
     name: String,
     connection: ConnectionState?,
     count: Int,
+    unread: Int,
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
@@ -431,6 +441,16 @@ private fun ComputerSectionHeader(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        if (unread > 0) {
+            Text(
+                "$unread",
+                color = colors.onAccent,
+                style = CodyncType.caption,
+                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(colors.accentFill)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+        }
         Text("$count", color = colors.tertiary, style = CodyncType.caption)
         Spacer(Modifier.width(6.dp))
         CodyncIcon(

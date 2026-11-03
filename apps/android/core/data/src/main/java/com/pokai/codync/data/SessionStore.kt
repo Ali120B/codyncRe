@@ -159,6 +159,44 @@ class SessionStore(
     fun computerIdForBot(botId: String): String? =
         snapshot.value.botComputers[botId]
 
+    /** The chat last written to on any device, as a flow, so an open chat can follow it. */
+    fun latestChat(botId: String): Flow<String> = snapshot
+        .map { state -> state.bots.firstOrNull { it.id == botId }?.latestChat?.takeIf(String::isNotBlank) ?: "main" }
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.Default)
+
+    /** Whether this chat root is in the mirror already (a new chat's root arrives by event). */
+    fun hasChat(botId: String, chatId: String): Boolean =
+        chatId == "main" || snapshot.value.entriesByBot[botId].orEmpty().any { it.id == chatId && it.data.chat == true }
+
+    /**
+     * The chat an entry belongs to: a chat root is its own chat, a thread reply lives in the
+     * chat that owns its root, and anything else is the main chat. Host chat titles can name a
+     * thread root as if it were a chat, so opening a listed row goes through here.
+     */
+    fun chatOf(botId: String, entryId: String): String {
+        if (entryId == "main" || entryId == "new" || entryId.isBlank()) return entryId
+        val entries = snapshot.value.entriesByBot[botId].orEmpty()
+        val entry = entries.firstOrNull { it.id == entryId } ?: return "main"
+        if (entry.data.chat == true) return entry.id
+        val root = entry.threadId?.let { rootId -> entries.firstOrNull { it.id == rootId } }
+        return if (root?.data?.chat == true) root.id else "main"
+    }
+
+    /**
+     * The chat a tap on this bot/group should open: the one last written to on any device
+     * (`latestChat`), not always the main chat. `main` when the host hasn't said yet.
+     */
+    fun latestChatFor(botId: String): String {
+        val bot = snapshot.value.bots.firstOrNull { it.id == botId }
+        val latest = bot?.latestChat?.takeIf { it.isNotBlank() } ?: return "main"
+        if (latest == "main") return "main"
+        val known = snapshot.value.entriesByBot[botId].orEmpty()
+        // A chat that was deleted elsewhere falls back to the main chat.
+        val exists = known.any { it.id == latest && it.data.chat == true }
+        return if (exists) latest else "main"
+    }
+
     fun computerForBot(botId: String): Computer? =
         computerIdForBot(botId)?.let { id -> snapshot.value.computers.firstOrNull { it.id == id } }
 

@@ -57,6 +57,8 @@ export interface Bot {
   workingChat?: string | null
   workingThread?: string | null
   unread: number
+  /** The chat last written to (`main` or a chat root id), shared by every device. */
+  latestChat?: string
   lastMessage?: string | null
   lastAt: number
 }
@@ -104,6 +106,7 @@ export function normalizeBot(raw: Partial<Bot> & { id: string }): Bot {
     workingChat: raw.workingChat ?? null,
     workingThread: raw.workingThread ?? null,
     unread: raw.unread ?? 0,
+    latestChat: raw.latestChat ?? 'main',
     lastMessage: raw.lastMessage ?? null,
     lastAt: raw.lastAt ?? createdAt,
   }

@@ -117,10 +117,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -184,6 +186,21 @@ fun LiveChatScreen(
         if (showChats && connection.kind != com.pokai.codync.transport.TransportKind.Offline) {
             session.loadChatTitles(botId)
         }
+    }
+    // The latest chat is shared: a message sent on another device switches this one to that
+    // chat too, unless this screen is already showing it or the user is starting a new chat.
+    // Only a change is followed, so a notification deep link still lands where it points.
+    val latestChat by remember(botId) { session.latestChat(botId) }.collectAsState(initial = "main")
+    var seenLatestChat by remember(botId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(botId, latestChat, startingNewChat) {
+        val previous = seenLatestChat
+        seenLatestChat = latestChat
+        if (previous == null || previous == latestChat || startingNewChat || latestChat == chatId) return@LaunchedEffect
+        // A new chat's root arrives on the events stream a moment after the send.
+        withTimeoutOrNull(5_000) {
+            while (!session.hasChat(botId, latestChat)) delay(120)
+        }
+        if (session.hasChat(botId, latestChat)) onOpenChat(botId, latestChat)
     }
     val chatRoomMode = rootEntry?.data?.chat == true
     val threadMode = chatId.isNotBlank() && chatId != "main" && chatId != "new" && !chatRoomMode
@@ -1108,7 +1125,8 @@ fun LiveChatScreen(
                                         showChats = false
                                         scope.launch {
                                             if (row.id != "main") session.ensureEntry(botId, row.id)
-                                            onOpenChat(botId, row.id)
+                                            // A listed row can be a thread root: open its chat.
+                                            onOpenChat(botId, session.chatOf(botId, row.id))
                                         }
                                     },
                                 )

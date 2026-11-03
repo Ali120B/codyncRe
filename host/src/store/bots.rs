@@ -84,6 +84,7 @@ impl Store {
         c.execute("DELETE FROM entries WHERE bot_id = ?1", [id])?;
         // Lane state (see `lane_key`) it owned, or that bots kept in it.
         c.execute("DELETE FROM kv WHERE k GLOB ?1 OR k GLOB ?2", [format!("lane.*.{id}@*"), format!("lane.*@{id}*")])?;
+        c.execute("DELETE FROM kv WHERE k = ?1", [format!("latest.{id}")])?;
         // ponytail: snapshots of replaced sessions stay until the bot goes; prune by session if kv grows.
         c.execute(
             "DELETE FROM kv WHERE k GLOB ?1 OR k GLOB ?2",
@@ -177,45 +178,109 @@ impl Store {
         logged("unread roots", roots).unwrap_or_default()
     }
 
+    /// The chat the bot/group was last active in (`main` or a chat root id), shared by every
+    /// device: sending in a chat makes it the latest everywhere. Falls back to `main`.
+    pub fn latest_chat(&self, id: &str) -> String {
+        self.kv_get(&format!("latest.{id}")).filter(|chat| !chat.is_empty()).unwrap_or_else(|| "main".to_owned())
+    }
+
+    /// Remembers the latest chat after a message lands in it.
+    pub fn set_latest_chat(&self, id: &str, chat: &str) -> Result<()> {
+        self.kv_set(&format!("latest.{id}"), chat)
+    }
+
     /// Newest chat-visible line in the main chat for the roster preview, with its author
     /// (`None` for the user; a group reply names the bot that wrote it).
     pub fn last_message(&self, id: &str) -> Option<LastMessage> {
+        self.last_message_in(id, None)
+    }
+
+    /// Newest chat-visible line of one chat: `None` is the main chat, a chat root id is that
+    /// chat (its root plus the replies it owns). Threads are not chats.
+    pub fn last_message_in(&self, id: &str, chat: Option<&str>) -> Option<LastMessage> {
         let c = self.db.locked();
-        let row = c.query_row(
-            "SELECT kind, data, updated_at FROM entries WHERE bot_id = ?1 AND thread_id IS NULL AND
-               (kind = 'user' OR (kind = 'agent' AND json_extract(data, '$.final') = 1))
-             ORDER BY seq DESC LIMIT 1",
-            [id],
-            |r| {
-                let kind: String = r.get(0)?;
-                let data: String = r.get(1)?;
-                let at: i64 = r.get(2)?;
-                let data = serde_json::from_str::<Value>(&data).unwrap_or_default();
-                let mut text = data["text"].as_str().unwrap_or_default().to_owned();
-                // A files-only message previews as its file names.
-                if text.is_empty() {
-                    let names: Vec<&str> = data["attachments"]
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|a| a["name"].as_str())
-                        .collect();
-                    text = names.join(", ");
-                }
-                let author =
-                    (kind != EntryKind::User.as_str()).then(|| data["author"].as_str().unwrap_or(id).to_owned());
-                Ok(LastMessage { text, at, author })
-            },
-        );
+        let row = match chat {
+            // The main chat, without the roots of the other chats.
+            None => c.query_row(
+                "SELECT kind, data, updated_at FROM entries WHERE bot_id = ?1 AND thread_id IS NULL AND
+                   json_extract(data, '$.chat') IS NOT 1 AND
+                   (kind = 'user' OR (kind = 'agent' AND json_extract(data, '$.final') = 1))
+                 ORDER BY seq DESC LIMIT 1",
+                [id],
+                |r| read_last(r, id),
+            ),
+            Some(root) => c.query_row(
+                "SELECT kind, data, updated_at FROM entries WHERE bot_id = ?1 AND
+                   (id = ?2 OR thread_id = ?2) AND
+                   (kind = 'user' OR (kind = 'agent' AND json_extract(data, '$.final') = 1))
+                 ORDER BY seq DESC LIMIT 1",
+                params![id, root],
+                |r| read_last(r, id),
+            ),
+        };
         logged("last message", row.optional()).flatten()
     }
+}
+
+/// Reads one chat-visible row into its roster preview (author `None` for the user).
+fn read_last(r: &rusqlite::Row<'_>, id: &str) -> rusqlite::Result<LastMessage> {
+    let kind: String = r.get(0)?;
+    let data: String = r.get(1)?;
+    let at: i64 = r.get(2)?;
+    let data = serde_json::from_str::<Value>(&data).unwrap_or_default();
+    let mut text = data["text"].as_str().unwrap_or_default().to_owned();
+    // A files-only message previews as its file names.
+    if text.is_empty() {
+        let names: Vec<&str> = data["attachments"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|a| a["name"].as_str())
+            .collect();
+        text = names.join(", ");
+    }
+    let author = (kind != EntryKind::User.as_str()).then(|| data["author"].as_str().unwrap_or(id).to_owned());
+    Ok(LastMessage { text, at, author })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::store::model::{BotKind, EntryKind, Lane, Permission};
+    use crate::store::tests::test_bot;
     use crate::store::tests::temp_store;
+
+    #[test]
+    fn latest_chat_defaults_to_main_and_follows_sends() {
+        let s = temp_store();
+        assert_eq!(s.latest_chat("b1"), "main");
+        s.set_latest_chat("b1", "chat-1").unwrap();
+        assert_eq!(s.latest_chat("b1"), "chat-1");
+        // Another bot keeps its own.
+        assert_eq!(s.latest_chat("b2"), "main");
+        s.set_latest_chat("b1", "").unwrap();
+        assert_eq!(s.latest_chat("b1"), "main", "an empty value falls back to the main chat");
+    }
+
+    #[test]
+    fn last_message_in_reads_one_chat() {
+        let s = temp_store();
+        let bot = s.save_bot(&test_bot("b1", "One")).unwrap();
+        assert!(bot > 0);
+        let main = Lane::main("b1");
+        let chat = Lane { chat: "b1".into(), thread: Some("root-1".into()) };
+        s.insert_entry(&main, EntryKind::User, 1, &serde_json::json!({"text": "main line"})).unwrap();
+        s.insert_entry(
+            &Lane { chat: "b1".into(), thread: None },
+            EntryKind::User,
+            2,
+            &serde_json::json!({"text": "chat root", "chat": true}),
+        )
+        .unwrap();
+        s.insert_entry(&chat, EntryKind::User, 3, &serde_json::json!({"text": "in the chat"})).unwrap();
+        assert_eq!(s.last_message_in("b1", None).unwrap().text, "main line");
+        assert_eq!(s.last_message_in("b1", Some("root-1")).unwrap().text, "in the chat");
+    }
 
     #[test]
     fn thread_models_pin_and_clear() {

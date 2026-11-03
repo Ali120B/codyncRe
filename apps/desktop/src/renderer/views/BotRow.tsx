@@ -74,26 +74,12 @@ function Preview({ bot, store }: { bot: Bot; store: BotStore }) {
     )
   }
   if (bot.status === 'error') return <span style={{ ...line, color: 'var(--danger)' }}>{messagePreview(bot.lastMessage ?? 'Something went wrong')}</span>
-  const last = openChatPreview(bot, store) ?? bot.lastMessage
-  return <span style={{ ...line, color: 'var(--secondary)' }}>{messagePreview(last ?? (isGroup(bot) ? `${bot.members.length} bots` : `${store.backendName(bot.backend)} · ${folderName(bot)}`))}</span>
-}
-
-/** The last line of the chat this bot has open, if it isn't the first chat. */
-function openChatPreview(bot: Bot, store: BotStore): string | null {
-  const chat = store.openChats.get(bot.id) ?? localStorage.getItem(`chat.${bot.id}`)
-  if (!chat || chat === 'main') return null
-  const last = store
-    .allEntries(bot.id)
-    .filter((e) => e.id === chat || e.threadId === chat)
-    .filter((e) => e.kind === 'user' || (e.kind === 'agent' && e.data.final === true))
-    .sort((a, b) => a.seq - b.seq)
-    .at(-1)
-  if (!last) return null
-  const text = (last.data.text ?? '').replace(/\s+/g, ' ').trim()
-  if (!text) {
-    const file = last.data.files?.[0] ?? last.data.attachments?.[0]
-    return file ? file.name : null
-  }
-  if (last.kind === 'user') return `You: ${text}`
-  return isGroup(bot) ? `${store.authorName(last.data.author)}: ${text}` : text
+  // The host previews the latest chat's last line, the same one every device opens. It already
+  // carries the "You:" / author prefix, so only the first line is shortened here.
+  const last = bot.lastMessage
+  return (
+    <span style={{ ...line, color: 'var(--secondary)' }}>
+      {last ? messagePreview(last) : isGroup(bot) ? `${bot.members.length} bots` : `${store.backendName(bot.backend)} · ${folderName(bot)}`}
+    </span>
+  )
 }
