@@ -772,8 +772,10 @@ fun LiveChatScreen(
                             // Scroll to whatever the list currently ends at: the item count can
                             // change between the tap and the animation, and an out-of-range index
                             // crashes the lazy list mid-scroll.
-                            val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                            scope.launch { listState.animateScrollToItem(target) }
+                            val total = listState.layoutInfo.totalItemsCount
+                            if (total <= 0) return@GlassIconButton
+                            val target = (total - 1).coerceAtLeast(0)
+                            scope.launch { runCatching { listState.animateScrollToItem(target) } }
                         },
                     )
                 }

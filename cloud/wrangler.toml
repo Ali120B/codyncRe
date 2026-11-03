@@ -16,7 +16,7 @@ CLERK_ISSUER = "https://clerk.codync.dev"
 [[d1_databases]]
 binding = "DB"
 database_name = "codync"
-database_id = "858f4ad9-d3b5-4f3b-860f-464803a00017"
+database_id = "ae67a3f6-a66f-48ac-bdcb-8c3d934930cb"
 migrations_dir = "migrations"
 
 [[durable_objects.bindings]]
