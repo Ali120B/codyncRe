@@ -235,7 +235,11 @@ fun LiveChatScreen(
     val scope = remember { kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate) }
     DisposableEffect(Unit) { onDispose { scope.cancel() } }
     var initialScrollDone by remember(botId, chatId) { mutableStateOf(false) }
-    val finalListItemIndex = entries.lastIndex + if (threadMode && rootEntry != null) 1 else 0
+    // The list is built from visibleEntries (which the find bar narrows), so the jump target has
+    // to be measured in that index space or scrolling can land past the end.
+    val finalListItemIndex = visibleEntries.lastIndex +
+        (if (threadMode && rootEntry != null) 1 else 0) +
+        (if (showFind) 1 else 0)
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     LaunchedEffect(imeBottom) {
         if (imeBottom > 0 && nearLatest) {
@@ -318,10 +322,11 @@ fun LiveChatScreen(
     LaunchedEffect(pendingMessageJump, entries.size) {
         val target = pendingMessageJump ?: return@LaunchedEffect
         session.ensureEntry(botId, target)
-        val index = entries.indexOfFirst { it.id == target }
+        val index = visibleEntries.indexOfFirst { it.id == target }
         if (index >= 0) {
             val rootOffset = if (threadMode && rootEntry != null) 1 else 0
-            listState.scrollToItem(index + rootOffset)
+            val findBarOffset = if (showFind) 1 else 0
+            listState.scrollToItem(index + rootOffset + findBarOffset)
             pendingMessageJump = null
         }
     }
@@ -736,7 +741,7 @@ fun LiveChatScreen(
                 }
             }
             }
-            if (entries.isNotEmpty() && !nearLatest) {
+            if (visibleEntries.isNotEmpty() && !nearLatest) {
                 GlassSurface(
                     state = hazeState,
                     shape = CircleShape,
@@ -746,7 +751,13 @@ fun LiveChatScreen(
                     GlassIconButton(
                         CodyncIcons.ArrowDown,
                         "Jump to latest",
-                        onClick = { scope.launch { listState.animateScrollToItem(finalListItemIndex.coerceAtLeast(0)) } },
+                        onClick = {
+                            // Scroll to whatever the list currently ends at: the item count can
+                            // change between the tap and the animation, and an out-of-range index
+                            // crashes the lazy list mid-scroll.
+                            val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                            scope.launch { listState.animateScrollToItem(target) }
+                        },
                     )
                 }
             }

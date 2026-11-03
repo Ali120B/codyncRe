@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,7 +57,6 @@ import com.pokai.codync.design.StatusDot
 import com.pokai.codync.design.theme.CodyncTheme
 import com.pokai.codync.design.theme.CodyncType
 import com.pokai.codync.model.Bot
-import com.pokai.codync.model.Computer
 import com.pokai.codync.transport.ConnectionState
 import com.pokai.codync.transport.TransportKind
 import dev.chrisbanes.haze.HazeState
@@ -68,9 +70,12 @@ private enum class HomeFilter(val label: String, val symbol: com.pokai.codync.de
     Hidden("Hidden", CodyncIcons.Hide),
 }
 
+// Kept outside the composable so the roster filters survive tab switches and chat round trips
+// (they reset when the app itself is closed).
 private object HomeFilterState {
     var filter: HomeFilter = HomeFilter.All
     var selectedComputerId: String? = null
+    var collapsedComputers: Set<String> = emptySet()
 }
 
 @Composable
@@ -92,8 +97,10 @@ fun LiveBotsScreen(
     val colors = CodyncTheme.colors
     var filter by remember { mutableStateOf(HomeFilterState.filter) }
     var selectedComputerId by remember { mutableStateOf(HomeFilterState.selectedComputerId) }
+    var collapsedComputers by remember { mutableStateOf(HomeFilterState.collapsedComputers) }
     LaunchedEffect(filter) { HomeFilterState.filter = filter }
     LaunchedEffect(selectedComputerId) { HomeFilterState.selectedComputerId = selectedComputerId }
+    LaunchedEffect(collapsedComputers) { HomeFilterState.collapsedComputers = collapsedComputers }
     var showNewChat by remember { mutableStateOf(false) }
     var createMenuOpen by remember { mutableStateOf(false) }
     var computerMenuOpen by remember { mutableStateOf(false) }
@@ -102,7 +109,11 @@ fun LiveBotsScreen(
     var groupsExpanded by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(computers) {
-        if (selectedComputerId != null && computers.none { it.id == selectedComputerId }) selectedComputerId = null
+        // The computers flow starts empty on every remount, so only drop a selection once the
+        // real roster arrives and that computer is genuinely gone.
+        if (computers.isNotEmpty() && selectedComputerId != null && computers.none { it.id == selectedComputerId }) {
+            selectedComputerId = null
+        }
     }
 
     val scopeId = selectedComputerId
@@ -125,6 +136,24 @@ fun LiveBotsScreen(
         connections[computer.id]?.let { it.kind != TransportKind.Offline && it.hello != null } == true
     }
     val selectedComputer = computers.firstOrNull { it.id == selectedComputerId }
+    // With several computers paired and no single one picked, each computer gets its own
+    // collapsible section; bots and groups stay mixed inside, newest conversation first.
+    val perComputer = selectedComputerId == null && computers.size >= 2
+    val computerSections: List<Pair<String, List<Bot>>> = remember(perComputer, visible, computers, botComputers) {
+        if (!perComputer) emptyList() else {
+            val sections = computers.map { computer ->
+                computer.id to visible
+                    .filter { bot -> botComputers[bot.id] == computer.id }
+                    .sortedByDescending { it.lastAt }
+            }
+            val known = computers.map { it.id }.toSet()
+            val leftovers = visible.filter { botComputers[it.id]?.let { it in known } != true }
+                .sortedByDescending { it.lastAt }
+            (sections + ("__other" to leftovers))
+                .filter { (_, bots) -> bots.isNotEmpty() }
+                .sortedByDescending { (_, bots) -> bots.maxOfOrNull { it.lastAt } ?: 0L }
+        }
+    }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         LargeHeader(
@@ -246,10 +275,35 @@ fun LiveBotsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(start = 16.dp, top = 6.dp, end = 16.dp, bottom = 88.dp),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 6.dp,
+                    end = 16.dp,
+                    // Clear the floating bottom nav plus the system navigation bar.
+                    bottom = 96.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                ),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
-                if (false) {
+                if (perComputer) {
+                    computerSections.forEach { (computerId, bots) ->
+                        val computer = computers.firstOrNull { it.id == computerId }
+                        val expanded = computerId !in collapsedComputers
+                        item(key = "computer_$computerId") {
+                            ComputerSectionHeader(
+                                name = computer?.name ?: "Other computers",
+                                connection = computer?.let { connections[it.id] },
+                                count = bots.size,
+                                expanded = expanded,
+                                onToggle = {
+                                    collapsedComputers =
+                                        if (expanded) collapsedComputers + computerId else collapsedComputers - computerId
+                                },
+                            )
+                        }
+                        if (expanded) {
+                            rosterItems(bots, hostBots, onOpenChat, onOpenBotDetails, keyPrefix = "computer_$computerId")
+                        }
+                    }
                 } else {
                     val groups = visible.filter { it.kind == "group" }.sortedByDescending { it.lastAt }
                     val singles = visible.filter { it.kind != "group" }.sortedByDescending { it.lastAt }
@@ -353,22 +407,37 @@ private fun BotRosterRow(
 }
 
 @Composable
-private fun ComputerGroupHeader(
-    computer: Computer,
+private fun ComputerSectionHeader(
+    name: String,
     connection: ConnectionState?,
-    bots: List<Bot>,
+    count: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit,
 ) {
     val colors = CodyncTheme.colors
     val online = connection != null && connection.kind != TransportKind.Offline && connection.hello != null
     Row(
-        Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 14.dp, bottom = 4.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onToggle)
+            .padding(start = 10.dp, end = 8.dp, top = 12.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StatusDot(if (online) colors.added else colors.tertiary)
         Spacer(Modifier.width(7.dp))
-        Text(computer.name, color = colors.secondary, style = CodyncType.caption.copy(fontWeight = FontWeight.SemiBold))
-        Spacer(Modifier.weight(1f))
-        Text("${bots.size} bots", color = colors.tertiary, style = CodyncType.caption)
+        Text(
+            name,
+            color = colors.secondary,
+            style = CodyncType.caption.copy(fontWeight = FontWeight.SemiBold),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text("$count", color = colors.tertiary, style = CodyncType.caption)
+        Spacer(Modifier.width(6.dp))
+        CodyncIcon(
+            if (expanded) CodyncIcons.ChevronDown else CodyncIcons.ChevronRight,
+            tint = colors.tertiary,
+            size = 14.dp,
+        )
     }
 }
 
