@@ -201,17 +201,20 @@ jobs:
         # notarized release runs instead.
         run: |
           npm ci
+          node tools/account-config.mjs main
+          node tools/native-host.mjs main
+          node tools/native-screen.mjs main
+          npm run build
           if [ -n "$CSC_LINK" ]; then
-            # A certificate without Apple credentials still signs, it just cannot notarize.
             if [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
-              npm run dist:mac:main -- --publish never
+              npx electron-builder --mac --publish never
             else
-              npm run dist:mac:main -- --publish never -c.mac.notarize=false
+              npx electron-builder --mac --publish never -c.mac.notarize=false
             fi
             codesign -d --entitlements - dist/mac-universal/Codync.app | grep -q com.apple.security.device.audio-input ||
               { echo "audio-input entitlement missing"; exit 1; }
           else
-            CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac:main -- --publish never -c.mac.notarize=false
+            CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --publish never -c.mac.notarize=false
           fi
           cd dist
           shasum -a 256 codync-macos.dmg codync-macos.zip > codync-macos.sha256
