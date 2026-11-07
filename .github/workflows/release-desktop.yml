@@ -173,8 +173,12 @@ jobs:
       - name: Generate the Xcode project
         # project.yml is the source of truth for the screen helper's version and build settings.
         run: |
-          command -v xcodegen >/dev/null || brew install xcodegen
+          if ! command -v xcodegen >/dev/null; then
+            brew install xcodegen
+          fi
           xcodegen generate --spec apps/project.yml
+      - name: Install Rosetta (for x86_64 builds on Apple Silicon)
+        run: softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
       - name: Build the speech helper (universal)
         working-directory: apps/desktop/native/speech-macos
         run: |
