@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 if (process.platform !== 'darwin') process.exit(0)
 import { existsSync } from 'node:fs'
 // Validate or find a working DEVELOPER_DIR
-if (!process.env.DEVELOPER_DIR || !existsSync(process.env.DEVELOPER_DIR)) {
+if (!process.env.DEVELOPER_DIR || !existsSync(process.env.DEVELOPER_DIR + '/usr/bin/xcodebuild')) {
   const candidates = [
     '/Applications/Xcode.app/Contents/Developer',
     '/Applications/Xcode_26.0.app/Contents/Developer',
@@ -20,22 +20,16 @@ if (!process.env.DEVELOPER_DIR || !existsSync(process.env.DEVELOPER_DIR)) {
     `${process.env.HOME}/Applications/Xcode.app/Contents/Developer`,
   ]
   for (const candidate of candidates) {
-    if (existsSync(candidate)) { process.env.DEVELOPER_DIR = candidate; break }
+    if (existsSync(candidate + '/usr/bin/xcodebuild')) { process.env.DEVELOPER_DIR = candidate; break }
   }
-  if (!process.env.DEVELOPER_DIR || !existsSync(process.env.DEVELOPER_DIR)) {
+  if (!process.env.DEVELOPER_DIR || !existsSync(process.env.DEVELOPER_DIR + '/usr/bin/xcodebuild')) {
     try {
       const result = execFileSync('xcode-select', ['-p'], { encoding: 'utf8' }).trim()
-      if (existsSync(result)) process.env.DEVELOPER_DIR = result
-    } catch {}
-  }
-  // Fallback: use xcode-select
-  if (!process.env.DEVELOPER_DIR) {
-    try {
-      const result = execFileSync('xcode-select', ['-p'], { encoding: 'utf8' }).trim()
-      if (existsSync(result)) process.env.DEVELOPER_DIR = result
+      if (existsSync(result + '/usr/bin/xcodebuild')) process.env.DEVELOPER_DIR = result
     } catch {}
   }
 }
+
 const env = process.argv[2] ?? 'main'
 if (process.env.DEVELOPER_DIR) {
   process.env.PATH = `${process.env.DEVELOPER_DIR}/usr/bin:${process.env.PATH}`
