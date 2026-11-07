@@ -11,9 +11,8 @@ import { fileURLToPath } from 'node:url'
 
 if (process.platform !== 'darwin') process.exit(0)
 import { existsSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
-if (!process.env.DEVELOPER_DIR) {
-  // Try common Xcode locations on CI runners and local Macs
+// Validate or find a working DEVELOPER_DIR
+if (!process.env.DEVELOPER_DIR || !existsSync(process.env.DEVELOPER_DIR)) {
   const candidates = [
     '/Applications/Xcode.app/Contents/Developer',
     '/Applications/Xcode_26.0.app/Contents/Developer',
@@ -22,6 +21,12 @@ if (!process.env.DEVELOPER_DIR) {
   ]
   for (const candidate of candidates) {
     if (existsSync(candidate)) { process.env.DEVELOPER_DIR = candidate; break }
+  }
+  if (!process.env.DEVELOPER_DIR || !existsSync(process.env.DEVELOPER_DIR)) {
+    try {
+      const result = execFileSync('xcode-select', ['-p'], { encoding: 'utf8' }).trim()
+      if (existsSync(result)) process.env.DEVELOPER_DIR = result
+    } catch {}
   }
   // Fallback: use xcode-select
   if (!process.env.DEVELOPER_DIR) {
