@@ -10,7 +10,16 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 if (process.platform !== 'darwin') process.exit(0)
+import { existsSync } from 'node:fs'
+if (!process.env.DEVELOPER_DIR) {
+  for (const candidate of ['/Applications/Xcode.app/Contents/Developer', `${process.env.HOME}/Applications/Xcode.app/Contents/Developer`]) {
+    if (existsSync(candidate)) { process.env.DEVELOPER_DIR = candidate; break }
+  }
+}
 const env = process.argv[2] ?? 'main'
+if (process.env.DEVELOPER_DIR) {
+  process.env.PATH = `${process.env.DEVELOPER_DIR}/usr/bin:${process.env.PATH}`
+}
 if (!['main', 'dev'].includes(env)) throw new Error(`unknown environment ${env}`)
 const name = env === 'dev' ? 'CodyncDevScreen' : 'CodyncScreen'
 const configuration = env === 'dev' ? 'DevRelease' : 'Release'
