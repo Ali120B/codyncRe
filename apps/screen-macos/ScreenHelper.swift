@@ -26,6 +26,7 @@ final class ScreenHelper {
 
     func start() {
         let captureAtLaunch = CGPreflightScreenCaptureAccess()
+        let inputAtLaunch = AXIsProcessTrusted()
         link.start()
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.sendStatus() }
@@ -39,6 +40,11 @@ final class ScreenHelper {
                 // while we run never shows up here. Ask a fresh process; once it's granted, quit
                 // and let launchd (KeepAlive) start us again with capture working.
                 if !captureAtLaunch, await Self.captureGrantedNow() {
+                    self?.closeAll()
+                    exit(0)
+                }
+                // Accessibility is cached the same way. Exit so launchd restarts us with the grant.
+                if !inputAtLaunch, await Self.inputGrantedNow() {
                     self?.closeAll()
                     exit(0)
                 }
@@ -110,17 +116,20 @@ final class ScreenHelper {
         badge.update(viewers: 0)
     }
 
-    /// Runs this binary with `--probe-capture`: a new process reads the current grant.
-    private static func captureGrantedNow() async -> Bool {
+    /// Runs this binary with `--probe-capture` or `--probe-input`: a new process reads the grant.
+    private static func grantedNow(_ argument: String) async -> Bool {
         guard let exe = Bundle.main.executableURL else { return false }
         let p = Process()
         p.executableURL = exe
-        p.arguments = ["--probe-capture"]
+        p.arguments = [argument]
         return await withCheckedContinuation { c in
             p.terminationHandler = { c.resume(returning: $0.terminationStatus == 0) }
             do { try p.run() } catch { c.resume(returning: false) }
         }
     }
+
+    private static func captureGrantedNow() async -> Bool { await grantedNow("--probe-capture") }
+    private static func inputGrantedNow() async -> Bool { await grantedNow("--probe-input") }
 
     private func display(_ v: Any?) -> CGDirectDisplayID {
         (v as? NSNumber)?.uint32Value ?? CGMainDisplayID()
@@ -158,8 +167,15 @@ enum ScreenHelperMain {
     @MainActor
     static func main() {
         if CommandLine.arguments.contains("--probe-capture") { exit(CGPreflightScreenCaptureAccess() ? 0 : 1) }
+        if CommandLine.arguments.contains("--probe-input") { exit(AXIsProcessTrusted() ? 0 : 1) }
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
+        // Trigger the Screen Recording TCC prompt at launch if needed; running as a
+        // background daemon otherwise never creates the entry System Settings shows.
+        if !CGPreflightScreenCaptureAccess() {
+            app.activate(ignoringOtherApps: true)
+            _ = CGRequestScreenCaptureAccess()
+        }
         let helper = ScreenHelper()
         Self.helper = helper
         helper.start()
