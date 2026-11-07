@@ -172,7 +172,10 @@ jobs:
           workspaces: host
       - name: Generate the Xcode project
         # project.yml is the source of truth for the screen helper's version and build settings.
+        env:
+          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
         run: |
+          export PATH="/Applications/Xcode.app/Contents/Developer/usr/bin:$PATH"
           if ! command -v xcodegen >/dev/null; then
             brew install xcodegen
           fi
@@ -181,7 +184,10 @@ jobs:
         run: softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
       - name: Build the speech helper (universal)
         working-directory: apps/desktop/native/speech-macos
+        env:
+          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
         run: |
+          export PATH="/Applications/Xcode.app/Contents/Developer/usr/bin:$PATH"
           mkdir -p ../../build/native
           swift build -c release --arch arm64
           swift build -c release --arch x86_64
@@ -199,19 +205,25 @@ jobs:
         run: node tools/native-host.mjs main
       - name: Build screen helper (universal)
         working-directory: apps/desktop
-        run: node tools/native-screen.mjs main
+        env:
+          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+        run: |
+          export PATH="/Applications/Xcode.app/Contents/Developer/usr/bin:$PATH"
+          node tools/native-screen.mjs main
       - name: Build renderer
         working-directory: apps/desktop
         run: npm run build
       - name: Package DMG
         working-directory: apps/desktop
         env:
+          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          export PATH="/Applications/Xcode.app/Contents/Developer/usr/bin:$PATH"
           if [ -n "$CSC_LINK" ]; then
             if [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
               npx electron-builder --mac --publish never
