@@ -182,6 +182,7 @@ jobs:
       - name: Build the speech helper (universal)
         working-directory: apps/desktop/native/speech-macos
         run: |
+          mkdir -p ../../build/native
           swift build -c release --arch arm64
           swift build -c release --arch x86_64
           lipo -create .build/arm64-apple-macosx/release/codync-speech .build/x86_64-apple-macosx/release/codync-speech -output ../../build/native/codync-speech
