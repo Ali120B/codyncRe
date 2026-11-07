@@ -11,9 +11,24 @@ import { fileURLToPath } from 'node:url'
 
 if (process.platform !== 'darwin') process.exit(0)
 import { existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 if (!process.env.DEVELOPER_DIR) {
-  for (const candidate of ['/Applications/Xcode.app/Contents/Developer', `${process.env.HOME}/Applications/Xcode.app/Contents/Developer`]) {
+  // Try common Xcode locations on CI runners and local Macs
+  const candidates = [
+    '/Applications/Xcode.app/Contents/Developer',
+    '/Applications/Xcode_26.0.app/Contents/Developer',
+    '/Applications/Xcode_26.1.app/Contents/Developer',
+    `${process.env.HOME}/Applications/Xcode.app/Contents/Developer`,
+  ]
+  for (const candidate of candidates) {
     if (existsSync(candidate)) { process.env.DEVELOPER_DIR = candidate; break }
+  }
+  // Fallback: use xcode-select
+  if (!process.env.DEVELOPER_DIR) {
+    try {
+      const result = execFileSync('xcode-select', ['-p'], { encoding: 'utf8' }).trim()
+      if (existsSync(result)) process.env.DEVELOPER_DIR = result
+    } catch {}
   }
 }
 const env = process.argv[2] ?? 'main'
@@ -39,7 +54,7 @@ const signing = identity
   : ['CODE_SIGN_IDENTITY=-', 'CODE_SIGNING_REQUIRED=NO', 'CODE_SIGNING_ALLOWED=NO']
 execFileSync('xcodebuild', [
   'build', '-project', join(repo, 'apps/Codync.xcodeproj'), '-scheme', env === 'dev' ? 'Screen Dev' : 'Screen', '-configuration', configuration,
-  '-destination', 'generic/platform=macOS', '-derivedDataPath', derived, '-quiet',
+  '-destination', 'generic/platform=macOS', '-derivedDataPath', derived,
   ...signing,
 ], { stdio: 'inherit' })
 const out = join(root, `build/native/${name}.app`)
