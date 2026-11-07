@@ -188,7 +188,22 @@ jobs:
           lipo -create .build/arm64-apple-macosx/release/codync-speech .build/x86_64-apple-macosx/release/codync-speech -output ../../build/native/codync-speech
       - name: Draw the DMG background
         run: swift packaging/dmg/background.swift apps/desktop/build/dmg-background.tiff
-      - name: Build
+      - name: Install dependencies
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Account config
+        working-directory: apps/desktop
+        run: node tools/account-config.mjs main
+      - name: Build native host (universal)
+        working-directory: apps/desktop
+        run: node tools/native-host.mjs main
+      - name: Build screen helper (universal)
+        working-directory: apps/desktop
+        run: node tools/native-screen.mjs main
+      - name: Build renderer
+        working-directory: apps/desktop
+        run: npm run build
+      - name: Package DMG
         working-directory: apps/desktop
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -196,15 +211,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        # Without a Developer ID certificate this fork still produces a DMG, unsigned and not
-        # notarized (Gatekeeper warns on first launch). With CSC_LINK the normal signed and
-        # notarized release runs instead.
         run: |
-          npm ci
-          node tools/account-config.mjs main
-          node tools/native-host.mjs main
-          node tools/native-screen.mjs main
-          npm run build
           if [ -n "$CSC_LINK" ]; then
             if [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
               npx electron-builder --mac --publish never
