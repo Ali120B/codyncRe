@@ -239,6 +239,8 @@ jobs:
               npx electron-builder --mac --publish never -c.mac.notarize=false
           fi
           cd dist
+          # The installer fetches <asset>.sha256 next to each file, like Linux and Windows.
+          for f in codync-macos.dmg codync-macos.zip; do shasum -a 256 "$f" > "$f.sha256"; done
           shasum -a 256 codync-macos.dmg codync-macos.zip > codync-macos.sha256
       - name: Smoke test the bundled host
         working-directory: apps/desktop/dist/mac-universal/Codync.app/Contents/Resources
@@ -255,7 +257,9 @@ jobs:
           name: codync-macos
           path: |
             apps/desktop/dist/codync-macos.dmg
+            apps/desktop/dist/codync-macos.dmg.sha256
             apps/desktop/dist/codync-macos.zip
+            apps/desktop/dist/codync-macos.zip.sha256
             apps/desktop/dist/codync-macos.sha256
             apps/desktop/dist/latest-mac.yml
       - uses: softprops/action-gh-release@v2
@@ -263,7 +267,9 @@ jobs:
         with:
           files: |
             apps/desktop/dist/codync-macos.dmg
+            apps/desktop/dist/codync-macos.dmg.sha256
             apps/desktop/dist/codync-macos.zip
+            apps/desktop/dist/codync-macos.zip.sha256
             apps/desktop/dist/codync-macos.sha256
       # The update feed last, once the packages it points at are downloadable.
       - uses: softprops/action-gh-release@v2
