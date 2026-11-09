@@ -233,7 +233,10 @@ jobs:
             codesign -d --entitlements - dist/mac-universal/Codync.app | grep -q com.apple.security.device.audio-input ||
               { echo "audio-input entitlement missing"; exit 1; }
           else
-            CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --publish never -c.mac.notarize=false
+            # An empty CSC_LINK (no signing secret) is treated as a certificate path by
+            # electron-builder, which then tries to import the project directory and fails.
+            env -u CSC_LINK -u CSC_KEY_PASSWORD CSC_IDENTITY_AUTO_DISCOVERY=false \
+              npx electron-builder --mac --publish never -c.mac.notarize=false
           fi
           cd dist
           shasum -a 256 codync-macos.dmg codync-macos.zip > codync-macos.sha256
