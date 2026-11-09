@@ -5,7 +5,7 @@
 // The cua-driver the Xcode target embeds keeps its own signature (never sign with --deep). Without
 // it the app registers a launch agent pointing at a missing helper and Remote screen never starts.
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdirSync, rmSync } from 'node:fs'
+import { cpSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -61,7 +61,29 @@ mkdirSync(dirname(out), { recursive: true })
 rmSync(out, { recursive: true, force: true })
 cpSync(join(derived, `Build/Products/${configuration}/${name}.app`), out, { recursive: true, verbatimSymlinks: true })
 // Xcode already signed it with the stable identity when one was given. Unsigned CI builds get an
-// ad-hoc signature so a local run works; electron-builder re-signs them for distribution. No
-// --deep: the cua-driver keeps its maker's signature.
-if (!identity) execFileSync('codesign', ['--force', '--sign', '-', out], { stdio: 'inherit' })
+// ad-hoc signature so a local run works; electron-builder re-signs them for distribution. Xcode
+// leaves the embedded WebRTC framework unsigned when signing is off, and codesign refuses to seal
+// an app around unsigned nested code, so sign bundles and dylibs first (deepest first). No --deep:
+// the cua-driver keeps its maker's signature, so skip it.
+if (!identity) {
+  const sign = (path) => execFileSync('codesign', ['--force', '--sign', '-', path], { stdio: 'inherit' })
+  const nested = []
+  const collect = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (entry.name.endsWith('.framework') || entry.name.endsWith('.app')) nested.push(path)
+        collect(path)
+      } else if (entry.name.endsWith('.dylib')) {
+        nested.push(path)
+      }
+    }
+  }
+  collect(out)
+  nested
+    .filter((path) => !path.includes('cua-driver'))
+    .sort((a, b) => b.split('/').length - a.split('/').length)
+    .forEach(sign)
+  sign(out)
+}
 console.log(`screen: built (${identity ?? 'ad-hoc'})`)
